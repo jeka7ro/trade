@@ -1,0 +1,3331 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradePro AI — Analiză & Forecast</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+/* ═══════════════════════════════════════════════
+   THEME TOKENS
+═══════════════════════════════════════════════ */
+:root {
+  --bg:      #f0f3fa;
+  --bg2:     #ffffff;
+  --bg3:     #e8ecf5;
+  --bg4:     #dde2ef;
+  --border:  #dde2ef;
+  --accent:  #2962ff;
+  --accent2: #1e53e5;
+  --green:   #089981;
+  --red:     #f23645;
+  --yellow:  #e0a800;
+  --purple:  #7c3aed;
+  --teal:    #0097a7;
+  --text:    #131722;
+  --text2:   #787b86;
+  --text3:   #4c5057;
+  --shadow:  rgba(0,0,0,.07);
+  --chart-bg:#ffffff;
+  --chart-grid:#f0f3fa;
+}
+[data-theme="dark"] {
+  --bg:      #131722;
+  --bg2:     #1e222d;
+  --bg3:     #2a2e39;
+  --bg4:     #363c4e;
+  --border:  #2a2e39;
+  --green:   #26a69a;
+  --red:     #ef5350;
+  --yellow:  #f0b90b;
+  --text:    #d1d4dc;
+  --text2:   #787b86;
+  --text3:   #9598a1;
+  --shadow:  rgba(0,0,0,.3);
+  --chart-bg:#131722;
+  --chart-grid:#1e222d;
+}
+
+/* ═══════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;overflow:hidden;height:100vh;display:flex;flex-direction:column;transition:background .2s,color .2s;}
+
+/* ═══════════════════════════════════════════════
+   TOP BAR
+═══════════════════════════════════════════════ */
+#topbar{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:0 12px;height:50px;flex-shrink:0;
+  box-shadow:0 1px 4px var(--shadow);
+}
+#logo{font-size:17px;font-weight:800;color:var(--accent);letter-spacing:-0.5px;white-space:nowrap;padding-right:4px;}
+#logo em{color:var(--yellow);font-style:normal;}
+#logo sup{font-size:9px;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;padding:1px 5px;border-radius:8px;font-weight:700;vertical-align:super;}
+
+.search-wrap{position:relative;flex:0 0 230px;}
+#symbolInput{
+  width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:7px;
+  color:var(--text);font-size:14px;font-weight:700;padding:7px 10px 7px 32px;
+  outline:none;transition:border-color .2s,background .2s;
+}
+#symbolInput:focus{border-color:var(--accent);background:var(--bg2);}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;}
+
+#searchBtn{
+  background:var(--accent);color:#fff;border:none;border-radius:7px;
+  padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;
+  transition:background .15s,transform .1s;white-space:nowrap;
+}
+#searchBtn:hover{background:var(--accent2);}
+#searchBtn:active{transform:scale(.97);}
+
+.sep{width:1px;height:28px;background:var(--border);margin:0 2px;flex-shrink:0;}
+
+.tf-group{display:flex;gap:2px;background:var(--bg3);border-radius:7px;padding:3px;}
+.tf-btn{
+  background:transparent;color:var(--text2);border:none;border-radius:5px;
+  padding:4px 9px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.tf-btn:hover{color:var(--text);}
+.tf-btn.active{background:var(--accent);color:#fff;box-shadow:0 2px 6px rgba(41,98,255,.35);}
+
+.ind-group{display:flex;gap:3px;flex-wrap:nowrap;}
+.ind-btn{
+  background:var(--bg3);color:var(--text2);border:1.5px solid var(--border);border-radius:5px;
+  padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.ind-btn:hover{color:var(--text);border-color:var(--text2);}
+.ind-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 1px 4px rgba(41,98,255,.3);}
+
+#themeBtn{
+  background:var(--bg3);border:1.5px solid var(--border);color:var(--text2);
+  border-radius:7px;padding:5px 10px;font-size:14px;cursor:pointer;
+  transition:all .2s;margin-left:2px;
+}
+#themeBtn:hover{color:var(--text);border-color:var(--text2);}
+
+#priceInfo{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+#curSymbol{font-size:15px;font-weight:800;color:var(--text);}
+#curPrice{font-size:19px;font-weight:800;color:var(--text);}
+#curChange{font-size:12px;font-weight:700;padding:3px 9px;border-radius:5px;}
+#curChange.up{background:rgba(8,153,129,.12);color:var(--green);}
+#curChange.dn{background:rgba(242,54,69,.12);color:var(--red);}
+
+/* ── AUTOCOMPLETE ── */
+.autocomplete-items {
+  position: absolute;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-top: none;
+  z-index: 9999;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: var(--bg2);
+  max-height: 250px;
+  overflow-y: auto;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.6);
+}
+.autocomplete-items div {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.autocomplete-items div:hover {
+  background-color: var(--bg3);
+}
+.autocomplete-symbol {
+  font-weight: 800;
+  color: var(--text);
+}
+.autocomplete-name {
+  font-size: 11px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 65%;
+  text-align: right;
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN LAYOUT
+═══════════════════════════════════════════════ */
+#main{display:flex;flex:1;overflow:hidden;}
+
+/* ── SIDEBAR ── */
+#sidebar{
+  width:50px;background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;flex-shrink:0;
+}
+.tool-btn{
+  width:34px;height:34px;background:transparent;border:none;color:var(--text2);
+  border-radius:7px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;position:relative;
+}
+.tool-btn:hover{background:var(--bg3);color:var(--text);}
+.tool-btn.active{background:var(--accent);color:#fff;}
+.tool-btn[title]:hover::after{
+  content:attr(title);position:absolute;left:42px;top:50%;transform:translateY(-50%);
+  background:var(--bg4);color:var(--text);padding:4px 8px;border-radius:5px;white-space:nowrap;
+  font-size:11px;z-index:200;border:1px solid var(--border);box-shadow:0 2px 8px var(--shadow);
+}
+.sidebar-sep{width:26px;height:1px;background:var(--border);margin:3px 0;}
+
+/* ── CHART AREA ── */
+#chartArea{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;min-width:0;}
+#chartMain{flex:1;position:relative;min-height:0;}
+#chartCanvas{width:100%;height:100%;}
+
+#chartRSI{height:115px;flex-shrink:0;position:relative;border-top:1px solid var(--border);}
+#rsiCanvas{width:100%;height:100%;}
+#rsiLabel{position:absolute;top:4px;left:10px;font-size:11px;color:var(--text2);font-weight:700;z-index:10;display:flex;gap:8px;}
+
+#chartMACD{height:105px;flex-shrink:0;position:relative;border-top:1px solid var(--border);}
+#macdCanvas{width:100%;height:100%;}
+#macdLabel{position:absolute;top:4px;left:10px;font-size:11px;color:var(--text2);font-weight:700;z-index:10;display:flex;gap:8px;}
+
+/* ── RIGHT PANEL ── */
+#rightPanel{
+  width:290px;background:var(--bg2);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;
+}
+/* Tabs */
+#panelTabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ptab{
+  flex:1;padding:10px 4px;text-align:center;font-size:11px;font-weight:700;
+  color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.ptab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.ptab:hover{color:var(--text);}
+.panel-page{display:none;flex-direction:column;}
+.panel-page.active{display:flex;}
+
+.panel-section{border-bottom:1px solid var(--border);padding:12px;}
+.panel-title{font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+
+.stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.stat-label{color:var(--text2);font-size:12px;}
+.stat-val{font-size:12px;font-weight:700;}
+.stat-val.green{color:var(--green);} .stat-val.red{color:var(--red);} .stat-val.yellow{color:var(--yellow);}
+
+/* Gauge */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px;}
+#gaugeCanvas{width:170px;height:96px;}
+.gauge-label{font-size:13px;font-weight:800;margin-top:2px;}
+.gauge-sub{font-size:10px;color:var(--text2);margin-top:1px;}
+.score-bars{display:flex;gap:3px;margin-top:8px;justify-content:center;}
+.score-bar{height:6px;width:18px;border-radius:3px;background:var(--bg3);}
+.score-bar.bull{background:var(--green);}
+.score-bar.bear{background:var(--red);}
+.score-bar.neut{background:var(--yellow);}
+
+/* Key Levels */
+.level-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+.level-item:last-child{border:none;}
+.level-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;}
+.level-badge.res{background:rgba(242,54,69,.12);color:var(--red);}
+.level-badge.sup{background:rgba(8,153,129,.12);color:var(--green);}
+.level-price{font-size:13px;font-weight:800;}
+.level-dist{font-size:10px;color:var(--text2);}
+
+/* AI Signals */
+.ai-signal{background:var(--bg3);border-radius:8px;padding:11px;margin-bottom:8px;border:1px solid var(--border);}
+.signal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.signal-name{font-size:11px;font-weight:700;color:var(--text);}
+.signal-badge{font-size:10px;font-weight:800;padding:2px 9px;border-radius:10px;}
+.signal-badge.bull{background:rgba(8,153,129,.15);color:var(--green);}
+.signal-badge.bear{background:rgba(242,54,69,.15);color:var(--red);}
+.signal-badge.neut{background:rgba(120,123,134,.15);color:var(--text2);}
+.signal-desc{font-size:11px;color:var(--text2);line-height:1.55;}
+
+/* ── FORECAST PANEL ── */
+.forecast-header{
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  padding:14px 12px;color:#fff;flex-shrink:0;
+}
+.forecast-header h3{font-size:13px;font-weight:800;margin-bottom:2px;}
+.forecast-header p{font-size:11px;opacity:.8;}
+
+.fc-targets{display:flex;gap:6px;padding:12px;flex-shrink:0;}
+.fc-target{
+  flex:1;background:var(--bg3);border-radius:8px;padding:10px 8px;
+  text-align:center;border:1.5px solid var(--border);transition:border-color .15s;
+}
+.fc-target:hover{border-color:var(--accent);}
+.fc-target-label{font-size:9px;font-weight:800;text-transform:uppercase;color:var(--text2);letter-spacing:.5px;margin-bottom:4px;}
+.fc-target-price{font-size:14px;font-weight:800;}
+.fc-target-pct{font-size:10px;font-weight:700;margin-top:2px;}
+.fc-target.bull-t .fc-target-price{color:var(--green);}
+.fc-target.bull-t .fc-target-pct{color:var(--green);}
+.fc-target.base-t .fc-target-price{color:var(--yellow);}
+.fc-target.base-t .fc-target-pct{color:var(--yellow);}
+.fc-target.bear-t .fc-target-price{color:var(--red);}
+.fc-target.bear-t .fc-target-pct{color:var(--red);}
+
+.fc-horizon{display:flex;gap:4px;padding:0 12px 10px;flex-shrink:0;}
+.fc-h-btn{
+  flex:1;background:var(--bg3);border:1.5px solid var(--border);border-radius:6px;
+  color:var(--text2);font-size:11px;font-weight:700;padding:5px 4px;cursor:pointer;
+  text-align:center;transition:all .15s;
+}
+.fc-h-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.fc-h-btn:hover:not(.active){color:var(--text);}
+
+/* Forecast confidence bar */
+.fc-conf{padding:0 12px 12px;}
+.fc-conf-label{font-size:10px;color:var(--text2);font-weight:700;margin-bottom:5px;display:flex;justify-content:space-between;}
+.fc-conf-bar{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;}
+.fc-conf-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .5s;}
+
+/* Pattern cards */
+.pattern-card{
+  background:var(--bg3);border-radius:8px;padding:10px 11px;margin-bottom:6px;
+  border-left:3px solid var(--accent);display:flex;align-items:center;gap:10px;
+}
+.pattern-icon{font-size:22px;flex-shrink:0;}
+.pattern-info .pattern-name{font-size:12px;font-weight:800;color:var(--text);}
+.pattern-info .pattern-desc{font-size:10px;color:var(--text2);margin-top:2px;line-height:1.4;}
+.pattern-signal{font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;flex-shrink:0;}
+.pattern-signal.bull{background:rgba(8,153,129,.15);color:var(--green);}
+.pattern-signal.bear{background:rgba(242,54,69,.15);color:var(--red);}
+.pattern-signal.neut{background:rgba(120,123,134,.15);color:var(--text2);}
+
+/* Forecast chart area */
+.fc-chart-wrap{padding:0 12px 12px;}
+.fc-chart-title{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--text2);letter-spacing:.6px;margin-bottom:6px;}
+#fcMiniChart{width:100%;height:120px;background:var(--bg3);border-radius:8px;position:relative;overflow:hidden;}
+
+/* Watchlist */
+.wl-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;cursor:pointer;transition:background .15s;
+  border-bottom:1px solid var(--border);
+}
+.wl-item:hover{background:var(--bg3);}
+.wl-item.active{background:rgba(41,98,255,.08);border-left:2px solid var(--accent);}
+.wl-sym{font-size:13px;font-weight:800;}
+.wl-name{font-size:10px;color:var(--text2);}
+.wl-price{text-align:right;}
+.wl-p{font-size:13px;font-weight:700;}
+.wl-chg{font-size:10px;font-weight:700;}
+.up{color:var(--green);} .dn{color:var(--red);}
+
+/* Crosshair info */
+#crosshairInfo{
+  position:absolute;top:8px;left:60px;z-index:20;
+  display:flex;gap:14px;font-size:12px;pointer-events:none;
+  background:var(--bg2);padding:4px 10px;border-radius:6px;
+  border:1px solid var(--border);opacity:.95;
+}
+.chi{color:var(--text2);}
+.chi span{color:var(--text);font-weight:700;}
+
+/* Loading */
+#loadOverlay{
+  position:absolute;bottom:20px;left:20px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+  display:flex;flex-direction:row;align-items:center;justify-content:center;z-index:50;padding:6px 16px;gap:10px;box-shadow:var(--shadow);
+}
+[data-theme="dark"] #loadOverlay{background:var(--bg2);}
+.spinner{width:34px;height:34px;border:3px solid var(--bg3);border-top-color:var(--accent);border-radius:50%;animation:spin .65s linear infinite;margin:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loadText{color:var(--text2);font-size:12px;font-weight:600;}
+
+/* Resize handles */
+.resize-handle{height:3px;background:var(--border);cursor:ns-resize;flex-shrink:0;transition:background .15s;}
+.resize-handle:hover{background:var(--accent);}
+
+/* ── MARKET STATUS BAR ── */
+#marketStatusBar{
+  display:flex;align-items:center;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:4px 14px;font-size:11px;flex-shrink:0;
+  box-shadow:0 1px 3px var(--shadow);min-height:24px;
+}
+
+/* ── LIVE ANIMATIONS ── */
+@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(8,153,129,.6)}50%{box-shadow:0 0 0 4px rgba(8,153,129,0)}}
+@keyframes pulse-yellow{0%,100%{box-shadow:0 0 0 0 rgba(224,168,0,.6)}50%{box-shadow:0 0 0 4px rgba(224,168,0,0)}}
+@keyframes flash-up{0%{background:rgba(8,153,129,.25)}100%{background:transparent}}
+@keyframes flash-dn{0%{background:rgba(242,54,69,.25)}100%{background:transparent}}
+@keyframes countup{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.flash-up{animation:flash-up .6s ease forwards;}
+.flash-dn{animation:flash-dn .6s ease forwards;}
+.countup{animation:countup .3s ease forwards;}
+
+/* Live clock */
+#liveClock{font-size:11px;color:var(--text2);margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600;}
+
+/* Price flash */
+#curPrice{transition:color .3s;}
+.price-up{color:var(--green) !important;}
+.price-dn{color:var(--red)   !important;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px;}
+
+/* ── FIBONACCI PANEL ── */
+.fib-header{
+  background:linear-gradient(135deg,#e0a800,#f59e0b);
+  padding:14px 12px;color:#fff;flex-shrink:0;
+}
+.fib-header h3{font-size:13px;font-weight:800;margin-bottom:2px;}
+.fib-header p{font-size:11px;opacity:.85;}
+
+.fib-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);}
+.fib-toggle-label{font-size:12px;font-weight:700;color:var(--text);}
+.toggle-switch{position:relative;width:36px;height:20px;cursor:pointer;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-track{position:absolute;inset:0;background:var(--bg4);border-radius:10px;transition:.2s;}
+.toggle-switch input:checked + .toggle-track{background:var(--yellow);}
+.toggle-thumb{position:absolute;left:3px;top:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:.2s;}
+.toggle-switch input:checked ~ .toggle-thumb{left:19px;}
+
+.fib-swing-info{padding:10px 12px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.fib-swing-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.fib-swing-label{font-size:11px;color:var(--text2);font-weight:600;}
+.fib-swing-val{font-size:12px;font-weight:800;}
+
+.fib-levels-table{width:100%;border-collapse:collapse;}
+.fib-levels-table th{font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;padding:5px 10px;border-bottom:2px solid var(--border);text-align:left;}
+.fib-levels-table td{padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;transition:background .1s;}
+.fib-levels-table tr:last-child td{border:none;}
+.fib-level-row.current-zone td{background:rgba(224,168,0,.12);font-weight:800;}
+.fib-level-row.current-zone td .fib-ratio{color:var(--yellow);}
+.fib-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}
+.fib-ratio{font-weight:800;font-size:12px;}
+.fib-price{font-size:12px;font-weight:700;}
+.fib-dist{font-size:10px;color:var(--text2);}
+.fib-type{font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;}
+.fib-type.sup{background:rgba(8,153,129,.12);color:var(--green);}
+.fib-type.res{background:rgba(242,54,69,.12);color:var(--red);}
+.fib-type.cur{background:rgba(224,168,0,.15);color:var(--yellow);}
+
+.fib-recommendation{
+  margin:12px;background:var(--bg3);border-radius:10px;padding:14px;
+  border:1.5px solid var(--border);
+}
+.fib-rec-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.fib-rec-icon{font-size:22px;}
+.fib-rec-title{font-size:13px;font-weight:800;color:var(--text);}
+.fib-rec-badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;margin-left:auto;}
+.fib-rec-badge.bull{background:rgba(8,153,129,.15);color:var(--green);}
+.fib-rec-badge.bear{background:rgba(242,54,69,.15);color:var(--red);}
+.fib-rec-badge.neut{background:rgba(120,123,134,.15);color:var(--text2);}
+.fib-rec-text{font-size:11px;color:var(--text2);line-height:1.6;}
+.fib-rec-targets{display:flex;gap:6px;margin-top:10px;}
+.fib-rec-target{flex:1;background:var(--bg4);border-radius:6px;padding:7px;text-align:center;}
+.fib-rec-target .label{font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase;margin-bottom:2px;}
+.fib-rec-target .val{font-size:12px;font-weight:800;}
+
+.fib-lookback-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);}
+.fib-lookback-label{font-size:11px;color:var(--text2);}
+.fib-lookback-select{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 6px;font-size:11px;font-weight:600;cursor:pointer;}
+
+/* AI Forecast score ring */
+.ring-wrap{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:10px;margin-bottom:10px;}
+.ring-canvas-wrap{position:relative;flex-shrink:0;}
+.ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;}
+.ring-info .ring-title{font-size:13px;font-weight:800;color:var(--text);}
+.ring-info .ring-sub{font-size:11px;color:var(--text2);margin-top:3px;line-height:1.4;}
+
+/* Forecast table */
+.fc-table{width:100%;border-collapse:collapse;font-size:11px;}
+.fc-table th{color:var(--text2);font-weight:700;padding:4px 6px;border-bottom:1px solid var(--border);text-align:left;font-size:10px;}
+.fc-table td{padding:6px 6px;border-bottom:1px solid var(--border);font-weight:600;}
+.fc-table tr:last-child td{border:none;}
+.fc-table .bull{color:var(--green);} .fc-table .bear{color:var(--red);}
+
+/* News/sentiment pills */
+.sent-pills{display:flex;flex-wrap:wrap;gap:4px;padding:10px 12px;}
+.sent-pill{font-size:10px;font-weight:700;padding:3px 9px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);}
+.sent-pill.pos{border-color:var(--green);color:var(--green);background:rgba(8,153,129,.08);}
+.sent-pill.neg{border-color:var(--red);color:var(--red);background:rgba(242,54,69,.08);}
+.sent-pill.neu{color:var(--text2);}
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 768px) {
+  #appContainer { flex-direction: column; height: auto; min-height: 100vh; }
+  #leftPanel { width: 100%; height: 50vh; border-right: none; border-bottom: 1px solid var(--border); }
+  #rightPanel { width: 100%; height: 50vh; }
+  .top-bar { flex-direction: column; gap: 10px; height: auto; padding: 10px; }
+  .tb-controls { flex-wrap: wrap; justify-content: center; width: 100%; }
+  #signalPopup { 
+    top: auto !important; bottom: 10px !important; right: 10px !important; left: 10px !important; 
+    width: auto !important; z-index: 9999;
+  }
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="logo">Trade<em>Pro</em> <sup>AI</sup></div>
+
+  <div class="search-wrap" style="min-width:140px;max-width:200px;">
+    <span class="search-icon">⌕</span>
+    <input id="symbolInput" type="text" placeholder="Simbol... (Enter pentru căutare)" autocomplete="off" style="width:100%;" title="Scrie simbolul si apasă Enter sau alege din lista"/>
+  </div>
+  <button id="signalBtn" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);margin-left:4px;padding:0 10px;border-radius:8px;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;" onclick="forceShowSignal()" title="Semnal AI">Semnal AI</button>
+  <button id="deepForecastBtn" style="background:linear-gradient(45deg, #7b1fa2, #4a148c);border:1px solid rgba(255,255,255,0.2);color:#fff;margin-left:4px;padding:0 10px;border-radius:8px;font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;box-shadow:0 0 8px rgba(123,31,162,0.4);" onclick="openDeepForecastModal()" title="Deep Forecast">Forecast Avansat</button>
+  <div class="sep"></div>
+
+  <div class="tf-group" style="gap:1px;">
+    <button class="tf-btn" data-tf="5m">5m</button>
+    <button class="tf-btn" data-tf="15m">15m</button>
+    <button class="tf-btn" data-tf="30m">30m</button>
+    <button class="tf-btn" data-tf="1h">1h</button>
+    <button class="tf-btn" data-tf="4h">4h</button>
+    <button class="tf-btn active" data-tf="1d">1 Zi</button>
+    <button class="tf-btn" data-tf="1wk">1 Sapt</button>
+    <button class="tf-btn" data-tf="1mo">1 Luna</button>
+  </div>
+  <div class="sep"></div>
+
+  <div class="ind-group" style="gap:1px;">
+    <button class="ind-btn active" data-ind="ma">MA</button>
+    <button class="ind-btn active" data-ind="bb">Benz</button>
+    <button class="ind-btn active" data-ind="vol">Volum</button>
+    <button class="ind-btn active" data-ind="rsi">RSI</button>
+    <button class="ind-btn active" data-ind="macd">MACD</button>
+    <button class="ind-btn" data-ind="ema">EMA21</button>
+    <button class="ind-btn" data-ind="vwap">VWAP</button>
+    <button class="ind-btn active" data-ind="forecast">Prognoze</button>
+  </div>
+  <div class="sep"></div>
+
+  <button id="themeBtn" title="Schimbă tema" style="padding:0 6px;font-size:13px;flex-shrink:0;">☀️</button>
+
+  <div id="priceInfo" style="flex-shrink:0;">
+    <div style="display:flex;flex-direction:column;justify-content:center;">
+      <span id="curSymbol" style="font-size:14px;font-weight:800;line-height:1.2;">---</span>
+      <span id="curCompanyName" style="font-size:10px;color:var(--text2);font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">---</span>
+    </div>
+    <span id="curPrice">—</span>
+    <span id="curChange" class="up">—</span>
+    <!-- Extended hours card — apare doar în pre/after market -->
+    <div id="extHoursCard" style="display:none;background:rgba(224,168,0,.1);border:1.5px solid rgba(224,168,0,.4);border-radius:7px;padding:4px 10px;margin-left:4px;">
+      <div style="font-size:9px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;" id="extHoursLabel">PRE-MARKET</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:1px;">
+        <span style="font-size:15px;font-weight:800;" id="extHoursPrice">—</span>
+        <span style="font-size:11px;font-weight:700;" id="extHoursChange">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="marketStatusBar">
+  Se calculează statusul pieței…
+  <span id="liveClock"></span>
+  <span style="margin-left:12px;display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);">
+    <span id="liveUpdateDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.3;transition:opacity .2s;"></span>
+    <span style="font-weight:700;color:var(--accent);">LIVE 10s</span>
+  </span>
+</div>
+
+<!-- ══════════ MAIN ══════════ -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <button class="tool-btn active" id="toolCursor"  title="Cursor" onclick="setTool('cursor')">↖</button>
+    <button class="tool-btn"        id="toolTrend"   title="Linie Trend" onclick="setTool('trend')">╱</button>
+    <button class="tool-btn"        id="toolHline"   title="Linie Orizontală" onclick="setTool('hline')">—</button>
+    <button class="tool-btn"        id="toolVline"   title="Linie Verticală" onclick="setTool('vline')">│</button>
+    <button class="tool-btn"        id="toolRect"    title="Dreptunghi" onclick="setTool('rect')">□</button>
+    <button class="tool-btn active"  id="toolFib"     title="Fibonacci Auto" onclick="openFibPanel()">Φ</button>
+    <div class="sidebar-sep"></div>
+    <button class="tool-btn" title="Undo" onclick="undoDrawing()">↩</button>
+    <button class="tool-btn" title="Șterge tot" onclick="clearDrawings()">🗑</button>
+    <div class="sidebar-sep"></div>
+    <button class="tool-btn" title="Fullscreen" onclick="toggleFS()">⛶</button>
+  </div>
+
+  <!-- CHART AREA -->
+  <div id="chartArea">
+    <div id="chartMain">
+      <div id="chartCanvas"></div>
+      <div id="crosshairInfo"></div>
+      <div id="loadOverlay">
+        <div class="spinner"></div>
+        <div id="loadText">Se încarcă datele…</div>
+      </div>
+    </div>
+    <div class="resize-handle" id="rsiHandle"></div>
+    <div id="chartRSI" style="display:none">
+      <div id="rsiLabel">RSI(14) <span id="rsiVal" style="color:var(--purple)">—</span></div>
+      <div id="rsiCanvas"></div>
+    </div>
+    <div class="resize-handle" id="macdHandle" style="display:none"></div>
+    <div id="chartMACD" style="display:none">
+      <div id="macdLabel">MACD <span id="macdVal" style="color:var(--accent)">—</span></div>
+      <div id="macdCanvas"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="rightPanel">
+    <!-- Tabs -->
+    <div id="panelTabs">
+      <div class="ptab" data-page="analysis">📊</div>
+      <div class="ptab" data-page="fibonacci">Φ Fib</div>
+      <div class="ptab" data-page="forecast">🔮</div>
+      <div class="ptab active" data-page="watchlist">👁 Watchlist</div>
+    </div>
+
+    <!-- ── PAGE: ANALYSIS ── -->
+    <div class="panel-page" id="page-analysis">
+      <div class="panel-section">
+        <div class="panel-title">Informații Preț</div>
+        <div class="stat-row"><span class="stat-label">Deschidere</span><span class="stat-val" id="statO">—</span></div>
+        <div class="stat-row"><span class="stat-label">Maxim</span><span class="stat-val green" id="statH">—</span></div>
+        <div class="stat-row"><span class="stat-label">Minim</span><span class="stat-val red" id="statL">—</span></div>
+        <div class="stat-row"><span class="stat-label">Închidere</span><span class="stat-val" id="statC">—</span></div>
+        <div class="stat-row"><span class="stat-label">Volum</span><span class="stat-val yellow" id="statV">—</span></div>
+        <div class="stat-row"><span class="stat-label">Variație zi</span><span class="stat-val" id="stat24h">—</span></div>
+        <!-- Extended hours rows — vizibile doar când e pre/after -->
+        <div id="statPreRow" class="stat-row" style="display:none;">
+          <span class="stat-label" style="color:var(--yellow);">🌅 Pre-Market</span>
+          <span class="stat-val yellow" id="statPre">—</span>
+        </div>
+        <div id="statPostRow" class="stat-row" style="display:none;">
+          <span class="stat-label" style="color:var(--yellow);">🌆 After-Hours</span>
+          <span class="stat-val yellow" id="statPost">—</span>
+        </div>
+        <div id="statExtChgRow" class="stat-row" style="display:none;">
+          <span class="stat-label" id="statExtChgLabel" style="color:var(--yellow);"></span>
+          <span class="stat-val" id="statExtChg">—</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Semnal Global</div>
+        <div class="gauge-wrap">
+          <canvas id="gaugeCanvas" width="170" height="96"></canvas>
+          <div class="gauge-label" id="gaugeLabel">—</div>
+          <div class="gauge-sub" id="gaugeSub">—</div>
+        </div>
+        <div class="score-bars" id="scoreBars"></div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Niveluri Cheie</div>
+        <div id="keyLevels"></div>
+      </div>
+
+      <div style="padding:12px;flex:1;">
+        <div class="panel-title">Semnale Tehnice AI</div>
+        <div id="aiSignals"></div>
+      </div>
+    </div>
+
+    <!-- ── PAGE: FIBONACCI ── -->
+    <div class="panel-page" id="page-fibonacci">
+      <div class="fib-header">
+        <h3>Φ Fibonacci Automat</h3>
+        <p>Auto-detecție swing · Niveluri cheie · Recomandări AI</p>
+      </div>
+
+      <div class="fib-toggle-row">
+        <span class="fib-toggle-label">Afișează pe grafic</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="fibToggle" checked onchange="onFibToggle()">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+
+      <div class="fib-lookback-row">
+        <span class="fib-lookback-label">Lookback:</span>
+        <select class="fib-lookback-select" id="fibLookback" onchange="onFibLookbackChange()">
+          <option value="30">30 bare</option>
+          <option value="60" selected>60 bare</option>
+          <option value="100">100 bare</option>
+          <option value="200">200 bare</option>
+        </select>
+        <span class="fib-lookback-label" style="margin-left:auto;cursor:pointer;color:var(--accent);font-weight:700;" onclick="if(allData.length) renderFibonacci(allData);">↻ Recalcul</span>
+      </div>
+
+      <!-- Swing info -->
+      <div class="fib-swing-info" id="fibSwingInfo">
+        <div class="fib-swing-row">
+          <span class="fib-swing-label">📈 Swing High</span>
+          <span class="fib-swing-val green" id="fibSwingHigh">—</span>
+        </div>
+        <div class="fib-swing-row">
+          <span class="fib-swing-label">📉 Swing Low</span>
+          <span class="fib-swing-val red" id="fibSwingLow">—</span>
+        </div>
+        <div class="fib-swing-row" style="margin:0">
+          <span class="fib-swing-label">📏 Amplitudine</span>
+          <span class="fib-swing-val yellow" id="fibAmplitude">—</span>
+        </div>
+      </div>
+
+      <!-- Recommendation box -->
+      <div class="fib-recommendation" id="fibRecommendation"></div>
+
+      <!-- Levels table -->
+      <div style="padding:0 12px 8px;">
+        <div class="panel-title" style="padding-top:8px;">Niveluri Fibonacci</div>
+        <table class="fib-levels-table">
+          <thead>
+            <tr>
+              <th>Nivel</th>
+              <th>Preț</th>
+              <th>Dist.</th>
+              <th>Tip</th>
+            </tr>
+          </thead>
+          <tbody id="fibTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Extended levels -->
+      <div style="padding:0 12px 12px;">
+        <div class="panel-title">Extensii Fibonacci</div>
+        <table class="fib-levels-table">
+          <thead><tr><th>Nivel</th><th>Preț</th><th>Dist.</th><th></th></tr></thead>
+          <tbody id="fibExtBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── PAGE: FORECAST ── -->
+    <div class="panel-page" id="page-forecast">
+      <div class="forecast-header">
+        <h3>🔮 AI Price Forecast</h3>
+        <p>Regresie liniară · Momentum · Pattern · Volatilitate</p>
+      </div>
+
+      <!-- Horizon selector -->
+      <div class="fc-horizon" style="padding-top:10px;">
+        <div class="fc-h-btn active" data-h="7">7 Zile</div>
+        <div class="fc-h-btn" data-h="14">14 Zile</div>
+        <div class="fc-h-btn" data-h="30">30 Zile</div>
+        <div class="fc-h-btn" data-h="90">90 Zile</div>
+      </div>
+
+      <!-- Score ring + desc -->
+      <div style="padding:0 12px 8px;">
+        <div class="ring-wrap">
+          <div class="ring-canvas-wrap">
+            <canvas id="ringCanvas" width="60" height="60"></canvas>
+            <div class="ring-center" id="ringPct">—</div>
+          </div>
+          <div class="ring-info">
+            <div class="ring-title" id="fcDirection">—</div>
+            <div class="ring-sub" id="fcSummary">Calculez forecast…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Price targets -->
+      <div class="fc-targets" id="fcTargets">
+        <div class="fc-target bull-t">
+          <div class="fc-target-label">📈 Optimist</div>
+          <div class="fc-target-price" id="fcBull">—</div>
+          <div class="fc-target-pct" id="fcBullPct">—</div>
+        </div>
+        <div class="fc-target base-t">
+          <div class="fc-target-label">⚖️ Mediu</div>
+          <div class="fc-target-price" id="fcBase">—</div>
+          <div class="fc-target-pct" id="fcBasePct">—</div>
+        </div>
+        <div class="fc-target bear-t">
+          <div class="fc-target-label">📉 Pesimist</div>
+          <div class="fc-target-price" id="fcBear">—</div>
+          <div class="fc-target-pct" id="fcBearPct">—</div>
+        </div>
+      </div>
+
+      <!-- Confidence -->
+      <div class="fc-conf">
+        <div class="fc-conf-label">
+          <span>Încredere Forecast</span>
+          <span id="fcConfPct" style="color:var(--accent);font-weight:800">—</span>
+        </div>
+        <div class="fc-conf-bar"><div class="fc-conf-fill" id="fcConfFill" style="width:0%"></div></div>
+      </div>
+
+      <!-- Forecast table -->
+      <div style="padding:0 12px 10px;">
+        <div class="panel-title">Prognoze pe Orizonturi</div>
+        <table class="fc-table" id="fcTable">
+          <thead><tr><th>Orizont</th><th>Target</th><th>Variație</th><th>Semnal</th></tr></thead>
+          <tbody id="fcTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Mini forecast chart -->
+      <div class="fc-chart-wrap">
+        <div class="fc-chart-title">Grafic Forecast (proiecție)</div>
+        <canvas id="fcMiniChart" width="266" height="120"></canvas>
+      </div>
+
+      <!-- Pattern Recognition -->
+      <div style="padding:12px;flex:1;">
+        <div class="panel-title">Recunoaștere Pattern-uri</div>
+        <div id="patternCards"></div>
+      </div>
+
+      <!-- Sentiment -->
+      <div class="panel-section">
+        <div class="panel-title">Sentiment Tehnic</div>
+        <div class="sent-pills" id="sentPills"></div>
+      </div>
+    </div>
+
+    <!-- ── PAGE: WATCHLIST ── -->
+    <div class="panel-page active" id="page-watchlist">
+      <!-- Header -->
+      <div style="padding:10px 12px 8px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span class="panel-title" style="margin:0">Watchlist</span>
+          <button onclick="resetWatchlist()" title="Resetează la default" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">↺ Reset</button>
+        </div>
+      </div>
+      
+      <!-- Căsuță de adăugare Custom -->
+      <div style="padding:10px 12px;display:flex;gap:4px;border-bottom:1px solid var(--border);background:var(--bg2);">
+        <div style="position:relative;display:flex;flex:1;">
+           <input type="text" id="addWlInput" placeholder="EX: META, BTC-USD..." style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 10px;font-size:12px;text-transform:uppercase;font-weight:600;" autocomplete="off">
+        </div>
+        <button onclick="addToWatchlistCustom()" style="background:var(--accent);border:none;color:#fff;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 0 8px rgba(41,98,255,0.4);">+ Adaugă</button>
+      </div>
+
+      <!-- Grup Unic: Toate Simbolurile (Draggable) -->
+      <div id="watchlistUser" style="flex:1;overflow-y:auto;padding-top:4px;"></div>
+    </div>
+  </div><!-- /rightPanel -->
+</div><!-- /main -->
+
+  <!-- DEEP FORECAST MODAL -->
+  <div id="dfModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;width:90%;max-width:800px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.8);position:relative;">
+      <!-- Header -->
+      <div style="background:linear-gradient(90deg, #4a148c, #1a237e);padding:16px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;">
+        <h2 style="margin:0;color:#fff;font-size:18px;display:flex;align-items:center;gap:8px;">
+          <span id="dfModalTitle">Deep Forecast Analysis</span>
+        </h2>
+        <button onclick="document.getElementById('dfModal').style.display='none'" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:18px;cursor:pointer;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      <!-- Body -->
+      <div style="padding:24px;" id="dfModalBody">
+        <div style="text-align:center;padding:40px;color:var(--text2);"><div class="spinner" style="margin:0 auto 16px;"></div>Procesez milioane de date...</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════
+let currentSymbol = '';
+let currentTF = '1d';
+let allData = [];
+let indicators = { ma:true, bb:true, vol:true, rsi:true, macd:true, ema:false, vwap:false, forecast:true };
+let activeTool = 'cursor';
+let forecastHorizon = 7;
+let lastForecast = null;
+
+// Charts
+let mainChart, candleSeries, volumeSeries;
+let ma20S, ma50S, ma200S, bbU, bbM, bbL, emaS, vwapS;
+let fcLineS, fcBandU, fcBandL;
+let rsiChart, rsiS, rsiOB, rsiOS;
+let macdChart, macdHistS, macdLineS, macdSigS;
+
+// Multiple CORS proxies — tried in order until one works
+const PROXIES = [
+  url => `http://localhost:3457/proxy?url=${encodeURIComponent(url)}`
+];
+
+async function fetchJSON(url, timeoutMs = 8000) {
+  for (let pi = 0; pi < PROXIES.length; pi++) {
+    const proxyUrl = PROXIES[pi](url);
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(proxyUrl, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text || text.trim().startsWith('<')) continue; // HTML error page
+      return JSON.parse(text);
+    } catch(e) {
+      clearTimeout(tid);
+      console.warn(`Proxy ${pi+1} failed:`, e.message);
+    }
+  }
+  throw new Error('Toate proxy-urile au eșuat. Verificați conexiunea.');
+}
+
+// Simbolurile DEFAULT — MEREU prezente, nu pot fi șterse accidental
+const watchlistDefault = [
+  {sym:'AAPL',     name:'Apple Inc.'},
+  {sym:'TSLA',     name:'Tesla Inc.'},
+  {sym:'NVDA',     name:'NVIDIA Corp.'},
+  {sym:'AMZN',     name:'Amazon'},
+  {sym:'MSFT',     name:'Microsoft'},
+  {sym:'BTC-USD',  name:'Bitcoin'},
+  {sym:'ETH-USD',  name:'Ethereum'},
+  {sym:'GC=F',     name:'Aur (Gold)'},
+  {sym:'CL=F',     name:'Petrol Brut (Oil)'},
+  {sym:'EURUSD=X', name:'EUR/USD'},
+  {sym:'SPY',      name:'S&P 500 ETF'},
+  {sym:'QQQ',      name:'NASDAQ ETF'},
+];
+
+const WL_KEY = 'tradepro_watchlist_v2';
+const WL_KEY_OLD = 'tradepro_watchlist_v1';
+
+function loadWatchlist() {
+  try {
+    // Citeste din v2
+    const saved = localStorage.getItem(WL_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    // Fallback la v1 daca exista (migrare)
+    const oldSaved = localStorage.getItem(WL_KEY_OLD);
+    if (oldSaved) {
+      const oldParsed = JSON.parse(oldSaved);
+      if (Array.isArray(oldParsed) && oldParsed.length > 0) {
+        // Migrează automat
+        localStorage.setItem(WL_KEY, JSON.stringify(oldParsed));
+        return oldParsed;
+      }
+    }
+    // Daca nu exista nimic salvat, sterge cheia v3 gresita si returneaza default
+    localStorage.removeItem('tradepro_watchlist_v3');
+  } catch(e) {}
+  return [...watchlistDefault];
+}
+
+function saveWatchlist() {
+  try { localStorage.setItem(WL_KEY, JSON.stringify(watchlistData)); } catch(e) {}
+}
+
+function resetWatchlist() {
+  if (!confirm('Resetezi watchlist-ul la simbolurile implicite? Orice modificare va fi pierdută.')) return;
+  try { localStorage.removeItem(WL_KEY); } catch(e) {}
+  watchlistData = loadWatchlist();
+  saveWatchlist();
+  renderWatchlist();
+}
+
+let watchlistData = loadWatchlist();
+
+// ════════════════════════════════════════════════════════════
+//  THEME
+// ════════════════════════════════════════════════════════════
+let isDark = false;
+document.getElementById('themeBtn').addEventListener('click', () => {
+  isDark = !isDark;
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.getElementById('themeBtn').textContent = isDark ? '🌙' : '☀️';
+  if (mainChart) {
+    const bg = isDark ? '#131722' : '#ffffff';
+    const grid = isDark ? '#1e222d' : '#f0f3fa';
+    const tc = isDark ? '#d1d4dc' : '#131722';
+    const bc = isDark ? '#2a2e39' : '#dde2ef';
+    [mainChart, rsiChart, macdChart].forEach(c => {
+      if (!c) return;
+      c.applyOptions({ layout:{background:{color:bg},textColor:tc}, grid:{vertLines:{color:grid},horzLines:{color:grid}}, timeScale:{borderColor:bc}, rightPriceScale:{borderColor:bc} });
+    });
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+//  PANEL TABS
+// ════════════════════════════════════════════════════════════
+document.querySelectorAll('.ptab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel-page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('page-' + tab.dataset.page).classList.add('active');
+  });
+});
+
+// Forecast horizon buttons
+document.querySelectorAll('.fc-h-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fc-h-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    forecastHorizon = parseInt(btn.dataset.h);
+    if (allData.length) buildForecast(allData);
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+//  INIT CHARTS
+// ════════════════════════════════════════════════════════════
+function chartOpts(w, h) {
+  return {
+    width: w, height: h,
+    layout: { background:{color:'#ffffff'}, textColor:'#131722' },
+    grid: { vertLines:{color:'#f0f3fa'}, horzLines:{color:'#f0f3fa'} },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { borderColor:'#dde2ef', timeVisible:true, secondsVisible:false },
+    rightPriceScale: { borderColor:'#dde2ef' },
+    handleScroll: { mouseWheel:true, pressedMouseMove:true },
+    handleScale: { mouseWheel:true, pinch:true },
+  };
+}
+
+function initCharts() {
+  const ce = document.getElementById('chartCanvas');
+  const re = document.getElementById('rsiCanvas');
+  const me = document.getElementById('macdCanvas');
+
+  mainChart = LightweightCharts.createChart(ce, chartOpts(ce.offsetWidth, ce.offsetHeight));
+
+  candleSeries = mainChart.addCandlestickSeries({
+    upColor:'#089981', downColor:'#f23645',
+    borderUpColor:'#089981', borderDownColor:'#f23645',
+    wickUpColor:'#089981', wickDownColor:'#f23645',
+  });
+
+  volumeSeries = mainChart.addHistogramSeries({ priceFormat:{type:'volume'}, priceScaleId:'volume' });
+  mainChart.priceScale('volume').applyOptions({ scaleMargins:{top:0.82, bottom:0} });
+
+  ma20S  = mainChart.addLineSeries({ color:'#2962ff', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+  ma50S  = mainChart.addLineSeries({ color:'#ff9800', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+  ma200S = mainChart.addLineSeries({ color:'#e91e63', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+  bbU    = mainChart.addLineSeries({ color:'rgba(124,58,237,0.5)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
+  bbM    = mainChart.addLineSeries({ color:'rgba(124,58,237,0.25)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
+  bbL    = mainChart.addLineSeries({ color:'rgba(124,58,237,0.5)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
+  emaS   = mainChart.addLineSeries({ color:'#00bcd4', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+  vwapS  = mainChart.addLineSeries({ color:'#ff5722', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dotted });
+
+  // Forecast series
+  fcLineS = mainChart.addLineSeries({ color:'rgba(124,58,237,0.9)', lineWidth:2, priceLineVisible:false, lastValueVisible:true, lineStyle:LightweightCharts.LineStyle.Dashed });
+  fcBandU = mainChart.addLineSeries({ color:'rgba(124,58,237,0.25)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dotted });
+  fcBandL = mainChart.addLineSeries({ color:'rgba(124,58,237,0.25)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dotted });
+
+  // RSI
+  rsiChart = LightweightCharts.createChart(re, { ...chartOpts(re.offsetWidth, 115), timeScale:{ ...chartOpts(0,0).timeScale, visible:false } });
+  rsiS  = rsiChart.addLineSeries({ color:'#7c3aed', lineWidth:2, priceLineVisible:false, lastValueVisible:true });
+  rsiOB = rsiChart.addLineSeries({ color:'rgba(242,54,69,0.4)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
+  rsiOS = rsiChart.addLineSeries({ color:'rgba(8,153,129,0.4)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
+
+  // MACD
+  macdChart    = LightweightCharts.createChart(me, { ...chartOpts(me.offsetWidth, 105), timeScale:{ ...chartOpts(0,0).timeScale, visible:false } });
+  macdHistS    = macdChart.addHistogramSeries({ priceLineVisible:false, lastValueVisible:false });
+  macdLineS    = macdChart.addLineSeries({ color:'#2962ff', lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+  macdSigS     = macdChart.addLineSeries({ color:'#ff9800', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
+
+  mainChart.subscribeCrosshairMove(updateCrosshairInfo);
+  mainChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+    if (!range) return;
+    if (indicators.rsi)  rsiChart.timeScale().setVisibleLogicalRange(range);
+    if (indicators.macd) macdChart.timeScale().setVisibleLogicalRange(range);
+  });
+
+  window.addEventListener('resize', handleResize);
+  handleResize();
+}
+
+function handleResize() {
+  const ce = document.getElementById('chartCanvas');
+  const re = document.getElementById('rsiCanvas');
+  const me = document.getElementById('macdCanvas');
+  if (mainChart) mainChart.resize(ce.offsetWidth, ce.offsetHeight);
+  if (rsiChart && re.offsetHeight > 0)  rsiChart.resize(re.offsetWidth, re.offsetHeight);
+  if (macdChart && me.offsetHeight > 0) macdChart.resize(me.offsetWidth, me.offsetHeight);
+}
+
+// ════════════════════════════════════════════════════════════
+//  FETCH
+// ════════════════════════════════════════════════════════════
+function tfToYahoo(tf) {
+  const m = {'5m':{i:'5m',r:'5d'},'15m':{i:'15m',r:'10d'},'30m':{i:'30m',r:'30d'},'1h':{i:'60m',r:'60d'},'4h':{i:'60m',r:'120d'},'1d':{i:'1d',r:'1y'},'1wk':{i:'1wk',r:'5y'},'1mo':{i:'1mo',r:'20y'}};
+  return m[tf] || m['1d'];
+}
+
+// Try Yahoo Finance v8 — includePrePost=true pentru date extended hours
+function yahooUrls(symbol, interval, range) {
+  const sym = encodeURIComponent(symbol);
+  // includePrePost=true adaugă lumânările pre-market și after-hours pe TF scurte
+  const prePost = ['5m','15m','30m','60m'].includes(interval) ? '&includePrePost=true' : '';
+  return [
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includeAdjustedClose=true${prePost}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includeAdjustedClose=true${prePost}`,
+    `https://query1.finance.yahoo.com/v7/finance/chart/${sym}?interval=${interval}&range=${range}${prePost}`,
+  ];
+}
+
+async function fetchData(symbol, tf, silent = false) {
+  const {i, r} = tfToYahoo(tf);
+  const urls = yahooUrls(symbol, i, r);
+
+  let lastErr = null;
+  for (const url of urls) {
+    try {
+      if (!silent) setLoadText(`Conectare la date (${symbol})…`);
+      const json = await fetchJSON(url);
+      const result = json?.chart?.result?.[0];
+      if (!result || !result.timestamp) { lastErr = 'Simbol invalid sau lipsă date'; continue; }
+      const ts = result.timestamp;
+      const q  = result.indicators.quote[0];
+      let raw = ts.map((t, idx) => ({
+        time:   t,
+        open:   q.open[idx],
+        high:   q.high[idx],
+        low:    q.low[idx],
+        close:  q.close[idx],
+        volume: q.volume[idx] || 0,
+      })).filter(d => d.open != null && d.high != null && d.low != null && d.close != null
+                   && !isNaN(d.open) && !isNaN(d.close));
+      if (!raw.length) { lastErr = 'Date goale returnate'; continue; }
+      if (tf === '4h') raw = aggregate4h(raw);
+      const news = await fetchNews(symbol);
+      const meta = result.meta || {};
+      meta.news = news;
+      
+      // Obține prețul LIVE (inclusiv pre-market / post-market)
+      try {
+        const quoteUrl = PROXIES[0](`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`);
+        const quoteRes = await fetch(quoteUrl);
+        const quoteJson = await quoteRes.json();
+        const qData = quoteJson?.quoteResponse?.result?.[0];
+        if (qData) {
+          const livePrice = qData.postMarketPrice || qData.preMarketPrice || qData.regularMarketPrice;
+          const lastCandle = raw[raw.length - 1];
+          if (livePrice && livePrice !== lastCandle.close) {
+             // Dacă e pre/post market, data (timestamp) poate fi diferită. Adăugăm / updatăm o lumânare.
+             const isSameDay = new Date(lastCandle.time * 1000).toDateString() === new Date().toDateString();
+             if (isSameDay) {
+                lastCandle.close = livePrice;
+                lastCandle.high = Math.max(lastCandle.high, livePrice);
+                lastCandle.low = Math.min(lastCandle.low, livePrice);
+             } else {
+                raw.push({
+                   time: Math.floor(Date.now() / 1000),
+                   open: livePrice,
+                   high: livePrice,
+                   low: livePrice,
+                   close: livePrice,
+                   volume: 0
+                });
+             }
+          }
+        }
+      } catch(e) {}
+
+      return { raw: raw.map(d => ({...d, time: Math.floor(d.time)})), meta };
+    } catch(e) {
+      lastErr = e.message;
+      if (!silent) console.warn('fetchData attempt failed:', e.message);
+    }
+  }
+
+  // All real data sources failed — fall back to demo data
+  if (!silent) console.warn('All data sources failed, using demo data. Error:', lastErr);
+  if (!silent) setLoadText('Date live indisponibile — afișez date DEMO…');
+  if (!silent) await new Promise(r => setTimeout(r, 600));
+  return { raw: generateDemoData(symbol, tf), meta: { demo: true, err: lastErr } };
+}
+
+// Background auto-refresh for current symbol
+let liveTickTimer = null;
+
+async function liveTick() {
+  if (!currentSymbol || typeof allData === 'undefined' || !allData || allData.length === 0) return;
+  try {
+    const quoteUrl = PROXIES[0](`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${currentSymbol}`);
+    const quoteRes = await fetch(quoteUrl);
+    const quoteJson = await quoteRes.json();
+    const qData = quoteJson?.quoteResponse?.result?.[0];
+    if (qData) {
+      const livePrice = qData.postMarketPrice || qData.preMarketPrice || qData.regularMarketPrice;
+      const lastCandle = allData[allData.length - 1];
+      
+      if (livePrice && livePrice !== lastCandle.close) {
+         const isSameDay = new Date(lastCandle.time * 1000).toDateString() === new Date().toDateString();
+         if (isSameDay) {
+            lastCandle.close = livePrice;
+            lastCandle.high = Math.max(lastCandle.high, livePrice);
+            lastCandle.low = Math.min(lastCandle.low, livePrice);
+         } else {
+            allData.push({
+               time: Math.floor(Date.now() / 1000),
+               open: livePrice,
+               high: livePrice,
+               low: livePrice,
+               close: livePrice,
+               volume: 0
+            });
+         }
+         
+         const newLastCandle = allData[allData.length - 1];
+         candleSeries.update({ time: newLastCandle.time, open: newLastCandle.open, high: newLastCandle.high, low: newLastCandle.low, close: newLastCandle.close });
+         
+         if (indicators.rsi) {
+            const rsiData = calcRSI(allData);
+            rsiSeries.update(rsiData[rsiData.length-1]);
+         }
+         if (indicators.macd) {
+            const macdData = calcMACD(allData);
+            if (macdData.line.length) macdLine.update(macdData.line[macdData.line.length-1]);
+            if (macdData.signal.length) macdSignal.update(macdData.signal[macdData.signal.length-1]);
+            if (macdData.hist.length) macdHist.update(macdData.hist[macdData.hist.length-1]);
+         }
+         
+         // Update AI logic silently
+         runAnalysis(allData, latestSignalData ? { news: latestSignalData.reasons } : {});
+      }
+    }
+  } catch(e) {}
+}
+
+setInterval(liveTick, 1800);
+
+function setLoadText(txt) {
+  const el = document.getElementById('loadText');
+  if (el) el.textContent = txt;
+}
+
+async function fetchNews(symbol) {
+  try {
+    const searchUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${symbol}&newsCount=5`;
+    const proxyUrl = PROXIES[0](searchUrl);
+    const res = await fetch(proxyUrl);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.news || [];
+  } catch (e) {
+    console.warn('News fetch failed:', e);
+    return [];
+  }
+}
+
+// Generates realistic-looking OHLCV demo data
+function generateDemoData(symbol, tf) {
+  // Seed price based on symbol name to be consistent
+  const seed = symbol.split('').reduce((s,c) => s + c.charCodeAt(0), 0);
+  const basePrice = 50 + (seed % 450);
+  const barSeconds = {'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400,'1wk':604800,'1mo':2592000}[tf] || 86400;
+  const nBars = {'5m':200,'15m':200,'30m':200,'1h':200,'4h':200,'1d':365,'1wk':260,'1mo':120}[tf] || 300;
+  const vol = basePrice * 0.015; // daily volatility ~1.5%
+
+  const now = Math.floor(Date.now() / 1000);
+  const startTime = now - nBars * barSeconds;
+
+  let price = basePrice;
+  const trend = seed % 3 === 0 ? 0.0002 : seed % 3 === 1 ? -0.0001 : 0.00005;
+  const data = [];
+
+  let rng = seed;
+  const rand = () => { rng = (rng * 1664525 + 1013904223) & 0xffffffff; return (rng >>> 0) / 0xffffffff; };
+
+  for (let i = 0; i < nBars; i++) {
+    const t = startTime + i * barSeconds;
+    const change = (rand() - 0.49 + trend) * vol;
+    const open  = price;
+    const close = Math.max(0.01, price + change);
+    const hi    = Math.max(open, close) * (1 + rand() * 0.005);
+    const lo    = Math.min(open, close) * (1 - rand() * 0.005);
+    const vol2  = Math.round(basePrice * 1000 * (0.5 + rand()));
+    data.push({ time:t, open:+open.toFixed(4), high:+hi.toFixed(4), low:+lo.toFixed(4), close:+close.toFixed(4), volume:vol2 });
+    price = close;
+  }
+  return data;
+}
+
+function aggregate4h(data) {
+  const buckets = {};
+  data.forEach(d => {
+    const b = Math.floor(d.time / 14400) * 14400;
+    if (!buckets[b]) buckets[b] = { time:b, open:d.open, high:d.high, low:d.low, close:d.close, volume:d.volume };
+    else { buckets[b].high = Math.max(buckets[b].high, d.high); buckets[b].low = Math.min(buckets[b].low, d.low); buckets[b].close = d.close; buckets[b].volume += d.volume; }
+  });
+  return Object.values(buckets).sort((a,b) => a.time - b.time);
+}
+
+// ════════════════════════════════════════════════════════════
+//  INDICATORS
+// ════════════════════════════════════════════════════════════
+function sma(data, n) {
+  return data.map((d,i) => {
+    if (i < n-1) return null;
+    return { time:d.time, value: data.slice(i-n+1,i+1).reduce((s,x)=>s+x.close,0)/n };
+  }).filter(Boolean);
+}
+
+function ema(data, n) {
+  const k = 2/(n+1); let e = null;
+  return data.map((d,i) => {
+    if (i < n-1) return null;
+    e = i===n-1 ? data.slice(0,n).reduce((s,x)=>s+x.close,0)/n : d.close*k + e*(1-k);
+    return { time:d.time, value:e };
+  }).filter(Boolean);
+}
+
+function calcBB(data, n=20, m=2) {
+  return data.map((d,i) => {
+    if (i < n-1) return null;
+    const sl = data.slice(i-n+1,i+1).map(x=>x.close);
+    const mean = sl.reduce((s,v)=>s+v,0)/n;
+    const std  = Math.sqrt(sl.reduce((s,v)=>s+(v-mean)**2,0)/n);
+    return { time:d.time, upper:mean+m*std, middle:mean, lower:mean-m*std };
+  }).filter(Boolean);
+}
+
+function calcRSI(data, n=14) {
+  let g=0, l=0; const res=[];
+  for (let i=1;i<data.length;i++) {
+    const d = data[i].close - data[i-1].close;
+    if (i < n) { g += Math.max(d,0); l += Math.max(-d,0); continue; }
+    if (i===n) { g=(g+Math.max(d,0))/n; l=(l+Math.max(-d,0))/n; }
+    else { g=(g*(n-1)+Math.max(d,0))/n; l=(l*(n-1)+Math.max(-d,0))/n; }
+    const rs = l===0 ? 100 : g/l;
+    res.push({ time:data[i].time, value: 100-100/(1+rs) });
+  }
+  return res;
+}
+
+function calcMACD(data, f=12, sl=26, sg=9) {
+  const ef = ema(data,f), es = ema(data,sl);
+  const ml = [];
+  const mn = Math.min(ef.length, es.length);
+  for (let i=0;i<mn;i++) {
+    ml.push({ time:es[es.length-mn+i].time, close:ef[ef.length-mn+i].value - es[es.length-mn+i].value });
+  }
+  const sig = ema(ml, sg);
+  const hist = sig.map((s,i) => {
+    const v = ml[ml.length-sig.length+i].close - s.value;
+    return { time:s.time, value:v, color: v>=0 ? 'rgba(8,153,129,0.7)' : 'rgba(242,54,69,0.7)' };
+  });
+  return { line:ml.map(d=>({time:d.time,value:d.close})), signal:sig.map(d=>({time:d.time,value:d.value})), hist };
+}
+
+function calcVWAP(data) {
+  let pv=0,v=0;
+  return data.map(d => { const tp=(d.high+d.low+d.close)/3; pv+=tp*d.volume; v+=d.volume; return {time:d.time,value:v>0?pv/v:d.close}; });
+}
+
+// ════════════════════════════════════════════════════════════
+//  RENDER ALL
+// ════════════════════════════════════════════════════════════
+function renderAll(data) {
+  allData = data;
+
+  candleSeries.setData(data.map(d => ({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close})));
+
+  volumeSeries.setData(indicators.vol
+    ? data.map(d => ({time:d.time,value:d.volume,color:d.close>=d.open?'rgba(8,153,129,0.35)':'rgba(242,54,69,0.35)'}))
+    : []);
+
+  ma20S.setData(indicators.ma ? sma(data,20) : []);
+  ma50S.setData(indicators.ma ? sma(data,50) : []);
+  ma200S.setData(indicators.ma ? sma(data,200) : []);
+
+  if (indicators.bb) {
+    const bb = calcBB(data);
+    bbU.setData(bb.map(d=>({time:d.time,value:d.upper})));
+    bbM.setData(bb.map(d=>({time:d.time,value:d.middle})));
+    bbL.setData(bb.map(d=>({time:d.time,value:d.lower})));
+  } else { bbU.setData([]); bbM.setData([]); bbL.setData([]); }
+
+  emaS.setData(indicators.ema ? ema(data,21) : []);
+  vwapS.setData(indicators.vwap ? calcVWAP(data) : []);
+
+  // RSI
+  const showRSI = indicators.rsi;
+  document.getElementById('chartRSI').style.display = showRSI ? 'block' : 'none';
+  document.getElementById('rsiHandle').style.display = showRSI ? 'block' : 'none';
+  if (showRSI) {
+    const rsiData = calcRSI(data);
+    rsiS.setData(rsiData);
+    const t = rsiData.map(d=>d.time);
+    rsiOB.setData(t.map(t=>({time:t,value:70})));
+    rsiOS.setData(t.map(t=>({time:t,value:30})));
+    if (rsiData.length) document.getElementById('rsiVal').textContent = rsiData[rsiData.length-1].value.toFixed(1);
+  }
+
+  // MACD
+  const showMACD = indicators.macd;
+  document.getElementById('chartMACD').style.display = showMACD ? 'block' : 'none';
+  document.getElementById('macdHandle').style.display = showMACD ? 'block' : 'none';
+  if (showMACD) {
+    const md = calcMACD(data);
+    macdHistS.setData(md.hist);
+    macdLineS.setData(md.line);
+    macdSigS.setData(md.signal);
+    if (md.hist.length) document.getElementById('macdVal').textContent = md.hist[md.hist.length-1].value.toFixed(4);
+  }
+
+  // Forecast on chart
+  if (indicators.forecast) buildForecastChart(data);
+  else { fcLineS.setData([]); fcBandU.setData([]); fcBandL.setData([]); }
+
+  // Fibonacci auto
+  renderFibonacci(data);
+
+  handleResize();
+  setTimeout(handleResize, 100);
+}
+
+// ════════════════════════════════════════════════════════════
+//  FORECAST ENGINE
+// ════════════════════════════════════════════════════════════
+function linearRegression(values) {
+  const n = values.length;
+  const xs = Array.from({length:n},(_,i)=>i);
+  const mx = (n-1)/2;
+  const my = values.reduce((s,v)=>s+v,0)/n;
+  const num = xs.reduce((s,x,i)=>s+(x-mx)*(values[i]-my),0);
+  const den = xs.reduce((s,x)=>s+(x-mx)**2,0);
+  const slope = den !== 0 ? num/den : 0;
+  const intercept = my - slope*mx;
+  return { slope, intercept, predict: x => intercept + slope*x };
+}
+
+function stdDev(values) {
+  const m = values.reduce((s,v)=>s+v,0)/values.length;
+  return Math.sqrt(values.reduce((s,v)=>s+(v-m)**2,0)/values.length);
+}
+
+function buildForecastChart(data) {
+  if (data.length < 20) { fcLineS.setData([]); fcBandU.setData([]); fcBandL.setData([]); return; }
+
+  // Determine bar interval in seconds
+  const barInterval = data.length > 1 ? (data[data.length-1].time - data[data.length-2].time) : 86400;
+
+  const lookback = Math.min(60, data.length);
+  const recentData = data.slice(-lookback);
+  const closes = recentData.map(d => d.close);
+  const reg = linearRegression(closes);
+
+  // Residuals
+  const residuals = closes.map((c,i) => c - reg.predict(i));
+  const std = stdDev(residuals);
+
+  // Last point on chart (last candle)
+  const lastTime = data[data.length-1].time;
+  const lastClose = data[data.length-1].close;
+
+  // Bridge: start line from the last real data point
+  const fcLine = [{ time: lastTime, value: lastClose }];
+  const fcUpper = [{ time: lastTime, value: lastClose + std }];
+  const fcLower = [{ time: lastTime, value: lastClose - std }];
+
+  const nProject = Math.max(forecastHorizon, 15);
+  for (let i = 1; i <= nProject; i++) {
+    const projected = lastClose + reg.slope * i;
+    const t = lastTime + i * barInterval;
+    const band = std * (1 + i * 0.04);
+    fcLine.push({ time: t, value: projected });
+    fcUpper.push({ time: t, value: projected + band });
+    fcLower.push({ time: t, value: projected - band });
+  }
+
+  fcLineS.setData(fcLine);
+  fcBandU.setData(fcUpper);
+  fcBandL.setData(fcLower);
+
+  lastForecast = { reg, std, lookback, barInterval, lastClose };
+}
+
+function buildForecast(data) {
+  if (data.length < 20) return;
+
+  const lookback = Math.min(30, data.length); // Redus de la 80 la 30 pentru a reacționa mai rapid la schimbările recente de trend
+  const recentData = data.slice(-lookback);
+  const closes = recentData.map(d => d.close);
+  const reg = linearRegression(closes);
+  const residuals = closes.map((c,i) => c - reg.predict(i));
+  const std = stdDev(residuals);
+
+  const lastClose = data[data.length-1].close;
+  const n = forecastHorizon;
+
+  // Base: linear regression extrapolation from the last close!
+  const basePrice = lastClose + reg.slope * n;
+
+  // Volatility-adjusted
+  const vol = std / lastClose; // % volatility
+  const momentum = (closes[closes.length-1] - closes[0]) / closes[0]; // total return over lookback
+
+  // Bull: base + 1.5σ + momentum boost (weighted by n)
+  const bullPrice = basePrice + 1.5 * std * Math.sqrt(n) + (momentum > 0 ? (lastClose * momentum * (n/lookback)) : 0);
+  // Bear: base - 1.5σ + momentum drag
+  const bearPrice = basePrice - 1.5 * std * Math.sqrt(n) + (momentum < 0 ? (lastClose * momentum * (n/lookback)) : 0);
+
+  const bullPct = (bullPrice/lastClose-1)*100;
+  const basePct = (basePrice/lastClose-1)*100;
+  const bearPct = (bearPrice/lastClose-1)*100;
+
+  document.getElementById('fcBull').textContent = fmt(bullPrice);
+  document.getElementById('fcBullPct').textContent = (bullPct>=0?'+':'')+bullPct.toFixed(2)+'%';
+  document.getElementById('fcBase').textContent = fmt(basePrice);
+  document.getElementById('fcBasePct').textContent = (basePct>=0?'+':'')+basePct.toFixed(2)+'%';
+  document.getElementById('fcBear').textContent = fmt(bearPrice);
+  document.getElementById('fcBearPct').textContent = (bearPct>=0?'+':'')+bearPct.toFixed(2)+'%';
+
+  // Confidence: based on R² of regression
+  const ssTot = residuals.reduce((s,v) => s + (v)**2, 0);
+  const predResiduals = closes.map((c,i) => c - reg.predict(i));
+  const ssRes = predResiduals.reduce((s,v) => s + v**2, 0);
+  const r2 = Math.max(0, Math.min(1, 1 - ssRes/ssTot));
+  // Reduce confidence for longer horizons
+  const horizonPenalty = Math.max(0, 1 - (n-7)*0.015);
+  const confidence = Math.round(r2 * 100 * horizonPenalty);
+
+  document.getElementById('fcConfPct').textContent = confidence + '%';
+  document.getElementById('fcConfFill').style.width = confidence + '%';
+
+  // Direction & summary
+  const bullish = basePct > 0.5;
+  const bearish = basePct < -0.5;
+  document.getElementById('fcDirection').textContent = bullish ? '🟢 Direcție: BULLISH' : bearish ? '🔴 Direcție: BEARISH' : '🟡 Direcție: LATERAL';
+  document.getElementById('fcSummary').textContent =
+    `Regresia liniară pe ${lookback} bare proiectează prețul la ${fmt(basePrice)} (${basePct>=0?'+':''}${basePct.toFixed(1)}%) în ${n} zile. Volatilitate: ${(vol*100).toFixed(1)}%/perioadă.`;
+
+  // Ring
+  const ringScore = Math.max(0, Math.min(100, Math.round(50 + basePct * 3)));
+  drawRing(ringScore);
+  document.getElementById('ringPct').textContent = ringScore + '%';
+
+  // Horizon table
+  const horizons = [7, 14, 30, 90];
+  const tbody = document.getElementById('fcTableBody');
+  tbody.innerHTML = horizons.map(h => {
+    const p = lastClose + reg.slope * h;
+    const pct = (p/lastClose-1)*100;
+    const sig = pct > 1 ? 'bull' : pct < -1 ? 'bear' : 'neut';
+    return `<tr>
+      <td>${h} zile</td>
+      <td class="${sig}">${fmt(p)}</td>
+      <td class="${sig}">${pct>=0?'+':''}${pct.toFixed(2)}%</td>
+      <td class="${sig}">${sig==='bull'?'📈 Optimist':sig==='bear'?'📉 Pesimist':'➡️ Neutru'}</td>
+    </tr>`;
+  }).join('');
+
+  // Mini chart
+  drawMiniChart(data, reg, std, lookback, n);
+
+  // Patterns
+  detectPatterns(data);
+
+  // Sentiment pills
+  buildSentimentPills(data);
+
+  buildForecastChart(data);
+}
+
+// ════════════════════════════════════════════════════════════
+//  MINI FORECAST CHART
+// ════════════════════════════════════════════════════════════
+function drawMiniChart(data, reg, std, lookback, horizon) {
+  const canvas = document.getElementById('fcMiniChart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const theme = document.documentElement.getAttribute('data-theme');
+  const bg = theme==='dark' ? '#2a2e39' : '#f0f3fa';
+  const lineC = theme==='dark' ? '#d1d4dc' : '#131722';
+
+  ctx.fillStyle = bg;
+  ctx.roundRect ? ctx.roundRect(0,0,W,H,8) : ctx.rect(0,0,W,H);
+  ctx.fill();
+
+  const showN = Math.min(40, data.length);
+  const hist = data.slice(-showN);
+  const projected = [];
+  for (let i=1; i<=horizon; i++) {
+    projected.push({ value: reg.predict(lookback + i - 1), upper: reg.predict(lookback+i-1)+std*(1+i*0.04), lower: reg.predict(lookback+i-1)-std*(1+i*0.04) });
+  }
+  const allValues = [...hist.map(d=>d.close), ...projected.map(d=>d.upper), ...projected.map(d=>d.lower)];
+  const minV = Math.min(...allValues) * 0.998;
+  const maxV = Math.max(...allValues) * 1.002;
+  const range = maxV - minV;
+
+  const toX = (i, total) => 8 + (i / (total-1)) * (W - 16);
+  const toY = v => H - 8 - ((v - minV) / range) * (H - 16);
+
+  const totalN = showN + horizon;
+
+  // Confidence band fill
+  ctx.beginPath();
+  projected.forEach((p, i) => { const x = toX(showN+i, totalN); i===0 ? ctx.moveTo(x, toY(p.upper)) : ctx.lineTo(x, toY(p.upper)); });
+  [...projected].reverse().forEach((p, i) => ctx.lineTo(toX(showN+projected.length-1-i, totalN), toY(p.lower)));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(124,58,237,0.1)';
+  ctx.fill();
+
+  // Divider
+  const divX = toX(showN-1, totalN);
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(divX, 4); ctx.lineTo(divX, H-4);
+  ctx.strokeStyle = 'rgba(120,123,134,0.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+
+  // Historical line
+  ctx.beginPath();
+  hist.forEach((d,i) => { const x=toX(i,totalN), y=toY(d.close); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.strokeStyle = lineC; ctx.lineWidth=1.5; ctx.stroke();
+
+  // Projection line
+  ctx.beginPath();
+  ctx.moveTo(toX(showN-1, totalN), toY(hist[hist.length-1].close));
+  projected.forEach((p,i) => ctx.lineTo(toX(showN+i, totalN), toY(p.value)));
+  ctx.strokeStyle = '#7c3aed'; ctx.lineWidth=2; ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Labels
+  ctx.font = '9px sans-serif'; ctx.fillStyle = 'rgba(120,123,134,0.9)';
+  ctx.fillText('Históric', 10, H-2);
+  ctx.fillText('Forecast →', divX+4, H-2);
+}
+
+// ════════════════════════════════════════════════════════════
+//  PATTERN RECOGNITION
+// ════════════════════════════════════════════════════════════
+function detectPatterns(data) {
+  const patterns = [];
+  const n = data.length;
+  if (n < 30) return;
+
+  const closes = data.slice(-30).map(d=>d.close);
+  const highs  = data.slice(-30).map(d=>d.high);
+  const lows   = data.slice(-30).map(d=>d.low);
+  const last   = closes[closes.length-1];
+
+  // Higher Highs + Higher Lows → Uptrend
+  const hh = highs[highs.length-1] > highs[Math.floor(highs.length*0.5)];
+  const hl = lows[lows.length-1] > lows[Math.floor(lows.length*0.5)];
+  if (hh && hl) patterns.push({icon:'📈', name:'Trend Ascendent', desc:'Maxime și minime mai ridicate în ultimele 30 de bare. Structura bullish confirmată.', signal:'bull'});
+
+  // Lower Highs + Lower Lows → Downtrend
+  const lh = highs[highs.length-1] < highs[Math.floor(highs.length*0.5)];
+  const ll2 = lows[lows.length-1] < lows[Math.floor(lows.length*0.5)];
+  if (lh && ll2) patterns.push({icon:'📉', name:'Trend Descendent', desc:'Maxime și minime mai joase în ultimele 30 de bare. Structura bearish confirmată.', signal:'bear'});
+
+  // Double Top detection (simplified)
+  const maxIdx1 = highs.indexOf(Math.max(...highs.slice(0, 15)));
+  const maxIdx2 = highs.slice(15).indexOf(Math.max(...highs.slice(15))) + 15;
+  const maxH1 = highs[maxIdx1], maxH2 = highs[maxIdx2];
+  if (Math.abs(maxH1 - maxH2) / maxH1 < 0.02 && Math.abs(maxIdx1 - maxIdx2) > 5 && last < maxH1 * 0.98)
+    patterns.push({icon:'🔱', name:'Double Top', desc:`Două maxime apropiate la ~${fmt(maxH1)}. Semnal de inversare bearish la nivelul ${fmt(last)}.`, signal:'bear'});
+
+  // Double Bottom
+  const minIdx1 = lows.indexOf(Math.min(...lows.slice(0,15)));
+  const minIdx2 = lows.slice(15).indexOf(Math.min(...lows.slice(15))) + 15;
+  const minL1 = lows[minIdx1], minL2 = lows[minIdx2];
+  if (Math.abs(minL1 - minL2) / minL1 < 0.02 && Math.abs(minIdx1 - minIdx2) > 5 && last > minL1 * 1.02)
+    patterns.push({icon:'⛸️', name:'Double Bottom', desc:`Două minime la ~${fmt(minL1)}. Semnal de inversare bullish. Target: ${fmt(last * 1.05)}.`, signal:'bull'});
+
+  // Consolidation (narrow range)
+  const rangeRatio = (Math.max(...highs.slice(-10)) - Math.min(...lows.slice(-10))) / last;
+  if (rangeRatio < 0.04) patterns.push({icon:'🔲', name:'Consolidare / Flag', desc:`Prețul oscilează în interval îngust (±${(rangeRatio*50).toFixed(1)}%). Urmează un breakout.`, signal:'neut'});
+
+  // RSI divergence (simplified)
+  const rsiData = calcRSI(data);
+  if (rsiData.length > 10) {
+    const lastRSI = rsiData[rsiData.length-1].value;
+    const prevRSI = rsiData[rsiData.length-10].value;
+    const priceUp = last > data[data.length-10].close;
+    const rsiDown = lastRSI < prevRSI;
+    if (priceUp && rsiDown && lastRSI > 55) patterns.push({icon:'⚠️', name:'Divergență Bearish RSI', desc:`Prețul a urcat dar RSI a scăzut (${prevRSI.toFixed(0)} → ${lastRSI.toFixed(0)}). Posibilă slăbire a trendului.`, signal:'bear'});
+    const priceDown = last < data[data.length-10].close;
+    const rsiUp = lastRSI > prevRSI;
+    if (priceDown && rsiUp && lastRSI < 45) patterns.push({icon:'💡', name:'Divergență Bullish RSI', desc:`Prețul a scăzut dar RSI a crescut (${prevRSI.toFixed(0)} → ${lastRSI.toFixed(0)}). Posibil rebound.`, signal:'bull'});
+  }
+
+  // Breakout above MA200
+  const ma200data = sma(data, 200);
+  if (ma200data.length) {
+    const ma200last = ma200data[ma200data.length-1].value;
+    if (last > ma200last * 1.01 && data[data.length-5].close < ma200last)
+      patterns.push({icon:'🚀', name:'Breakout MA200', desc:`Prețul a depășit MA200 (${fmt(ma200last)}) — semnal major bullish pe termen lung.`, signal:'bull'});
+  }
+
+  if (patterns.length === 0)
+    patterns.push({icon:'🔍', name:'Fără pattern clar', desc:'Nu s-au detectat pattern-uri semnificative pe datele curente. Monitorizați consolidarea.', signal:'neut'});
+
+  document.getElementById('patternCards').innerHTML = patterns.map(p => `
+    <div class="pattern-card" style="border-left-color:${p.signal==='bull'?'var(--green)':p.signal==='bear'?'var(--red)':'var(--accent)'}">
+      <div class="pattern-icon">${p.icon}</div>
+      <div class="pattern-info">
+        <div class="pattern-name">${p.name}</div>
+        <div class="pattern-desc">${p.desc}</div>
+      </div>
+      <div class="pattern-signal ${p.signal}">${p.signal==='bull'?'BULL':p.signal==='bear'?'BEAR':'NEUT'}</div>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  SENTIMENT PILLS
+// ════════════════════════════════════════════════════════════
+function buildSentimentPills(data) {
+  const rsiData = calcRSI(data);
+  const macdData = calcMACD(data);
+  const ma20data = sma(data, 20);
+  const ma50data = sma(data, 50);
+  const last = data[data.length-1];
+  const rsi = rsiData.length ? rsiData[rsiData.length-1].value : 50;
+  const macdH = macdData.hist.length ? macdData.hist[macdData.hist.length-1].value : 0;
+  const m20 = ma20data.length ? ma20data[ma20data.length-1].value : last.close;
+  const m50 = ma50data.length ? ma50data[ma50data.length-1].value : last.close;
+
+  const pills = [
+    { label: rsi > 70 ? 'RSI Overbought' : rsi < 30 ? 'RSI Oversold' : 'RSI Neutru', cls: rsi > 70 ? 'neg' : rsi < 30 ? 'pos' : 'neu' },
+    { label: macdH > 0 ? 'MACD Bullish' : 'MACD Bearish', cls: macdH > 0 ? 'pos' : 'neg' },
+    { label: last.close > m20 ? 'Deasupra MA20' : 'Sub MA20', cls: last.close > m20 ? 'pos' : 'neg' },
+    { label: last.close > m50 ? 'Deasupra MA50' : 'Sub MA50', cls: last.close > m50 ? 'pos' : 'neg' },
+    { label: last.volume > data.slice(-20).reduce((s,d)=>s+d.volume,0)/20*1.3 ? 'Volum Mare' : 'Volum Normal', cls: last.volume > data.slice(-20).reduce((s,d)=>s+d.volume,0)/20*1.3 ? 'pos' : 'neu' },
+    { label: last.close > last.open ? 'Candle Verde' : 'Candle Roșu', cls: last.close > last.open ? 'pos' : 'neg' },
+    { label: (last.high-last.low)/last.close > 0.03 ? 'Volatil' : 'Stabil', cls: (last.high-last.low)/last.close > 0.03 ? 'neg' : 'neu' },
+  ];
+
+  document.getElementById('sentPills').innerHTML = pills.map(p => `<span class="sent-pill ${p.cls}">${p.label}</span>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  ANALYSIS
+// ════════════════════════════════════════════════════════════
+function runAnalysis(data, meta) {
+  if (!data || data.length < 2) return;
+  const last = data[data.length-1];
+  const prev = data[data.length-2];
+  const chg = (last.close - prev.close) / prev.close * 100;
+
+  document.getElementById('curSymbol').textContent = currentSymbol;
+  
+  // Afiseaza numele companiei daca e disponibil in meta
+  const companyNameEl = document.getElementById('curCompanyName');
+  if (companyNameEl) {
+    const name = (meta && (meta.shortName || meta.longName || meta.symbol)) || currentSymbol;
+    companyNameEl.textContent = name;
+    companyNameEl.title = name;
+  }
+  
+  animatePrice(last.close);
+  document.getElementById('curPrice').textContent = fmt(last.close);
+  const ce = document.getElementById('curChange');
+  const chgVal = last.close - prev.close;
+  ce.textContent = `${chg>=0?'+':''}${chgVal.toFixed(last.close < 1 ? 6 : 2)} (${chg>=0?'+':''}${chg.toFixed(2)}%)`;
+  ce.className = chg>=0 ? 'up' : 'dn';
+  
+  // Actualizeaza titlul tabului de browser
+  document.title = `${currentSymbol} ${fmt(last.close)} (${chg>=0?'+':''}${chg.toFixed(2)}%) — TradePro AI`;
+
+  document.getElementById('statO').textContent = fmt(last.open);
+  document.getElementById('statH').textContent = fmt(last.high);
+  document.getElementById('statL').textContent = fmt(last.low);
+  document.getElementById('statC').textContent = fmt(last.close);
+  document.getElementById('statV').textContent = fmtVol(last.volume);
+  const s24 = document.getElementById('stat24h');
+  s24.textContent = `${chg>=0?'+':''}${chg.toFixed(2)}%`;
+  s24.className = `stat-val ${chg>=0?'green':'red'}`;
+
+  // Key levels
+  const highs = data.slice(-60).map(d=>d.high).sort((a,b)=>b-a);
+  const lows  = data.slice(-60).map(d=>d.low).sort((a,b)=>a-b);
+  document.getElementById('keyLevels').innerHTML = [
+    { type:'res', label:'Rezistență 1', price: highs[0] },
+    { type:'res', label:'Rezistență 2', price: highs[Math.floor(highs.length*.08)] },
+    { type:'sup', label:'Suport 1',     price: lows[0] },
+    { type:'sup', label:'Suport 2',     price: lows[Math.floor(lows.length*.08)] },
+  ].map(l => `
+    <div class="level-item">
+      <span class="level-badge ${l.type}">${l.label}</span>
+      <span class="level-price">${fmt(l.price)}</span>
+      <span class="level-dist">${((l.price/last.close-1)*100).toFixed(2)}%</span>
+    </div>`).join('');
+
+  // Signals
+  const ma20d  = sma(data,20);
+  const ma50d  = sma(data,50);
+  const rsiD   = calcRSI(data);
+  const macdD  = calcMACD(data);
+  const bbD    = calcBB(data);
+
+  const rsi    = rsiD.length  ? rsiD[rsiD.length-1].value      : 50;
+  const lma20  = ma20d.length ? ma20d[ma20d.length-1].value    : last.close;
+  const lma50  = ma50d.length ? ma50d[ma50d.length-1].value    : last.close;
+  const lmacd  = macdD.hist.length ? macdD.hist[macdD.hist.length-1].value : 0;
+  const lbb    = bbD.length   ? bbD[bbD.length-1]              : null;
+  const avgVol = data.slice(-20).reduce((s,d)=>s+d.volume,0)/20;
+  const volR   = last.volume / (avgVol||1);
+
+  const tBull = last.close > lma50 && lma20 > lma50;
+  const sig = {
+    trend: tBull ? 'bull' : last.close < lma50 ? 'bear' : 'neut',
+    rsi:   rsi > 70 ? 'bear' : rsi < 30 ? 'bull' : 'neut',
+    macd:  lmacd > 0 ? 'bull' : 'bear',
+    bb:    lbb ? (last.close >= lbb.upper ? 'bear' : last.close <= lbb.lower ? 'bull' : 'neut') : 'neut',
+    vol:   volR > 1.5 ? (chg > 0 ? 'bull' : 'bear') : 'neut',
+  };
+
+  const desc = {
+    trend: tBull ? `Preț deasupra MA50 (${fmt(lma50)}) și MA20 > MA50. Trend bullish puternic.` : last.close < lma50 ? `Prețul sub MA50 (${fmt(lma50)}). Presiune bearish.` : 'Prețul oscilează în jurul mediilor. Direcție neclară.',
+    rsi:   rsi > 70 ? `RSI=${rsi.toFixed(1)} — Supracumpărat ⚠️. Risc de corecție.` : rsi < 30 ? `RSI=${rsi.toFixed(1)} — Supravândut 🟢. Posibil rebound.` : `RSI=${rsi.toFixed(1)} — Zona neutră (30–70).`,
+    macd:  lmacd > 0 ? `Histogramă pozitivă (+${lmacd.toFixed(4)}). Momentum bullish activ.` : `Histogramă negativă (${lmacd.toFixed(4)}). Momentum bearish.`,
+    bb:    lbb ? (last.close >= lbb.upper ? `La banda superioară (${fmt(lbb.upper)}). Posibilă răsturnare.` : last.close <= lbb.lower ? `La banda inferioară (${fmt(lbb.lower)}). Posibil rebound.` : `În interiorul benzilor (${fmt(lbb.lower)}–${fmt(lbb.upper)}).`) : '—',
+    vol:   volR > 1.5 ? `Volum ${fmtVol(last.volume)} = ${volR.toFixed(1)}× media. Confirmare ${chg>0?'cumpărare':'vânzare'}.` : `Volum normal (${(volR*100).toFixed(0)}% din medie).`,
+  };
+
+  document.getElementById('aiSignals').innerHTML = [
+    ['Trend & MA', sig.trend, desc.trend],
+    ['RSI (14)', sig.rsi, desc.rsi],
+    ['MACD (12,26,9)', sig.macd, desc.macd],
+    ['Benzile Bollinger', sig.bb, desc.bb],
+    ['Volum', sig.vol, desc.vol],
+  ].map(([name, s, d]) => `
+    <div class="ai-signal">
+      <div class="signal-header">
+        <span class="signal-name">${name}</span>
+        <span class="signal-badge ${s}">${s==='bull'?'BULLISH':s==='bear'?'BEARISH':'NEUTRU'}</span>
+      </div>
+      <div class="signal-desc">${d}</div>
+    </div>`).join('');
+
+  // Gauge & Sentiment
+  const sigs = Object.values(sig);
+  let bulls = sigs.filter(s=>s==='bull').length;
+  let bears = sigs.filter(s=>s==='bear').length;
+  let totalSigs = sigs.length;
+
+  const reasons = [];
+  if (tBull) reasons.push(`🟢 Prețul a urcat peste MA50 (${fmt(lma50)})`);
+  else if (last.close < lma50) reasons.push(`🔴 Prețul este sub MA50 (${fmt(lma50)})`);
+  if (rsi < 30) reasons.push(`🟢 RSI indică Supravânzare severă (${rsi.toFixed(1)})`);
+  else if (rsi > 70) reasons.push(`🔴 RSI indică Supracumpărare severă (${rsi.toFixed(1)})`);
+  if (lmacd > 0) reasons.push(`🟢 MACD arată un momentum crescător (+${lmacd.toFixed(4)})`);
+  else reasons.push(`🔴 MACD arată un momentum descrescător (${lmacd.toFixed(4)})`);
+
+  let newsSentiment = 0;
+  if (meta && meta.news && meta.news.length > 0) {
+    const newsText = meta.news.map(n => (n.title || '').toLowerCase()).join(' ');
+    const posWords = ['up', 'rise', 'soar', 'jump', 'upgrade', 'buy', 'growth', 'beat', 'positive', 'win', 'high', 'surge', 'record'];
+    const negWords = ['down', 'fall', 'drop', 'plunge', 'downgrade', 'sell', 'miss', 'negative', 'loss', 'low', 'crash', 'lawsuit'];
+    let posCount = posWords.reduce((c, w) => c + (newsText.split(w).length - 1), 0);
+    let negCount = negWords.reduce((c, w) => c + (newsText.split(w).length - 1), 0);
+    
+    if (posCount > negCount + 1) { newsSentiment = 1; bulls++; totalSigs++; reasons.push(`📰 Știri Recente: Pozitive (${posCount} semnale)`); }
+    else if (negCount > posCount + 1) { newsSentiment = -1; bears++; totalSigs++; reasons.push(`📰 Știri Recente: Negative (${negCount} semnale)`); }
+    else { reasons.push(`📰 Știri Recente: Neutre / Mixte`); }
+  }
+
+  const score = (bulls - bears) / totalSigs;
+  drawGauge(score);
+  const lbl = score > 0.4 ? '🟢 CUMPĂRARE PUTERNICĂ' : score > 0.1 ? '🟢 CUMPĂRARE' : score < -0.4 ? '🔴 VÂNZARE PUTERNICĂ' : score < -0.1 ? '🔴 VÂNZARE' : '🟡 NEUTRU';
+  document.getElementById('gaugeLabel').textContent = lbl;
+  document.getElementById('gaugeSub').textContent = `${bulls}/${totalSigs} indicatori bullish`;
+
+  // Score bars
+  document.getElementById('scoreBars').innerHTML = sigs.map(s => `<div class="score-bar ${s}"></div>`).join('');
+
+  // Forecast tab
+  buildForecast(data);
+
+  // ── Aftermarket / Premarket info (topbar)
+  showMarketStatus();
+
+  // Salvează datele pentru a putea declanșa popup-ul manual
+  latestSignalData = { score, lbl, price: last.close, reasons, bulls, totalSigs };
+
+  // ── Pop-up recommendation
+  triggerSignalNotification(score, lbl, last.close, reasons, bulls, totalSigs);
+}
+
+// ════════════════════════════════════════════════════════════
+//  MARKET STATUS (aftermarket / premarket)
+// ════════════════════════════════════════════════════════════
+function getMarketSession() {
+  const now = new Date();
+  const yr = now.getUTCFullYear();
+  const dstStart = new Date(Date.UTC(yr, 2, 8  + (7 - new Date(Date.UTC(yr,2,8)).getUTCDay())  % 7, 7));
+  const dstEnd   = new Date(Date.UTC(yr,10, 1  + (7 - new Date(Date.UTC(yr,10,1)).getUTCDay()) % 7, 6));
+  const etOffset = (now >= dstStart && now < dstEnd) ? -4 : -5;
+  const etDate   = new Date(now.getTime() + etOffset * 3600000);
+  const etMin    = etDate.getUTCHours() * 60 + etDate.getUTCMinutes();
+  const dow      = etDate.getUTCDay();
+  const etStr    = etDate.getUTCHours().toString().padStart(2,'0') + ':' + etDate.getUTCMinutes().toString().padStart(2,'0');
+
+  if (dow === 0 || dow === 6)
+    return { label:'WEEKEND', sub:'Piața redeschide luni 04:00 ET', color:'var(--red)', dot:'red', etStr };
+  if (etMin >= 570 && etMin < 960) {
+    const left = 960 - etMin;
+    return { label:'DESCHIS', sub:`NYSE/NASDAQ · ${etStr} ET · închide în ${Math.floor(left/60)}h${left%60 < 10?'0':''}${left%60}m`, color:'var(--green)', dot:'green', etStr };
+  }
+  if (etMin >= 240 && etMin < 570) {
+    const left = 570 - etMin;
+    return { label:'PRE-MARKET', sub:`04:00–09:30 ET · ${etStr} ET · deschide în ${Math.floor(left/60)}h${left%60 < 10?'0':''}${left%60}m`, color:'var(--yellow)', dot:'yellow', etStr };
+  }
+  if (etMin >= 960 && etMin < 1200) {
+    const left = 1200 - etMin;
+    return { label:'AFTER-HOURS', sub:`16:00–20:00 ET · ${etStr} ET · se închide în ${Math.floor(left/60)}h${left%60 < 10?'0':''}${left%60}m`, color:'var(--yellow)', dot:'yellow', etStr };
+  }
+  const toPreMkt = etMin < 240 ? 240 - etMin : 1440 - etMin + 240;
+  return { label:'ÎNCHIS', sub:`Pre-market deschide în ${Math.floor(toPreMkt/60)}h${toPreMkt%60 < 10?'0':''}${toPreMkt%60}m`, color:'var(--red)', dot:'red', etStr };
+}
+
+function showMarketStatus() {
+  const el = document.getElementById('marketStatusBar');
+  if (!el) return;
+  const s = getMarketSession();
+  const dotColor = s.dot === 'green' ? '#089981' : s.dot === 'yellow' ? '#e0a800' : '#f23645';
+  const anim = s.dot === 'green' ? 'pulse-green' : s.dot === 'yellow' ? 'pulse-yellow' : '';
+  el.innerHTML = `
+    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:5px;vertical-align:middle;${anim ? `animation:${anim} 1.5s ease-in-out infinite;` : ''}"></span>
+    <span style="font-weight:800;color:${s.color};vertical-align:middle;">${s.label}</span>
+    <span style="color:var(--text2);font-size:10px;margin-left:6px;vertical-align:middle;">${s.sub}</span>`;
+}
+// Tick live — actualizează statusul la fiecare 30s
+setInterval(showMarketStatus, 30000);
+
+// ════════════════════════════════════════════════════════════
+//  SIGNAL NOTIFICATION POP-UP
+// ════════════════════════════════════════════════════════════
+let lastNotifScore = null;
+let latestSignalData = null;
+
+function forceShowSignal() {
+  const inputSym = document.getElementById('symbolInput').value.trim().toUpperCase();
+  if (inputSym && inputSym !== currentSymbol) {
+    loadSymbol(inputSym).then(() => {
+      forceShowSignal();
+    });
+    return;
+  }
+  
+  if (!latestSignalData) {
+    alert('Nicio analiză disponibilă încă. Se încarcă datele...');
+    return;
+  }
+  const { score, lbl, price, reasons, bulls, totalSigs } = latestSignalData;
+  triggerSignalNotification(score, lbl, price, reasons, bulls, totalSigs, true);
+}
+
+function triggerSignalNotification(score, labelText, price, reasons = [], bulls = 0, totalSigs = 5, force = false) {
+  // Only notify automatically on strong signals and if changed
+  const strong = Math.abs(score) >= 0.4;
+  if (!force && !strong) return;
+  if (!force && lastNotifScore !== null && Math.sign(score) === Math.sign(lastNotifScore)) return;
+  lastNotifScore = score;
+
+  const isBuy  = score > 0;
+  const emoji  = '';
+  const action = isBuy ? 'CUMPĂRARE' : 'VÂNZARE';
+  const color  = isBuy ? 'var(--green)' : 'var(--red)';
+  const bg     = isBuy ? 'rgba(8,153,129,.12)' : 'rgba(242,54,69,.12)';
+  const border = isBuy ? 'var(--green)' : 'var(--red)';
+  const conf   = Math.round(Math.abs(score) * 100);
+
+  const reasonsHtml = reasons.map(r => `<div style="margin-top:4px;">${r}</div>`).join('');
+
+  // Remove existing
+  document.getElementById('signalPopup')?.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'signalPopup';
+  popup.style.cssText = `
+    position:fixed;top:66px;right:310px;z-index:9999;
+    background:var(--bg2);border:2px solid ${border};border-radius:12px;
+    padding:14px 18px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.25);
+    animation:slideIn .3s ease;
+  `;
+  popup.innerHTML = `
+    <style>@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}</style>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span style="font-size:13px;font-weight:800;color:${color};">${emoji} SEMNAL AI: ${action}</span>
+      <span onclick="this.parentElement.parentElement.remove()" style="cursor:pointer;color:var(--text2);font-size:16px;line-height:1;">×</span>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">
+      <b style="color:var(--text)">${currentSymbol}</b> @ <b style="color:var(--text)">${fmt(price)}</b>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);">
+      Încredere: <b style="color:${color}">${conf}%</b> (${bulls}/${totalSigs} indicatori)
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.4;">
+      <b style="color:var(--text);font-size:10px;text-transform:uppercase;">Justificare Algoritm:</b>
+      ${reasonsHtml}
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button onclick="document.getElementById('signalPopup').remove()" style="flex:1;background:${bg};border:1px solid ${border};color:${color};border-radius:6px;padding:6px;font-size:11px;font-weight:700;cursor:pointer;">
+        ${isBuy ? '✅ Am înțeles, cumpăr' : '✅ Am înțeles, vând'}
+      </button>
+      <button onclick="document.getElementById('signalPopup').remove()" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:6px;font-size:11px;cursor:pointer;">
+        Ignoră
+      </button>
+    </div>
+    <div style="font-size:9px;color:var(--text2);margin-top:8px;opacity:.7;">⚠️ Nu constituie sfat financiar. Decizii pe propria răspundere.</div>
+  `;
+  document.body.appendChild(popup);
+
+  // Browser notification (dacă e permisă)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(`TradePro AI — ${action} ${currentSymbol}`, {
+      body: `${currentSymbol} @ ${fmt(price)} | Încredere: ${conf}%`,
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28">📈</text></svg>'
+    });
+  }
+
+  // Auto-close after 12 seconds
+  setTimeout(() => document.getElementById('signalPopup')?.remove(), 12000);
+}
+
+// Request browser notification permission (silently)
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+// ════════════════════════════════════════════════════════════
+//  GAUGE
+// ════════════════════════════════════════════════════════════
+function drawGauge(score) {
+  const canvas = document.getElementById('gaugeCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=H-8, r=66;
+
+  ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,0); ctx.lineWidth=13; ctx.strokeStyle='var(--bg3)'; ctx.stroke();
+
+  const grad = ctx.createLinearGradient(cx-r,0,cx+r,0);
+  grad.addColorStop(0,'#f23645'); grad.addColorStop(0.5,'#e0a800'); grad.addColorStop(1,'#089981');
+  const ang = Math.PI + (1+score)*Math.PI/2;
+  ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,ang); ctx.lineWidth=13; ctx.strokeStyle=grad; ctx.lineCap='round'; ctx.stroke();
+
+  const nx=cx+(r-6)*Math.cos(ang), ny=cy+(r-6)*Math.sin(ang);
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(nx,ny); ctx.lineWidth=2; ctx.strokeStyle='var(--text)'; ctx.lineCap='round'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fillStyle='var(--text)'; ctx.fill();
+
+  ctx.font='9px sans-serif'; ctx.fillStyle='var(--red)'; ctx.fillText('SELL',cx-r-2,cy+2);
+  ctx.fillStyle='var(--green)'; ctx.fillText('BUY',cx+r-22,cy+2);
+}
+
+// ════════════════════════════════════════════════════════════
+//  RING CHART
+// ════════════════════════════════════════════════════════════
+function drawRing(pct) {
+  const canvas = document.getElementById('ringCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,60,60);
+  const cx=30, cy=30, r=24;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.lineWidth=7; ctx.strokeStyle='var(--bg4)'; ctx.stroke();
+  const end = -Math.PI/2 + (pct/100)*Math.PI*2;
+  const color = pct > 60 ? '#089981' : pct < 40 ? '#f23645' : '#e0a800';
+  ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,end); ctx.lineWidth=7; ctx.strokeStyle=color; ctx.lineCap='round'; ctx.stroke();
+}
+
+// ════════════════════════════════════════════════════════════
+//  CROSSHAIR
+// ════════════════════════════════════════════════════════════
+function updateCrosshairInfo(param) {
+  const el = document.getElementById('crosshairInfo');
+  if (!param.point || !param.seriesData?.size) { el.style.display='none'; return; }
+  const d = param.seriesData.get(candleSeries);
+  if (!d) return;
+  el.style.display='flex';
+  el.innerHTML = `
+    <span class="chi">O: <span>${fmt(d.open)}</span></span>
+    <span class="chi">H: <span style="color:var(--green)">${fmt(d.high)}</span></span>
+    <span class="chi">L: <span style="color:var(--red)">${fmt(d.low)}</span></span>
+    <span class="chi">C: <span>${fmt(d.close)}</span></span>`;
+}
+
+// ════════════════════════════════════════════════════════════
+//  DRAWING TOOLS
+// ════════════════════════════════════════════════════════════
+function setTool(tool) {
+  activeTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const id = 'tool' + tool[0].toUpperCase() + tool.slice(1);
+  const btn = document.getElementById(id);
+  if (btn) btn.classList.add('active');
+}
+
+function openFibPanel() {
+  // Switch to Fibonacci tab
+  document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-page').forEach(p => p.classList.remove('active'));
+  const fibTab  = document.querySelector('.ptab[data-page="fibonacci"]');
+  const fibPage = document.getElementById('page-fibonacci');
+  if (fibTab)  fibTab.classList.add('active');
+  if (fibPage) fibPage.classList.add('active');
+  // Toggle lines visibility
+  const toggle = document.getElementById('fibToggle');
+  if (toggle) { toggle.checked = !toggle.checked; onFibToggle(); }
+}
+
+function undoDrawing() { /* placeholder */ }
+function clearDrawings() {
+  candleSeries.setMarkers([]);
+  // Also clear Fibonacci lines
+  fibPriceLines.forEach(pl => { try { candleSeries.removePriceLine(pl); } catch(e){} });
+  fibPriceLines = [];
+}
+function toggleFS() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+
+// ════════════════════════════════════════════════════════════
+//  WATCHLIST
+// ════════════════════════════════════════════════════════════
+// Drag & Drop state
+let draggedWlItemIndex = null;
+
+function handleWlDragStart(e, idx) {
+  draggedWlItemIndex = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/html', e.target.innerHTML);
+  e.target.style.opacity = '0.4';
+}
+
+function handleWlDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  return false;
+}
+
+function handleWlDrop(e, dropIdx) {
+  e.stopPropagation();
+  if (draggedWlItemIndex !== null && draggedWlItemIndex !== dropIdx) {
+    const draggedItem = watchlistData.splice(draggedWlItemIndex, 1)[0];
+    watchlistData.splice(dropIdx, 0, draggedItem);
+    saveWatchlist();
+    renderWatchlist();
+  }
+  return false;
+}
+
+function handleWlDragEnd(e) {
+  e.target.style.opacity = '1';
+  draggedWlItemIndex = null;
+}
+
+function wlItemHTML(w, idx) {
+  const delBtn = `<button onclick="event.stopPropagation();removeFromWatchlist('${w.sym}')"
+       style="background:none;border:none;color:var(--text2);font-size:11px;cursor:pointer;padding:0 2px;opacity:.5;line-height:1;"
+       title="Șterge din watchlist">✕</button>`;
+  return `
+    <div class="wl-item ${w.sym===currentSymbol?'active':''}" 
+         draggable="true" 
+         ondragstart="handleWlDragStart(event, ${idx})" 
+         ondragover="handleWlDragOver(event)" 
+         ondrop="handleWlDrop(event, ${idx})" 
+         ondragend="handleWlDragEnd(event)"
+         onclick="loadSymbol('${w.sym}')">
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div class="wl-sym" style="cursor:grab;">${w.sym}</div>
+          ${delBtn}
+        </div>
+        <div class="wl-name">${w.name}</div>
+      </div>
+      <div class="wl-price">
+        <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;">
+          <span id="wls-${safe(w.sym)}" style="display:none;font-size:8px;font-weight:800;color:var(--yellow);background:rgba(224,168,0,.15);padding:1px 4px;border-radius:3px;"></span>
+          <div class="wl-p" id="wlp-${safe(w.sym)}" style="transition:color .3s;">${w.price!=null?fmt(w.price):'—'}</div>
+        </div>
+        <div class="wl-chg ${(w.chg||0)>=0?'up':'dn'}" id="wlc-${safe(w.sym)}">${w.chg!=null?(w.chg>=0?'+':'')+w.chg.toFixed(2)+'%':''}</div>
+      </div>
+    </div>`;
+}
+
+function renderWatchlist() {
+  const userEl = document.getElementById('watchlistUser');
+  if (userEl) {
+    userEl.innerHTML = watchlistData.map((w, idx) => wlItemHTML(w, idx)).join('');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  LIVE BATCH QUOTES — un singur request pentru toate simbolurile
+// ════════════════════════════════════════════════════════════
+let liveQuotes = {};   // cache cu ultimele quote-uri
+let liveUpdateRunning = false;
+
+async function fetchBatchQuotes(symbols) {
+  const fields = [
+    'symbol','shortName','regularMarketPrice','regularMarketChange',
+    'regularMarketChangePercent','regularMarketPreviousClose',
+    'preMarketPrice','preMarketChange','preMarketChangePercent',
+    'postMarketPrice','postMarketChange','postMarketChangePercent',
+    'marketState'
+  ].join(',');
+  const syms = symbols.join(',');
+  const url  = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${fields}&lang=en&region=US`;
+  const json = await fetchJSON(url, 8000);
+  const results = json?.quoteResponse?.result || [];
+  const map = {};
+  results.forEach(q => { map[q.symbol] = q; });
+  return map;
+}
+
+function applyQuoteToDOM(sym, q) {
+  // Alege prețul în funcție de sesiunea curentă
+  const state = q.marketState || 'REGULAR'; // PRE, REGULAR, POST, CLOSED
+  let livePrice, liveChg, liveChgPct, sessionLabel;
+
+  if (state === 'PRE' && q.preMarketPrice != null) {
+    livePrice  = q.preMarketPrice;
+    liveChg    = q.preMarketChange;
+    liveChgPct = q.preMarketChangePercent;
+    sessionLabel = 'pre';
+  } else if ((state === 'POST' || state === 'POSTPOST') && q.postMarketPrice != null) {
+    livePrice  = q.postMarketPrice;
+    liveChg    = q.postMarketChange;
+    liveChgPct = q.postMarketChangePercent;
+    sessionLabel = 'post';
+  } else {
+    livePrice  = q.regularMarketPrice;
+    liveChg    = q.regularMarketChange;
+    liveChgPct = q.regularMarketChangePercent;
+    sessionLabel = 'reg';
+  }
+
+  if (livePrice == null || isNaN(livePrice)) return;
+
+  const id   = safe(sym);
+  const pe   = document.getElementById('wlp-' + id);
+  const ce   = document.getElementById('wlc-' + id);
+  const se   = document.getElementById('wls-' + id); // session badge
+
+  if (pe) {
+    const newTxt = fmt(livePrice);
+    if (pe.dataset.last && pe.dataset.last !== newTxt) {
+      const up = liveChg >= 0;
+      pe.classList.remove('flash-up','flash-dn');
+      void pe.offsetWidth;
+      pe.classList.add(up ? 'flash-up' : 'flash-dn');
+    }
+    pe.dataset.last = newTxt;
+    pe.textContent  = newTxt;
+    pe.style.color  = liveChg >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  if (ce && liveChgPct != null) {
+    const pct = liveChgPct.toFixed(2);
+    ce.textContent = (liveChg >= 0 ? '+' : '') + pct + '%';
+    ce.className   = `wl-chg ${liveChg >= 0 ? 'up' : 'dn'}`;
+  }
+
+  if (se) {
+    se.textContent  = sessionLabel === 'pre' ? 'PRE' : sessionLabel === 'post' ? 'POST' : '';
+    se.style.display = sessionLabel !== 'reg' ? 'inline' : 'none';
+  }
+
+  // Actualizează topbar + extended hours dacă e simbolul curent
+  if (sym === currentSymbol && livePrice != null) {
+    animatePrice(livePrice);
+    document.getElementById('curPrice').textContent = fmt(livePrice);
+    
+    // Afiseaza numele companiei din quote
+    const nameEl = document.getElementById('curCompanyName');
+    if (nameEl && (q.shortName || q.longName)) {
+      nameEl.textContent = q.shortName || q.longName;
+      nameEl.title = q.shortName || q.longName;
+    }
+    
+    if (liveChg != null) {
+      const ce2 = document.getElementById('curChange');
+      ce2.textContent = `${liveChg>=0?'+':''}${fmt(liveChg)} (${liveChg>=0?'+':''}${liveChgPct.toFixed(2)}%)`;
+      ce2.className   = liveChg >= 0 ? 'up' : 'dn';
+      // Titlul tabului de browser se actualizeaza live
+      document.title = `${sym} ${fmt(livePrice)} (${liveChg>=0?'+':''}${liveChgPct.toFixed(2)}%) — TradePro AI`;
+    }
+    // Stats panel — regular
+    document.getElementById('statC').textContent = fmt(livePrice);
+    const s24 = document.getElementById('stat24h');
+    if (s24 && q.regularMarketChangePercent != null) {
+      const rPct = q.regularMarketChangePercent;
+      s24.textContent = `${rPct>=0?'+':''}${rPct.toFixed(2)}%`;
+      s24.className   = `stat-val ${rPct>=0?'green':'red'}`;
+    }
+
+    // ── Extended Hours Card în topbar ─────────────────────
+    const extCard    = document.getElementById('extHoursCard');
+    const extLabel   = document.getElementById('extHoursLabel');
+    const extPrice   = document.getElementById('extHoursPrice');
+    const extChange  = document.getElementById('extHoursChange');
+
+    // ── Stats panel extended hours rows ──────────────────
+    const preRow     = document.getElementById('statPreRow');
+    const postRow    = document.getElementById('statPostRow');
+    const extChgRow  = document.getElementById('statExtChgRow');
+    const statPre    = document.getElementById('statPre');
+    const statPost   = document.getElementById('statPost');
+    const statExtChg = document.getElementById('statExtChg');
+    const statExtChgLabel = document.getElementById('statExtChgLabel');
+
+    const hasPre  = q.preMarketPrice != null;
+    const hasPost = q.postMarketPrice != null;
+
+    // Pre-market rows in stats
+    if (preRow)  preRow.style.display  = hasPre  ? 'flex' : 'none';
+    if (postRow) postRow.style.display = hasPost ? 'flex' : 'none';
+
+    if (hasPre && statPre) {
+      const preChgPct = q.preMarketChangePercent || 0;
+      statPre.textContent = `${fmt(q.preMarketPrice)}  ${preChgPct>=0?'+':''}${preChgPct.toFixed(2)}%`;
+      statPre.className   = `stat-val ${preChgPct>=0?'yellow':'red'}`;
+    }
+    if (hasPost && statPost) {
+      const postChgPct = q.postMarketChangePercent || 0;
+      statPost.textContent = `${fmt(q.postMarketPrice)}  ${postChgPct>=0?'+':''}${postChgPct.toFixed(2)}%`;
+      statPost.className   = `stat-val ${postChgPct>=0?'yellow':'red'}`;
+    }
+
+    // Cardul vizibil din topbar — arată prețul sesiunii active extended
+    const inPre  = state === 'PRE'  && hasPre;
+    const inPost = (state === 'POST' || state === 'POSTPOST') && hasPost;
+
+    if ((inPre || inPost) && extCard) {
+      const ehPrice = inPre  ? q.preMarketPrice  : q.postMarketPrice;
+      const ehChg   = inPre  ? q.preMarketChange : q.postMarketChange;
+      const ehChgPct= inPre  ? q.preMarketChangePercent : q.postMarketChangePercent;
+      const ehLabel = inPre  ? '🌅 PRE-MARKET' : '🌆 AFTER-HOURS';
+
+      extCard.style.display   = 'block';
+      extLabel.textContent    = ehLabel;
+      extPrice.textContent    = fmt(ehPrice);
+      extPrice.style.color    = ehChg >= 0 ? 'var(--green)' : 'var(--red)';
+      extChange.textContent   = `${ehChg>=0?'+':''}${fmt(ehChg)} (${ehChg>=0?'+':''}${ehChgPct.toFixed(2)}%)`;
+      extChange.style.color   = ehChg >= 0 ? 'var(--green)' : 'var(--red)';
+
+      // Și în extChgRow din stats panel
+      if (extChgRow && statExtChg) {
+        extChgRow.style.display    = 'flex';
+        statExtChgLabel.textContent= inPre ? '📊 Var. pre-mkt' : '📊 Var. after-hrs';
+        statExtChg.textContent     = `${ehChgPct>=0?'+':''}${ehChgPct.toFixed(2)}%`;
+        statExtChg.className       = `stat-val ${ehChgPct>=0?'yellow':'red'}`;
+      }
+    } else {
+      if (extCard) extCard.style.display = 'none';
+      if (extChgRow) extChgRow.style.display = 'none';
+    }
+  }
+}
+
+async function updateWatchlistPrices() {
+  if (liveUpdateRunning) return;
+  liveUpdateRunning = true;
+  try {
+    const syms  = watchlistData.map(w => w.sym);
+    const quotes = await fetchBatchQuotes(syms);
+    liveQuotes  = { ...liveQuotes, ...quotes };
+    syms.forEach(sym => { if (quotes[sym]) applyQuoteToDOM(sym, quotes[sym]); });
+    // Actualizează și simbolul curent dacă nu e în watchlist
+    if (!syms.includes(currentSymbol) && currentSymbol) {
+      const singleQuotes = await fetchBatchQuotes([currentSymbol]);
+      if (singleQuotes[currentSymbol]) applyQuoteToDOM(currentSymbol, singleQuotes[currentSymbol]);
+    }
+    // Update indicator live în status bar
+    const dotEl = document.getElementById('liveUpdateDot');
+    if (dotEl) { dotEl.style.opacity='1'; setTimeout(()=>{ dotEl.style.opacity='.3'; }, 400); }
+  } catch(e) {
+    console.warn('Batch quote fail:', e.message);
+  } finally {
+    liveUpdateRunning = false;
+  }
+}
+
+function addToWatchlistCustom() {
+  const input = document.getElementById('addWlInput');
+  const sym = input ? input.value : null;
+  if (!sym) return;
+  const symUp = sym.trim().toUpperCase();
+  if (watchlistData.find(w => w.sym === symUp)) { alert(`${symUp} există deja în watchlist!`); return; }
+  watchlistData.push({sym: symUp, name: symUp});
+  saveWatchlist();
+  renderWatchlist();
+  updateWatchlistPrices();
+  if (input) input.value = '';
+}
+
+function removeFromWatchlist(sym) {
+  watchlistData = watchlistData.filter(w => w.sym !== sym);
+  saveWatchlist();
+  renderWatchlist();
+}
+
+// ════════════════════════════════════════════════════════════
+//  MAIN LOAD
+// ════════════════════════════════════════════════════════════
+async function loadSymbol(symbol, tf) {
+  currentSymbol = (symbol || document.getElementById('symbolInput').value.trim()).toUpperCase();
+  if (!currentSymbol) return;
+  currentTF = tf || currentTF;
+  document.getElementById('symbolInput').value = currentSymbol;
+  document.getElementById('loadOverlay').style.display = 'flex';
+  setLoadText(`Se încarcă ${currentSymbol}…`);
+
+  // Clear DEMO badge if present
+  const demoBadge = document.getElementById('demoBadge');
+  if (demoBadge) demoBadge.remove();
+
+  try {
+    const { raw, meta } = await fetchData(currentSymbol, currentTF);
+    
+    // Salvează ultimul simbol căutat dacă fetch-ul a avut succes
+    localStorage.setItem('tradepro_last_symbol', currentSymbol);
+    
+    renderAll(raw);
+    runAnalysis(raw, meta);
+    renderWatchlist();
+    document.getElementById('loadOverlay').style.display = 'none';
+
+    // Show DEMO badge if no live data
+    if (meta && meta.demo) {
+      const badge = document.createElement('div');
+      badge.id = 'demoBadge';
+      badge.innerHTML = `⚠️ DATE DEMO — Proxy Error: ${meta.err || 'Unknown'}`;
+      badge.style.cssText = 'position:absolute;top:8px;right:8px;z-index:30;background:rgba(224,168,0,.15);border:1px solid var(--yellow);color:var(--yellow);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;pointer-events:none;';
+      document.getElementById('chartMain').appendChild(badge);
+    }
+  } catch(e) {
+    setLoadText(`❌ ${e.message}`);
+    setTimeout(() => document.getElementById('loadOverlay').style.display='none', 4000);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════════════
+function fmt(v) {
+  if (v == null || isNaN(v)) return '—';
+  if (v >= 1000) return v.toLocaleString('ro-RO', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (v >= 1) return v.toFixed(2);
+  return v.toFixed(6);
+}
+function fmtVol(v) {
+  if (!v) return '—';
+  if (v>=1e9) return (v/1e9).toFixed(2)+'B';
+  if (v>=1e6) return (v/1e6).toFixed(2)+'M';
+  if (v>=1e3) return (v/1e3).toFixed(1)+'K';
+  return v.toString();
+}
+function safe(s) { return s.replace(/[^a-z0-9]/gi,''); }
+
+// ════════════════════════════════════════════════════════════
+//  BIND BUTTONS
+// ════════════════════════════════════════════════════════════
+document.querySelectorAll('.tf-btn').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  loadSymbol(currentSymbol, btn.dataset.tf);
+}));
+
+document.querySelectorAll('.ind-btn').forEach(btn => btn.addEventListener('click', () => {
+  const ind = btn.dataset.ind;
+  indicators[ind] = !indicators[ind];
+  btn.classList.toggle('active', indicators[ind]);
+  if (allData.length) renderAll(allData);
+}));
+
+// Cautare prin Enter pe input (butonul Analizeaza a fost inlocuit cu Enter)
+document.getElementById('symbolInput').addEventListener('keydown', e => { if (e.key==='Enter') { closeAllLists(); loadSymbol(); } });
+
+// ════════════════════════════════════════════════════════════
+//  FIBONACCI AUTO — ENGINE COMPLET
+// ════════════════════════════════════════════════════════════
+
+// Culori per nivel
+const FIB_COLORS = {
+  '0.0':   '#ef5350',
+  '23.6':  '#ff9800',
+  '38.2':  '#f0b90b',
+  '50.0':  '#9c27b0',
+  '61.8':  '#2962ff',   // Golden ratio — cel mai important
+  '78.6':  '#00bcd4',
+  '100.0': '#089981',
+  '127.2': '#e91e63',
+  '161.8': '#ff5722',
+  '200.0': '#795548',
+  '261.8': '#607d8b',
+};
+
+const FIB_RATIOS    = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+const FIB_EXT_RATIOS= [1.272, 1.618, 2.0, 2.618];
+
+let fibPriceLines  = [];   // price line references pe candleSeries
+let fibVisible     = true;
+let fibLookback    = 60;
+
+// ── Detecție automată swing high / swing low ──────────────
+function detectSwings(data, lookback) {
+  const recent = data.slice(-lookback);
+  let hiIdx = 0, loIdx = 0;
+  let hi = recent[0].high, lo = recent[0].low;
+
+  // Zigzag simplu: caută pivotul semnificativ, nu doar extremul global
+  // Pasul 1: extremele brute
+  recent.forEach((d, i) => {
+    if (d.high > hi) { hi = d.high; hiIdx = i; }
+    if (d.low  < lo) { lo = d.low;  loIdx = i; }
+  });
+
+  // Pasul 2: direcția mișcării (highIdx vs lowIdx în timp)
+  // Dacă highIdx < lowIdx → prețul a coborât după maxim → retracement descendent
+  // Dacă highIdx > lowIdx → prețul a urcat după minim  → retracement ascendent
+  const trendUp = hiIdx > loIdx; // high apare DUPĂ low → trend up recent
+
+  return {
+    swingHigh: hi,
+    swingLow: lo,
+    hiIdx, loIdx,
+    trendUp,
+    range: hi - lo,
+  };
+}
+
+// ── Calculează niveluri Fibonacci ────────────────────────
+function calcFibLevels(swingHigh, swingLow, trendUp) {
+  const range = swingHigh - swingLow;
+  // Retracement: de la extremul recent spre cel opus
+  const levels = FIB_RATIOS.map(r => ({
+    ratio: r,
+    label: (r * 100).toFixed(1),
+    // dacă trend up → retracement coboară de la high spre low
+    price: trendUp
+      ? swingHigh - r * range
+      : swingLow  + r * range,
+  }));
+  const extensions = FIB_EXT_RATIOS.map(r => ({
+    ratio: r,
+    label: (r * 100).toFixed(1),
+    price: trendUp
+      ? swingLow  - (r - 1) * range   // extensie sub low
+      : swingHigh + (r - 1) * range,  // extensie deasupra high
+  }));
+  return { levels, extensions };
+}
+
+// ── Desenează price lines pe grafic ──────────────────────
+function drawFibLines(levels, extensions, visible) {
+  // Șterge liniile vechi
+  fibPriceLines.forEach(pl => { try { candleSeries.removePriceLine(pl); } catch(e){} });
+  fibPriceLines = [];
+  if (!visible) return;
+
+  const allLevels = [
+    ...levels.map(l => ({...l, isExt: false})),
+    ...extensions.map(l => ({...l, isExt: true})),
+  ];
+
+  allLevels.forEach(l => {
+    const key    = l.label;
+    const color  = FIB_COLORS[key] || (l.isExt ? 'rgba(150,150,150,0.5)' : '#787b86');
+    const width  = (l.label === '61.8' || l.label === '38.2') ? 2 : 1;
+    try {
+      const pl = candleSeries.createPriceLine({
+        price:              l.price,
+        color:              color,
+        lineWidth:          width,
+        lineStyle:          l.isExt
+                              ? LightweightCharts.LineStyle.Dotted
+                              : LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible:   true,
+        title:              `Fib ${l.label}%${l.isExt ? ' ext' : ''}`,
+      });
+      fibPriceLines.push(pl);
+    } catch(e) { console.warn('PriceLine error:', e.message); }
+  });
+}
+
+// ── Analiză AI Fibonacci ──────────────────────────────────
+function analyzeFibonacci(currentPrice, levels, swingHigh, swingLow, trendUp) {
+  const range  = swingHigh - swingLow;
+  // Găsește nivelul imediat superior și inferior față de preț curent
+  const sorted = [...levels].sort((a,b) => a.price - b.price);
+  const below  = sorted.filter(l => l.price <= currentPrice);
+  const above  = sorted.filter(l => l.price >  currentPrice);
+
+  const nearBelow = below.length ? below[below.length - 1] : null;
+  const nearAbove = above.length ? above[0] : null;
+
+  // Câtă % din range s-a retras
+  const retracePct = trendUp
+    ? ((swingHigh - currentPrice) / range * 100)
+    : ((currentPrice - swingLow)  / range * 100);
+
+  // Cel mai apropiat nivel cheie
+  const closestLevel = levels.reduce((best, l) => {
+    const d = Math.abs(l.price - currentPrice);
+    return d < Math.abs(best.price - currentPrice) ? l : best;
+  }, levels[0]);
+
+  const atKey = Math.abs(closestLevel.price - currentPrice) / currentPrice < 0.005; // în ±0.5%
+
+  // Generează recomandare
+  let signal = 'neut', icon = '⚖️', title, text, targetBuy, targetSell, stop;
+
+  if (closestLevel.label === '61.8' && atKey) {
+    if (trendUp) {
+      signal = 'bull'; icon = '🟢';
+      title  = 'La Golden Ratio (61.8%) — Suport Major';
+      text   = `Prețul testează nivelul Fibonacci 61.8% (${fmt(closestLevel.price)}) — cel mai important suport de retracement. Istoricul arată că trendurile ascendente reiau creșterea de la acest nivel. Probabilitate ridicată de bounce.`;
+      targetBuy  = nearAbove ? nearAbove.price : swingHigh;
+      stop       = levels.find(l=>l.label==='78.6')?.price || closestLevel.price * 0.99;
+      targetSell = swingHigh;
+    } else {
+      signal = 'bear'; icon = '🔴';
+      title  = 'La Golden Ratio (61.8%) — Rezistență Majoră';
+      text   = `Prețul testează rezistența Fibonacci 61.8% (${fmt(closestLevel.price)}). Nivel extrem de important. Dacă nu îl depășește, poate urma o corecție.`;
+      stop       = closestLevel.price * 1.005;
+      targetSell = nearBelow ? nearBelow.price : swingLow;
+    }
+  } else if (closestLevel.label === '38.2' && atKey) {
+    signal = trendUp ? 'bull' : 'bear'; icon = trendUp ? '🟢' : '🔴';
+    title  = `La 38.2% — ${trendUp ? 'Suport' : 'Rezistență'} Moderat`;
+    text   = `Nivelul 38.2% (${fmt(closestLevel.price)}) este un suport/rezistență moderat în teoria Fibonacci. Retrasul clasic se oprește adesea aici.`;
+    targetBuy  = trendUp ? (nearAbove?.price || swingHigh) : undefined;
+    targetSell = !trendUp ? (nearBelow?.price || swingLow) : undefined;
+    stop       = trendUp ? levels.find(l=>l.label==='50.0')?.price : levels.find(l=>l.label==='23.6')?.price;
+  } else if (closestLevel.label === '50.0' && atKey) {
+    signal = 'neut'; icon = '🟡';
+    title  = 'La 50% — Nivel Pivot Psihologic';
+    text   = `Prețul la exact 50% (${fmt(closestLevel.price)}) din mișcarea anterioară. Nivel important psihologic. Fii atent la confirmarea direcției cu volum.`;
+  } else if (retracePct < 23.6) {
+    signal = trendUp ? 'bull' : 'bear'; icon = trendUp ? '🚀' : '📉';
+    title  = trendUp ? 'Retracement Superficial — Trend Puternic' : 'Extensie Agresivă Bearish';
+    text   = `Retrasul de ${retracePct.toFixed(1)}% sub 23.6% indică un trend ${trendUp?'bullish extrem de puternic':'bearish agresiv'}. Piața nu vrea să se corecteze — continuare probabilă.`;
+  } else if (retracePct > 78.6) {
+    signal = trendUp ? 'bear' : 'bull'; icon = '⚠️';
+    title  = 'Retracement Adânc (>78.6%) — Pericol Inversare';
+    text   = `Retrasul depășește 78.6% (${retracePct.toFixed(1)}%). Un retracement > 100% invalidează structura. Trendurile sănătoase nu retrasează atât de adânc. Risc de inversare.`;
+  } else {
+    const nearLabel = closestLevel.label;
+    title = `Între niveluri Fibonacci (retras ${retracePct.toFixed(1)}%)`;
+    text  = `Prețul se află ${nearBelow ? `deasupra Fib ${nearBelow.label}% (${fmt(nearBelow.price)})` : 'sub toate nivelurile'} și ${nearAbove ? `sub Fib ${nearAbove.label}% (${fmt(nearAbove.price)})` : 'deasupra tuturor nivelurilor'}. Urmărește breakout/bounce la nivelul ${nearLabel}%.`;
+  }
+
+  return { signal, icon, title, text, targetBuy, targetSell, stop, nearBelow, nearAbove, retracePct, closestLevel, atKey };
+}
+
+// ── Randare completă Fibonacci ────────────────────────────
+function renderFibonacci(data) {
+  if (!data || data.length < 10) return;
+  const lb = parseInt(document.getElementById('fibLookback')?.value || 60);
+  fibLookback = lb;
+
+  const { swingHigh, swingLow, trendUp, range } = detectSwings(data, lb);
+  const { levels, extensions } = calcFibLevels(swingHigh, swingLow, trendUp);
+  const currentPrice = data[data.length - 1].close;
+  const visible = document.getElementById('fibToggle')?.checked ?? true;
+
+  // Desenează pe grafic
+  drawFibLines(levels, extensions, visible);
+
+  // Update swing info
+  document.getElementById('fibSwingHigh').textContent = fmt(swingHigh);
+  document.getElementById('fibSwingLow').textContent  = fmt(swingLow);
+  const ampPct = (range / swingLow * 100).toFixed(2);
+  document.getElementById('fibAmplitude').textContent = `${fmt(range)} (${ampPct}%)`;
+
+  // Analiză AI
+  const analysis = analyzeFibonacci(currentPrice, levels, swingHigh, swingLow, trendUp);
+
+  // Recommendation box
+  const recColor = analysis.signal === 'bull' ? 'var(--green)' : analysis.signal === 'bear' ? 'var(--red)' : 'var(--yellow)';
+  const recBorder = analysis.signal === 'bull' ? 'rgba(8,153,129,.3)' : analysis.signal === 'bear' ? 'rgba(242,54,69,.3)' : 'rgba(224,168,0,.3)';
+  document.getElementById('fibRecommendation').innerHTML = `
+    <div class="fib-rec-header">
+      <span class="fib-rec-icon">${analysis.icon}</span>
+      <span class="fib-rec-title">${analysis.title}</span>
+      <span class="fib-rec-badge ${analysis.signal}">${analysis.signal==='bull'?'BULLISH':analysis.signal==='bear'?'BEARISH':'NEUTRU'}</span>
+    </div>
+    <div class="fib-rec-text">${analysis.text}</div>
+    ${(analysis.targetBuy || analysis.targetSell || analysis.stop) ? `
+    <div class="fib-rec-targets" style="margin-top:10px;">
+      ${analysis.targetBuy  ? `<div class="fib-rec-target"><div class="label">🎯 Target</div><div class="val" style="color:var(--green)">${fmt(analysis.targetBuy)}</div></div>` : ''}
+      ${analysis.stop       ? `<div class="fib-rec-target"><div class="label">🛑 Stop</div><div class="val" style="color:var(--red)">${fmt(analysis.stop)}</div></div>` : ''}
+      ${analysis.targetSell ? `<div class="fib-rec-target"><div class="label">📤 Ieșire</div><div class="val" style="color:var(--red)">${fmt(analysis.targetSell)}</div></div>` : ''}
+      <div class="fib-rec-target"><div class="label">Retras</div><div class="val" style="color:var(--yellow)">${analysis.retracePct.toFixed(1)}%</div></div>
+    </div>` : ''}
+  `;
+  document.getElementById('fibRecommendation').style.borderColor = recBorder;
+
+  // Tabel niveluri retracement
+  document.getElementById('fibTableBody').innerHTML = levels.map(l => {
+    const color   = FIB_COLORS[l.label] || '#787b86';
+    const dist    = ((l.price / currentPrice - 1) * 100);
+    const isBelow = l.price <= currentPrice;
+    const isCur   = Math.abs(l.price - currentPrice) / currentPrice < 0.008;
+    const typeLabel = isCur ? 'CUR' : isBelow ? 'SUP' : 'REZ';
+    const typeCls   = isCur ? 'cur' : isBelow ? 'sup' : 'res';
+    const rowCls    = isCur ? 'current-zone' : '';
+    const special   = l.label === '61.8' ? ' ★' : l.label === '38.2' ? ' •' : '';
+    return `<tr class="fib-level-row ${rowCls}">
+      <td><span class="fib-dot" style="background:${color}"></span><span class="fib-ratio">${l.label}%${special}</span></td>
+      <td class="fib-price">${fmt(l.price)}</td>
+      <td class="fib-dist" style="color:${dist>=0?'var(--green)':'var(--red)'}">${dist>=0?'+':''}${dist.toFixed(2)}%</td>
+      <td><span class="fib-type ${typeCls}">${typeLabel}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Tabel extensii
+  document.getElementById('fibExtBody').innerHTML = extensions.map(l => {
+    const color = FIB_COLORS[l.label] || 'rgba(150,150,150,0.8)';
+    const dist  = ((l.price / currentPrice - 1) * 100);
+    return `<tr>
+      <td><span class="fib-dot" style="background:${color}"></span><span class="fib-ratio">${l.label}%</span></td>
+      <td class="fib-price">${fmt(l.price)}</td>
+      <td class="fib-dist" style="color:${dist>=0?'var(--green)':'var(--red)'}">${dist>=0?'+':''}${dist.toFixed(2)}%</td>
+      <td><span style="font-size:10px;color:var(--text2);">EXT</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function onFibToggle() {
+  fibVisible = document.getElementById('fibToggle').checked;
+  if (allData.length) {
+    const lb = parseInt(document.getElementById('fibLookback').value);
+    const { swingHigh, swingLow, trendUp } = detectSwings(allData, lb);
+    const { levels, extensions } = calcFibLevels(swingHigh, swingLow, trendUp);
+    drawFibLines(levels, extensions, fibVisible);
+  }
+}
+
+function onFibLookbackChange() {
+  if (allData.length) renderFibonacci(allData);
+}
+
+// ════════════════════════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════════════════════════
+// ── Live clock ────────────────────────────────────────────
+function tickClock() {
+  const el = document.getElementById('liveClock');
+  if (!el) return;
+  const now = new Date();
+  const s = getMarketSession();
+  el.textContent = `${now.toLocaleTimeString('ro-RO')}  ·  ${s.etStr} ET`;
+}
+setInterval(tickClock, 1000);
+
+// ── Animație preț la schimbare ────────────────────────────
+let lastDisplayedPrice = null;
+function animatePrice(newPrice) {
+  const el = document.getElementById('curPrice');
+  if (!el) return;
+  if (lastDisplayedPrice !== null && newPrice !== lastDisplayedPrice) {
+    el.classList.remove('price-up','price-dn','countup');
+    void el.offsetWidth; // reflow
+    el.classList.add(newPrice > lastDisplayedPrice ? 'price-up' : 'price-dn', 'countup');
+    setTimeout(() => el.classList.remove('price-up','price-dn'), 1200);
+  }
+  lastDisplayedPrice = newPrice;
+}
+
+function openDeepForecastModal() {
+  const inputSym = document.getElementById('symbolInput').value.trim().toUpperCase();
+  if (inputSym && inputSym !== currentSymbol) {
+    loadSymbol(inputSym).then(() => {
+      showDeepForecastPopup();
+    });
+  } else {
+    showDeepForecastPopup();
+  }
+}
+
+function showDeepForecastPopup() {
+  document.getElementById('dfModalTitle').textContent = `Deep Forecast: ${currentSymbol}`;
+  document.getElementById('dfModal').style.display = 'flex';
+  document.getElementById('dfModalBody').innerHTML = `<div style="text-align:center;padding:60px;color:var(--text2);"><div class="spinner" style="margin:0 auto 20px;"></div><div style="font-size:16px;font-weight:700;">Extrag date instituționale și tipare istorice...</div></div>`;
+  
+  setTimeout(() => {
+    runDeepForecast();
+  }, 100);
+}
+
+async function runDeepForecast() {
+  if (!allData || allData.length < 50) {
+     document.getElementById('dfModalBody').innerHTML = `<div style="color:var(--red);text-align:center;font-weight:700;">Date insuficiente pentru o analiză Deep Forecast (minim 50 bare necesare).</div>`;
+     return;
+  }
+  
+  const last = allData[allData.length - 1];
+  const closes = allData.map(d => d.close);
+  
+  // Fetch Quote for Earnings + analiza reactiei
+  let earningsHtml = `<div style="font-size:11px;color:var(--text2);margin-top:4px;">Date raportare indisponibile</div>`;
+  let isEarningsDanger = false;
+  try {
+     const quoteUrl = PROXIES[0](`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${currentSymbol}`);
+     const quoteRes = await fetch(quoteUrl);
+     const quoteJson = await quoteRes.json();
+     const qData = quoteJson?.quoteResponse?.result?.[0];
+     if (qData && qData.earningsTimestamp) {
+         const eDate = new Date(qData.earningsTimestamp * 1000);
+         const now   = new Date();
+         // Fix timezone: compara doar datele calendaristice
+         const eDateDay = new Date(eDate.getFullYear(), eDate.getMonth(), eDate.getDate());
+         const nowDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+         const daysToEarn = Math.round((eDateDay - nowDay) / (1000 * 60 * 60 * 24));
+
+         if (daysToEarn > 0 && daysToEarn <= 14) {
+             isEarningsDanger = true;
+             earningsHtml = `<div style="font-size:11px;color:var(--red);margin-top:4px;font-weight:800;">[!] Urmeaza EARNINGS in ${daysToEarn} ${daysToEarn === 1 ? 'zi' : 'zile'}! (${eDate.toLocaleDateString('ro-RO')}) - Volatilitate extrema garantata. Nu intra fara stop!</div>`;
+         } else if (daysToEarn <= 0 && daysToEarn >= -10) {
+             // Earnings tocmai a trecut - analizeaza reactia pretului din datele istorice
+             const absDay = Math.abs(daysToEarn);
+             let reactionHtml = '';
+             const dayLabel = daysToEarn === 0 ? 'AZI' : daysToEarn === -1 ? 'IERI' : `acum ${absDay} zile`;
+             
+             // Cauta bara din ziua earnings si ziua anterioara din datele noastre
+             const eTs = Math.floor(eDate.getTime() / 1000);
+             // Gaseste cea mai apropiata bara din allData
+             let closestIdx = -1, minDiff = Infinity;
+             for (let i = 0; i < allData.length; i++) {
+                 const diff = Math.abs(allData[i].time - eTs);
+                 if (diff < minDiff) { minDiff = diff; closestIdx = i; }
+             }
+             
+             if (closestIdx > 0 && minDiff < 86400 * 3) {
+                 const earningsBar  = allData[closestIdx];
+                 const prevBar      = allData[closestIdx - 1];
+                 const nextBar      = allData[Math.min(closestIdx + 1, allData.length - 1)];
+                 const gapPct       = ((earningsBar.open - prevBar.close) / prevBar.close * 100).toFixed(2);
+                 const dayMovePct   = ((earningsBar.close - earningsBar.open) / earningsBar.open * 100).toFixed(2);
+                 const afterMovePct = closestIdx + 1 < allData.length ? ((nextBar.close - earningsBar.close) / earningsBar.close * 100).toFixed(2) : null;
+                 const gapColor  = parseFloat(gapPct)  >= 0 ? '#00e676' : '#ff1744';
+                 const dayColor  = parseFloat(dayMovePct) >= 0 ? '#00e676' : '#ff1744';
+                 const aftrColor = afterMovePct && parseFloat(afterMovePct) >= 0 ? '#00e676' : '#ff1744';
+                 
+                 reactionHtml = `
+                   <div style="margin-top:6px;padding:8px;background:rgba(255,255,255,0.04);border-radius:5px;border-left:3px solid var(--yellow);">
+                     <div style="font-size:11px;font-weight:800;color:var(--yellow);margin-bottom:6px;">REACTIA PRETULUI LA EARNINGS (${dayLabel}):</div>
+                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px;">
+                       <div><span style="color:var(--text2);">Gap dupa raportare:</span><br><span style="font-weight:800;color:${gapColor};">${parseFloat(gapPct)>=0?'+':''}${gapPct}%</span></div>
+                       <div><span style="color:var(--text2);">Miscare in ziua raportarii:</span><br><span style="font-weight:800;color:${dayColor};">${parseFloat(dayMovePct)>=0?'+':''}${dayMovePct}%</span></div>
+                       ${afterMovePct ? `<div><span style="color:var(--text2);">Ziua urmatoare:</span><br><span style="font-weight:800;color:${aftrColor};">${parseFloat(afterMovePct)>=0?'+':''}${afterMovePct}%</span></div>` : ''}
+                     </div>
+                     <div style="margin-top:5px;font-size:10px;color:var(--text2);">Pretul inainte: <b>$${prevBar.close.toFixed(2)}</b> | Deschidere dupa: <b>$${earningsBar.open.toFixed(2)}</b> | Inchidere: <b>$${earningsBar.close.toFixed(2)}</b></div>
+                   </div>`;
+             } else {
+                 reactionHtml = `<div style="font-size:10px;color:var(--text2);margin-top:4px;">Datele zilnice pentru aceasta data nu sunt inca disponibile in istoricul incarcat.</div>`;
+             }
+             earningsHtml = `<div style="font-size:11px;color:var(--yellow);margin-top:4px;font-weight:800;">[!] EARNINGS A TRECUT ${dayLabel} (${eDate.toLocaleDateString('ro-RO')}) - Piata inca proceseaza reactia!</div>${reactionHtml}`;
+         } else {
+             const nextEarnDate = qData.earningsTimestampStart 
+                 ? new Date(qData.earningsTimestampStart * 1000).toLocaleDateString('ro-RO')
+                 : eDate.toLocaleDateString('ro-RO');
+             earningsHtml = `<div style="font-size:11px;color:var(--text2);margin-top:4px;">Ultimul raport: ${eDate.toLocaleDateString('ro-RO')} | Urmatorul estimat: cca ${nextEarnDate}</div>`;
+         }
+     }
+  } catch(e) { console.error('Earnings fetch err:', e); }
+  
+  // 1. Market Regime (ATR)
+  const lookback = 14;
+  let trSum = 0;
+  for (let i = allData.length - lookback; i < allData.length; i++) {
+     const high = allData[i].high;
+     const low = allData[i].low;
+     const prevClose = allData[i-1] ? allData[i-1].close : low;
+     const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+     trSum += tr;
+  }
+  const atr = trSum / lookback;
+  const atrPct = (atr / last.close) * 100;
+  
+  let regime = "Normal";
+  let regimeColor = "var(--text)";
+  if (atrPct > 4) { regime = "Volatilitate Extremă"; regimeColor = "var(--red)"; }
+  else if (atrPct < 1) { regime = "Consolidare (Range)"; regimeColor = "var(--yellow)"; }
+  else { regime = "Trend Sănătos"; regimeColor = "var(--green)"; }
+  
+  // 2. Volume Profile
+  let volUp = 0, volDn = 0;
+  const volLookback = 20;
+  for (let i = allData.length - volLookback; i < allData.length; i++) {
+     const d = allData[i];
+     if (d.close > d.open) volUp += d.volume;
+     else volDn += d.volume;
+  }
+  const volRatio = volUp / (volDn || 1);
+  const volAnalysis = volRatio > 1.2 ? "Acumulare Instituțională" : volRatio < 0.8 ? "Distribuție Masivă" : "Flux Neutru";
+  const volColor = volRatio > 1.2 ? "var(--green)" : volRatio < 0.8 ? "var(--red)" : "var(--yellow)";
+  
+  // 3. Multi-Timeframe Confluence (Simulated via SMA50 vs SMA200)
+  const sma50Data = sma(allData, 50);
+  const sma200Data = sma(allData, 200);
+  const sma50 = sma50Data.length ? sma50Data[sma50Data.length-1].value : last.close;
+  const sma200 = sma200Data.length ? sma200Data[sma200Data.length-1].value : last.close;
+  const confluence = last.close > sma50 && sma50 > sma200 ? "BULLISH PUTERNIC (Breakout)" : last.close < sma50 && sma50 < sma200 ? "BEARISH PUTERNIC (Downtrend)" : "PULLBACK / HAOS";
+  const confColor = confluence.includes("BULLISH") ? "var(--green)" : confluence.includes("BEARISH") ? "var(--red)" : "var(--yellow)";
+  
+  // 4. Mathematical Targets (ATR + Momentum based)
+  const isBull = confluence.includes("BULLISH") || volRatio > 1;
+  const stopLoss = isBull ? last.close - (atr * 1.5) : last.close + (atr * 1.5);
+  const target1 = isBull ? last.close + (atr * 2) : last.close - (atr * 2);
+  const target2 = isBull ? last.close + (atr * 4) : last.close - (atr * 4);
+  const winRate = Math.max(10, Math.min(95, Math.round(50 + (volRatio > 1 ? 15 : -15) + (last.close > sma50 ? 10 : -10) + (atrPct < 2 ? 10 : -5))));
+  
+  const newsSc = (latestSignalData && latestSignalData.reasons && latestSignalData.reasons.some(r => r.toLowerCase().includes('știri'))) ? "Știri Active Detectate" : "Nu sunt știri de impact";
+
+  // --- SWING HIGHS / LOWS (MARKET STRUCTURE ZONES) ---
+  const { swingHigh, swingLow } = detectSwings(allData, 30);
+  const sh = typeof swingHigh === 'number' ? swingHigh : last.close * 1.1;
+  const sl = typeof swingLow === 'number' ? swingLow : last.close * 0.9;
+  const distToRes = ((sh / last.close) - 1) * 100;
+  const distToSup = ((sl / last.close) - 1) * 100;
+
+  // --- FRACTAL PATTERN MATCHER ---
+  const FRACTAL_LEN = 14;
+  const FORECAST_LEN = 10;
+  let matchesHtml = `<div style="color:var(--text2);font-size:12px;">Nu s-au putut extrage tipare istorice...</div>`;
+  
+  if (allData.length > FRACTAL_LEN + FORECAST_LEN * 2) {
+      const currentSlice = allData.slice(-FRACTAL_LEN);
+      const currentBase = currentSlice[0].close;
+      const currentNorm = currentSlice.map(d => d.close / currentBase);
+      const currentMom = (currentSlice[FRACTAL_LEN-1].close / currentBase) - 1;
+      
+      let matches = [];
+      // Nu verificăm chiar ultimele zile (pentru a evita să ne matchuim cu noi înșine)
+      for (let i = 0; i < allData.length - FRACTAL_LEN - FORECAST_LEN - Math.max(10, FRACTAL_LEN); i++) {
+         const histSlice = allData.slice(i, i + FRACTAL_LEN);
+         const histBase = histSlice[0].close;
+         const histNorm = histSlice.map(d => d.close / histBase);
+         const histMom = (histSlice[FRACTAL_LEN-1].close / histBase) - 1;
+         
+         if (Math.sign(currentMom) !== Math.sign(histMom)) continue;
+         if (Math.abs(currentMom) > 0.03 && Math.abs(histMom) < Math.abs(currentMom) * 0.3) continue;
+         
+         let error = 0;
+         for (let j = 0; j < FRACTAL_LEN; j++) {
+            error += Math.abs(currentNorm[j] - histNorm[j]);
+         }
+         
+         const afterSlice = allData.slice(i + FRACTAL_LEN, i + FRACTAL_LEN + FORECAST_LEN);
+         const resultBase = histSlice[FRACTAL_LEN-1].close;
+         const resultFinal = afterSlice[afterSlice.length-1].close;
+         const resultPct = ((resultFinal / resultBase) - 1) * 100;
+         const resultMaxDrawdown = Math.min(...afterSlice.map(d => d.low)) / resultBase - 1;
+         const resultMaxRunup = Math.max(...afterSlice.map(d => d.high)) / resultBase - 1;
+         
+         matches.push({
+             dateStr: new Date(histSlice[0].time * 1000).toLocaleDateString('ro-RO', {month:'short', year:'numeric'}),
+             error, resultPct, resultMaxRunup: resultMaxRunup * 100, resultMaxDrawdown: resultMaxDrawdown * 100,
+             afterSlice, basePrice: resultBase
+         });
+      }
+      
+      matches.sort((a,b) => a.error - b.error);
+      const topMatches = matches.slice(0, 3);
+      
+      if (topMatches.length > 0) {
+          matchesHtml = topMatches.map((m, idx) => `
+             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);padding:10px;border-radius:6px;margin-bottom:8px;">
+               <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                 <span style="font-weight:700;font-size:13px;color:var(--text);">[Match #${idx+1}]: <span style="color:var(--accent);">${m.dateStr}</span></span>
+                 <span style="font-size:12px;color:${m.resultPct > 0 ? 'var(--green)' : 'var(--red)'};font-weight:800;">${m.resultPct > 0 ? 'A urcat cu' : 'A picat cu'} ${Math.abs(m.resultPct).toFixed(1)}%</span>
+               </div>
+               <div style="font-size:11px;color:var(--text2);">
+                 În următoarele ${FORECAST_LEN} perioade, piața s-a comportat astfel: <br>
+                 <span style="color:var(--green)">Max Spike: +${m.resultMaxRunup.toFixed(1)}%</span> | 
+                 <span style="color:var(--red)">Max Cădere: ${m.resultMaxDrawdown.toFixed(1)}%</span>
+               </div>
+             </div>
+          `).join('');
+      } else {
+          matchesHtml = `<div style="color:var(--text2);font-size:12px;">Prețul actual face mișcări neexplorate. Nu există tipare similare recente.</div>`;
+      }
+  }
+
+  let html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+      <div style="background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;">Regim Piață (ATR)</div>
+        <div style="font-size:18px;font-weight:800;color:${regimeColor};margin-top:4px;">${regime}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">Volatilitate zilnică: ${atrPct.toFixed(2)}%</div>
+      </div>
+      <div style="background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;">Ziduri / Structură (Support/Resistance)</div>
+        <div style="font-size:14px;font-weight:800;color:var(--text);margin-top:4px;">Rezistență: <span style="color:var(--red)">${fmt(sh)} (${distToRes.toFixed(1)}%)</span></div>
+        <div style="font-size:14px;font-weight:800;color:var(--text);margin-top:2px;">Suport: <span style="color:var(--green)">${fmt(sl)} (${distToSup.toFixed(1)}%)</span></div>
+      </div>
+      <div style="background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;">Trend Strategic</div>
+        <div style="font-size:18px;font-weight:800;color:${confColor};margin-top:4px;">${confluence}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">SMA50: ${fmt(sma50)} | SMA200: ${fmt(sma200)}</div>
+      </div>
+      <div style="background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);position:relative;">
+        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;">Evenimente (Raportări / Știri)</div>
+        <div style="font-size:15px;font-weight:800;color:${newsSc.includes('Active')?'var(--accent)':'var(--text)'};margin-top:4px;">${newsSc}</div>
+        ${earningsHtml}
+      </div>
+    </div>
+    
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.1);padding:16px;border-radius:8px;margin-bottom:24px;">
+      <h3 style="margin:0 0 12px 0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text);">[ISTORIC] Dovezi Istorice (Fractal Pattern Match)</h3>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Algoritmul a scanat mii de bare și a găsit dățile trecute când graficul arăta exact ca acum:</div>
+      ${matchesHtml}
+      
+      <div style="margin-top:16px;">
+         <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">PROIECTIE VIZUALA - Scenarii din Trecut suprapuse pe Pretul Actual</div>
+         <canvas id="dfCanvas" style="display:block;border-radius:6px;"></canvas>
+      </div>
+      
+      <div style="margin-top:16px;">
+         <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">DISTRIBUTIA REZULTATELOR ISTORICE (%)</div>
+         <canvas id="dfBarCanvas" style="display:block;border-radius:6px;"></canvas>
+      </div>
+    </div>
+    
+    <div style="background:linear-gradient(to right, ${isBull ? 'rgba(8,153,129,0.1)' : 'rgba(242,54,69,0.1)'}, rgba(0,0,0,0));border-left:4px solid ${isBull ? 'var(--green)' : 'var(--red)'};padding:16px;border-radius:4px;margin-bottom:20px;">
+      <h3 style="margin:0 0 12px 0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text);">[PLAN] Foaie de Parcurs (${isBull ? 'CUMPĂRĂ' : 'VINDE'})</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+         <div style="text-align:center;">
+           <div style="color:var(--text2);font-size:11px;">Intrare / Preț Curent</div>
+           <div style="font-size:20px;font-weight:800;">${fmt(last.close)}</div>
+         </div>
+         <div style="text-align:center;">
+           <div style="color:var(--red);font-size:11px;">Stop-Loss (Protecție)</div>
+           <div style="font-size:20px;font-weight:800;color:var(--red);">${fmt(stopLoss)}</div>
+         </div>
+         <div style="text-align:center;">
+           <div style="color:var(--green);font-size:11px;">Take-Profit 1 (Zid)</div>
+           <div style="font-size:20px;font-weight:800;color:var(--green);">${fmt(isBull ? sh : sl)}</div>
+         </div>
+         <div style="text-align:center;">
+           <div style="color:var(--green);font-size:11px;">Take-Profit 2 (Extensie)</div>
+           <div style="font-size:20px;font-weight:800;color:var(--green);">${fmt(target2)}</div>
+         </div>
+      </div>
+      <div style="margin-top:16px;border-top:1px dashed rgba(255,255,255,0.1);padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;color:var(--text2);">Șanse matematice de succes (Piață${isEarningsDanger?' - Penalizare Earnings!':''}):</span>
+        <span style="font-size:18px;font-weight:900;color:${isEarningsDanger ? 'var(--red)' : winRate > 60 ? 'var(--green)' : winRate < 40 ? 'var(--red)' : 'var(--yellow)'};">${isEarningsDanger ? 'NECALCULABIL (HAOS)' : winRate + '%'}</span>
+      </div>
+    </div>
+  `;
+  document.getElementById('dfModalBody').innerHTML = html;
+  
+  if (topMatches.length > 0) {
+      setTimeout(() => {
+          drawForecastChart(currentSlice, topMatches, target1, stopLoss, isBull);
+          drawBarChart(topMatches, isBull);
+      }, 150);
+  }
+}
+
+function drawBarChart(topMatches, isBull) {
+  const canvas = document.getElementById('dfBarCanvas');
+  if (!canvas || !topMatches.length) return;
+
+  const W = 660, H = 100;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = '#0d0d14';
+  ctx.fillRect(0, 0, W, H);
+
+  const barH   = 22;
+  const gap    = 10;
+  const labelW = 90;
+  const maxVal = Math.max(...topMatches.map(m => Math.abs(m.resultPct || 0)), 1);
+
+  topMatches.forEach((m, i) => {
+    const pct   = m.resultPct || 0;
+    const y     = 10 + i * (barH + gap);
+    const barW  = Math.abs(pct) / maxVal * (W - labelW - 60);
+    const color = pct >= 0 ? '#00e676' : '#ff1744';
+
+    // Label
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Match #${i+1}`, labelW - 6, y + barH - 7);
+
+    // Bar
+    ctx.fillStyle = color + '99';
+    ctx.fillRect(labelW, y, barW, barH);
+    ctx.fillStyle = color;
+    ctx.fillRect(labelW, y, 3, barH);
+
+    // Valoare
+    ctx.fillStyle = color;
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, labelW + barW + 6, y + barH - 7);
+  });
+
+  // Linie verticala la 0
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(labelW, 5);
+  ctx.lineTo(labelW, H - 5);
+  ctx.stroke();
+}
+
+function drawForecastChart(currentSlice, topMatches, target1, stopLoss, isBull) {
+  const canvas = document.getElementById('dfCanvas');
+  if (!canvas || !topMatches[0]?.afterSlice?.length) return;
+
+  // Dimensiuni fixe - nu depinde de layout
+  const W = 660, H = 240;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const PAD = { top: 28, right: 58, bottom: 28, left: 8 };
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top - PAD.bottom;
+
+  const FRACTAL_LEN  = currentSlice.length;
+  const FORECAST_LEN = topMatches[0].afterSlice.length;
+  const totalLen     = FRACTAL_LEN + FORECAST_LEN;
+  const currentPrice = currentSlice[currentSlice.length - 1].close;
+
+  const projectedPaths = topMatches.map(m => {
+    const base = m.basePrice || m.afterSlice[0].close;
+    return m.afterSlice.map(d => currentPrice * (d.close / base));
+  });
+
+  let allPrices = currentSlice.map(d => d.close);
+  projectedPaths.forEach(p => allPrices.push(...p));
+  allPrices.push(target1, stopLoss);
+
+  const minP  = Math.min(...allPrices);
+  const maxP  = Math.max(...allPrices);
+  const range = maxP - minP || 1;
+  const yMin  = minP - range * 0.1;
+  const yMax  = maxP + range * 0.1;
+
+  const gX = i     => PAD.left + (i / (totalLen - 1)) * cw;
+  const gY = price => PAD.top  + (1 - (price - yMin) / (yMax - yMin)) * ch;
+
+  // --- BG ---
+  ctx.fillStyle = '#0d0d14';
+  ctx.fillRect(0, 0, W, H);
+
+  // --- GRID ---
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (ch / 4) * i;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    const price = yMax - ((yMax - yMin) / 4) * i;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(price.toFixed(2), W - PAD.right + 4, y + 3);
+  }
+
+  // --- Linie ACUM ---
+  const nowX = gX(FRACTAL_LEN - 1);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(nowX, PAD.top); ctx.lineTo(nowX, PAD.top + ch); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = 'bold 9px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('ACUM', nowX, PAD.top - 10);
+
+  // --- Zona viitor ---
+  ctx.fillStyle = 'rgba(41,98,255,0.04)';
+  ctx.fillRect(nowX, PAD.top, (W - PAD.right) - nowX, ch);
+
+  // --- SL & TP ---
+  const slY = gY(stopLoss);
+  ctx.strokeStyle = 'rgba(242,54,69,0.6)';
+  ctx.setLineDash([5, 3]);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD.left, slY); ctx.lineTo(W - PAD.right, slY); ctx.stroke();
+  ctx.fillStyle = '#f23645'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'left';
+  ctx.fillText('SL', W - PAD.right + 3, slY + 3);
+
+  const tpY = gY(target1);
+  ctx.strokeStyle = 'rgba(8,153,129,0.6)';
+  ctx.beginPath(); ctx.moveTo(PAD.left, tpY); ctx.lineTo(W - PAD.right, tpY); ctx.stroke();
+  ctx.fillStyle = '#089981';
+  ctx.fillText('TP1', W - PAD.right + 3, tpY + 3);
+  ctx.setLineDash([]);
+
+  // --- Ghost Lines ---
+  const ghostCols = ['rgba(255,200,50,0.6)', 'rgba(80,180,255,0.6)', 'rgba(255,110,180,0.6)'];
+  projectedPaths.forEach((path, gi) => {
+    ctx.beginPath();
+    ctx.strokeStyle = ghostCols[gi % ghostCols.length];
+    ctx.lineWidth = 1.5;
+    ctx.moveTo(nowX, gY(currentPrice));
+    path.forEach((p, i) => ctx.lineTo(gX(FRACTAL_LEN + i), gY(p)));
+    ctx.stroke();
+    // dot final
+    const lp = path[path.length - 1];
+    ctx.beginPath();
+    ctx.arc(gX(totalLen - 1), gY(lp), 3, 0, Math.PI * 2);
+    ctx.fillStyle = ghostCols[gi % ghostCols.length];
+    ctx.fill();
+  });
+
+  // --- Consens ---
+  ctx.beginPath();
+  ctx.strokeStyle = isBull ? '#00e676' : '#ff1744';
+  ctx.lineWidth = 2.5;
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = isBull ? '#00e676' : '#ff1744';
+  ctx.moveTo(nowX, gY(currentPrice));
+  for (let i = 0; i < FORECAST_LEN; i++) {
+    const avg = projectedPaths.reduce((s, p) => s + (p[i] || 0), 0) / projectedPaths.length;
+    ctx.lineTo(gX(FRACTAL_LEN + i), gY(avg));
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // --- Linia curenta (albastra) ---
+  ctx.beginPath();
+  ctx.strokeStyle = '#2962ff';
+  ctx.lineWidth = 2;
+  currentSlice.forEach((d, i) => {
+    if (i === 0) ctx.moveTo(gX(i), gY(d.close));
+    else ctx.lineTo(gX(i), gY(d.close));
+  });
+  ctx.stroke();
+
+  // Dot ACUM
+  ctx.beginPath();
+  ctx.arc(nowX, gY(currentPrice), 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#2962ff'; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Label pret curent
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'left';
+  ctx.fillText(currentPrice.toFixed(2), W - PAD.right + 3, gY(currentPrice) + 4);
+
+  // Legenda
+  const L = PAD.left;
+  const LY = H - 10;
+  const drawLegend = (x, color, label) => {
+    ctx.fillStyle = color; ctx.fillRect(x, LY - 2, 16, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '9px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(label, x + 20, LY + 1);
+  };
+  drawLegend(L,       '#2962ff',   'Pret curent');
+  drawLegend(L + 88,  ghostCols[0],'Scenarii istorice');
+  drawLegend(L + 198, isBull ? '#00e676' : '#ff1744', 'Consens');
+}
+
+// ── AUTOCOMPLETE ENGINE ─────────────────────────────────
+function setupAutocomplete(inputId, onSelectCallback) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  let debounceTimer;
+
+  input.addEventListener("input", function(e) {
+    const val = this.value;
+    closeAllLists();
+    if (!val) return false;
+    
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      try {
+        const url = PROXIES[0](`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(val)}&quotesCount=5&newsCount=0`);
+        const res = await fetch(url);
+        const data = await res.json();
+        const quotes = data.quotes || [];
+        
+        if (quotes.length === 0) return;
+        
+        const a = document.createElement("DIV");
+        a.setAttribute("id", this.id + "autocomplete-list");
+        a.setAttribute("class", "autocomplete-items");
+        this.parentNode.appendChild(a);
+        
+        quotes.forEach(q => {
+          const b = document.createElement("DIV");
+          b.innerHTML = `<span class="autocomplete-symbol">${q.symbol}</span>`;
+          b.innerHTML += `<span class="autocomplete-name">${q.shortname || q.longname || q.exchange || ''}</span>`;
+          b.innerHTML += `<input type="hidden" value="${q.symbol}">`;
+          b.addEventListener("click", function(e) {
+              input.value = this.getElementsByTagName("input")[0].value;
+              closeAllLists();
+              if (onSelectCallback) onSelectCallback();
+          });
+          a.appendChild(b);
+        });
+      } catch(e) { console.error("Autocomplete err:", e); }
+    }, 300);
+  });
+
+  input.addEventListener("keydown", function(e) {
+      if (e.key === 'Enter') {
+          e.preventDefault();
+          closeAllLists();
+          if (onSelectCallback) onSelectCallback();
+      }
+  });
+
+  function closeAllLists(elmnt) {
+    var x = document.getElementsByClassName("autocomplete-items");
+    for (var i = x.length - 1; i >= 0; i--) {
+      if (elmnt != x[i] && elmnt != input) {
+        x[i].parentNode.removeChild(x[i]);
+      }
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+      closeAllLists(e.target);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  showMarketStatus();
+  tickClock();
+  renderWatchlist();
+  
+  // Curăță orice simbol implicit greșit din sesiunile vechi
+  if (localStorage.getItem('tradepro_last_symbol') === 'AAPL') {
+    localStorage.removeItem('tradepro_last_symbol');
+  }
+  
+  // Inițializare Autocomplete
+  setupAutocomplete('symbolInput', () => loadSymbol());
+  setupAutocomplete('addWlInput', () => addToWatchlistCustom());
+  
+  let lastSym = localStorage.getItem('tradepro_last_symbol');
+  if (!lastSym) {
+      const wl = loadWatchlist();
+      // Ia primul simbol din watchlist-ul UTILIZATORULUI, nu default
+      const userSyms = wl.filter(s => !['AAPL','TSLA','NVDA','AMZN','MSFT','BTC-USD','ETH-USD','GC=F','CL=F','EURUSD=X','SPY','QQQ'].includes(s.sym));
+      lastSym = userSyms.length > 0 ? userSyms[0].sym : wl[0]?.sym || 'TSLA';
+  }
+  
+  loadSymbol(lastSym, '1d');
+
+  // Prima actualizare la 2s după load
+  setTimeout(updateWatchlistPrices, 2000);
+
+  // ── LIVE: batch update la fiecare 10 secunde ──────────
+  setInterval(updateWatchlistPrices, 10000);
+
+  // ── Status piată la fiecare 30s ───────────────────────
+  // (deja setat via setInterval mai sus)
+});
+</script>
+</body>
+</html>
