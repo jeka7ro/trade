@@ -7,153 +7,188 @@
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 /* ═══════════════════════════════════════════════
-   THEME TOKENS
+   DESIGN SYSTEM TOKENS  (Pontaj Digital)
 ═══════════════════════════════════════════════ */
 :root {
-  --bg:      #f0f3fa;
-  --bg2:     #ffffff;
-  --bg3:     #e8ecf5;
-  --bg4:     #dde2ef;
-  --border:  #dde2ef;
-  --accent:  #2962ff;
-  --accent2: #1e53e5;
-  --green:   #089981;
-  --red:     #f23645;
-  --yellow:  #e0a800;
+  /* Background */
+  --bg:      #f1f5f9;   /* slate-100 */
+  --bg2:     #ffffff;   /* white */
+  --bg3:     #f8fafc;   /* slate-50 */
+  --bg4:     #e2e8f0;   /* slate-200 */
+  --border:  #e2e8f0;   /* slate-200 */
+  /* Brand */
+  --accent:  #2563eb;   /* blue-600 */
+  --accent2: #1d4ed8;   /* blue-700 */
+  --green:   #10b981;   /* emerald-500 */
+  --green2:  #059669;   /* emerald-600 */
+  --red:     #ef4444;   /* red-500 */
+  --red2:    #dc2626;   /* red-600 */
+  --yellow:  #f59e0b;   /* amber-500 */
   --purple:  #7c3aed;
   --teal:    #0097a7;
-  --text:    #131722;
-  --text2:   #787b86;
-  --text3:   #4c5057;
-  --shadow:  rgba(0,0,0,.07);
+  /* Text */
+  --text:    #0f172a;   /* slate-900 */
+  --text2:   #64748b;   /* slate-500 */
+  --text3:   #475569;   /* slate-600 */
+  /* Misc */
+  --shadow:  rgba(0,0,0,.06);
   --chart-bg:#ffffff;
-  --chart-grid:#f0f3fa;
+  --chart-grid:#f1f5f9;
+  /* Radius tokens */
+  --r-xl: 24px;   /* rounded-3xl — big cards */
+  --r-lg: 16px;   /* rounded-2xl — small cards */
+  --r-md: 12px;   /* rounded-xl */
+  --r-full: 9999px; /* rounded-full */
 }
 [data-theme="dark"] {
-  --bg:      #131722;
-  --bg2:     #1e222d;
-  --bg3:     #2a2e39;
-  --bg4:     #363c4e;
-  --border:  #2a2e39;
-  --green:   #26a69a;
-  --red:     #ef5350;
-  --yellow:  #f0b90b;
-  --text:    #d1d4dc;
-  --text2:   #787b86;
-  --text3:   #9598a1;
-  --shadow:  rgba(0,0,0,.3);
-  --chart-bg:#131722;
-  --chart-grid:#1e222d;
+  --bg:      #020617;   /* slate-950 */
+  --bg2:     #0f172a;   /* slate-900 */
+  --bg3:     #1e293b;   /* slate-800 */
+  --bg4:     #334155;   /* slate-700 */
+  --border:  #334155;   /* slate-700 */
+  --green:   #10b981;
+  --green2:  #059669;
+  --red:     #ef4444;
+  --red2:    #dc2626;
+  --yellow:  #f59e0b;
+  --text:    #ffffff;   /* white */
+  --text2:   #94a3b8;   /* slate-400 */
+  --text3:   #64748b;   /* slate-500 */
+  --shadow:  rgba(0,0,0,.35);
+  --chart-bg:#0f172a;
+  --chart-grid:#1e293b;
 }
 
 /* ═══════════════════════════════════════════════
    RESET & BASE
 ═══════════════════════════════════════════════ */
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;overflow:hidden;height:100vh;display:flex;flex-direction:column;transition:background .2s,color .2s;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:13px;font-weight:500;
+  overflow:hidden;height:100vh;
+  display:flex;flex-direction:column;
+  transition:background .2s,color .2s;
+}
 
-/* ═══════════════════════════════════════════════
-   TOP BAR
-═══════════════════════════════════════════════ */
 #topbar{
-  display:flex;align-items:center;gap:8px;
+  display:flex;flex-direction:column;gap:12px;
   background:var(--bg2);border-bottom:1px solid var(--border);
-  padding:0 12px;height:50px;flex-shrink:0;
-  box-shadow:0 1px 4px var(--shadow);
+  padding:12px 16px;flex-shrink:0;
+  box-shadow:0 1px 2px var(--shadow);
 }
-#logo{font-size:17px;font-weight:800;color:var(--accent);letter-spacing:-0.5px;white-space:nowrap;padding-right:4px;}
+.topbar-row{display:flex;align-items:center;gap:12px;width:100%;}
+.topbar-row:last-child{gap:16px;}
+#logo{font-size:17px;font-weight:900;color:var(--accent);letter-spacing:-0.5px;white-space:nowrap;padding-right:4px;}
 #logo em{color:var(--yellow);font-style:normal;}
-#logo sup{font-size:9px;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;padding:1px 5px;border-radius:8px;font-weight:700;vertical-align:super;}
+#logo sup{font-size:9px;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;padding:1px 5px;border-radius:var(--r-full);font-weight:700;vertical-align:super;}
 
-.search-wrap{position:relative;flex:0 0 230px;}
+/* Search — rounded-full */
+.search-wrap{position:relative;}
 #symbolInput{
-  width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:7px;
-  color:var(--text);font-size:14px;font-weight:700;padding:7px 10px 7px 32px;
-  outline:none;transition:border-color .2s,background .2s;
+  height:40px;
+  padding:0 16px 0 36px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:var(--r-full);
+  color:var(--text);font-size:13px;font-weight:700;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+  min-width:160px;max-width:220px;width:100%;
 }
-#symbolInput:focus{border-color:var(--accent);background:var(--bg2);}
-.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;}
+#symbolInput:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(37,99,235,.12);
+}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:14px;}
 
-#searchBtn{
-  background:var(--accent);color:#fff;border:none;border-radius:7px;
-  padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;
-  transition:background .15s,transform .1s;white-space:nowrap;
+/* Butoane principale — rounded-full h-10 */
+button{border:none;cursor:pointer;transition:all .15s;}
+
+#signalBtn{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+  height:40px;padding:0 16px;border-radius:var(--r-full);
+  font-weight:700;font-size:12px;white-space:nowrap;
 }
-#searchBtn:hover{background:var(--accent2);}
-#searchBtn:active{transform:scale(.97);}
+#signalBtn:hover{background:var(--bg4);color:var(--text);}
+
+#deepForecastBtn{
+  background:linear-gradient(135deg,#7c3aed,#4c1d95);
+  border:1px solid rgba(255,255,255,.15);
+  color:#fff;height:40px;padding:0 16px;
+  border-radius:var(--r-full);font-weight:800;font-size:12px;
+  white-space:nowrap;box-shadow:0 0 12px rgba(124,58,237,.35);
+}
+#deepForecastBtn:hover{box-shadow:0 0 20px rgba(124,58,237,.5);}
 
 .sep{width:1px;height:28px;background:var(--border);margin:0 2px;flex-shrink:0;}
 
-.tf-group{display:flex;gap:2px;background:var(--bg3);border-radius:7px;padding:3px;}
+/* TF Group — pill container */
+.tf-group{
+  display:flex;gap:2px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r-full);padding:3px;
+}
 .tf-btn{
-  background:transparent;color:var(--text2);border:none;border-radius:5px;
-  padding:4px 9px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
+  background:transparent;color:var(--text2);border:none;
+  border-radius:var(--r-full);
+  height:28px;padding:0 10px;font-size:12px;font-weight:600;
+  cursor:pointer;transition:all .15s;
 }
 .tf-btn:hover{color:var(--text);}
-.tf-btn.active{background:var(--accent);color:#fff;box-shadow:0 2px 6px rgba(41,98,255,.35);}
+.tf-btn.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.35);}
 
+/* Indicator buttons — ghost pill */
 .ind-group{display:flex;gap:3px;flex-wrap:nowrap;}
 .ind-btn{
-  background:var(--bg3);color:var(--text2);border:1.5px solid var(--border);border-radius:5px;
-  padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap;
+  background:var(--bg3);color:var(--text2);
+  border:1px solid var(--border);border-radius:var(--r-full);
+  height:28px;padding:0 10px;font-size:11px;font-weight:700;
+  cursor:pointer;transition:all .15s;white-space:nowrap;
 }
 .ind-btn:hover{color:var(--text);border-color:var(--text2);}
-.ind-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 1px 4px rgba(41,98,255,.3);}
+.ind-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 1px 4px rgba(37,99,235,.3);}
 
+/* Theme btn — icon rounded-full */
 #themeBtn{
-  background:var(--bg3);border:1.5px solid var(--border);color:var(--text2);
-  border-radius:7px;padding:5px 10px;font-size:14px;cursor:pointer;
-  transition:all .2s;margin-left:2px;
+  background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+  border-radius:var(--r-full);width:36px;height:36px;
+  font-size:14px;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;flex-shrink:0;
 }
 #themeBtn:hover{color:var(--text);border-color:var(--text2);}
 
+/* Price Info */
 #priceInfo{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0;}
-#curSymbol{font-size:15px;font-weight:800;color:var(--text);}
-#curPrice{font-size:19px;font-weight:800;color:var(--text);}
-#curChange{font-size:12px;font-weight:700;padding:3px 9px;border-radius:5px;}
-#curChange.up{background:rgba(8,153,129,.12);color:var(--green);}
-#curChange.dn{background:rgba(242,54,69,.12);color:var(--red);}
+#curSymbol{font-size:14px;font-weight:900;color:var(--text);}
+#curCompanyName{font-size:10px;color:var(--text2);font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#curPrice{font-size:19px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;}
+#curChange{
+  font-size:12px;font-weight:700;
+  height:28px;padding:0 12px;
+  border-radius:var(--r-full);
+  display:flex;align-items:center;
+}
+#curChange.up{background:rgba(16,185,129,.12);color:var(--green);}
+#curChange.dn{background:rgba(239,68,68,.12);color:var(--red);}
 
 /* ── AUTOCOMPLETE ── */
-.autocomplete-items {
-  position: absolute;
-  border: 1px solid var(--border);
-  border-bottom: none;
-  border-top: none;
-  z-index: 9999;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background-color: var(--bg2);
-  max-height: 250px;
-  overflow-y: auto;
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.6);
+.autocomplete-items{
+  position:absolute;border:1px solid var(--border);
+  z-index:9999;top:calc(100% + 4px);left:0;right:0;
+  background:var(--bg2);max-height:250px;overflow-y:auto;
+  border-radius:var(--r-lg);
+  box-shadow:0 8px 24px rgba(0,0,0,.15);
 }
-.autocomplete-items div {
-  padding: 10px 14px;
-  cursor: pointer;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.autocomplete-items div{
+  padding:10px 14px;cursor:pointer;
+  border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  transition:background .1s;
 }
-.autocomplete-items div:hover {
-  background-color: var(--bg3);
-}
-.autocomplete-symbol {
-  font-weight: 800;
-  color: var(--text);
-}
-.autocomplete-name {
-  font-size: 11px;
-  color: var(--text2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 65%;
-  text-align: right;
-}
+.autocomplete-items div:hover{background:var(--bg3);}
+.autocomplete-symbol{font-weight:900;color:var(--text);}
+.autocomplete-name{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%;text-align:right;}
 
 /* ═══════════════════════════════════════════════
    MAIN LAYOUT
@@ -162,20 +197,23 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
 /* ── SIDEBAR ── */
 #sidebar{
-  width:50px;background:var(--bg2);border-right:1px solid var(--border);
+  width:48px;background:var(--bg2);border-right:1px solid var(--border);
   display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;flex-shrink:0;
 }
 .tool-btn{
   width:34px;height:34px;background:transparent;border:none;color:var(--text2);
-  border-radius:7px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--r-full);cursor:pointer;font-size:15px;
+  display:flex;align-items:center;justify-content:center;
   transition:all .15s;position:relative;
 }
 .tool-btn:hover{background:var(--bg3);color:var(--text);}
 .tool-btn.active{background:var(--accent);color:#fff;}
 .tool-btn[title]:hover::after{
-  content:attr(title);position:absolute;left:42px;top:50%;transform:translateY(-50%);
-  background:var(--bg4);color:var(--text);padding:4px 8px;border-radius:5px;white-space:nowrap;
-  font-size:11px;z-index:200;border:1px solid var(--border);box-shadow:0 2px 8px var(--shadow);
+  content:attr(title);position:absolute;left:44px;top:50%;transform:translateY(-50%);
+  background:var(--bg3);color:var(--text);padding:4px 10px;
+  border-radius:var(--r-full);white-space:nowrap;
+  font-size:11px;font-weight:600;z-index:200;
+  border:1px solid var(--border);box-shadow:0 4px 12px var(--shadow);
 }
 .sidebar-sep{width:26px;height:1px;background:var(--border);margin:3px 0;}
 
@@ -183,6 +221,28 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 #chartArea{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;min-width:0;}
 #chartMain{flex:1;position:relative;min-height:0;}
 #chartCanvas{width:100%;height:100%;}
+
+/* ── CONTEXT MENU ── */
+#chartCtxMenu{
+  position:fixed;z-index:9999;min-width:220px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r-lg);
+  box-shadow:0 8px 32px rgba(0,0,0,.18);
+  padding:4px 0;font-size:13px;display:none;
+  animation:fadeInMenu .12s ease;
+}
+@keyframes fadeInMenu{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+#chartCtxMenu .ctx-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 16px;cursor:pointer;color:var(--text);
+  transition:background .1s;white-space:nowrap;font-weight:500;
+}
+#chartCtxMenu .ctx-item:hover{background:var(--bg3);}
+#chartCtxMenu .ctx-item .ctx-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;}
+#chartCtxMenu .ctx-item .ctx-key{margin-left:auto;color:var(--text2);font-size:11px;}
+#chartCtxMenu .ctx-sep{height:1px;background:var(--border);margin:4px 0;}
+#chartCtxMenu .ctx-buy{color:var(--green)!important;font-weight:700;}
+#chartCtxMenu .ctx-sell{color:var(--red)!important;font-weight:700;}
 
 #chartRSI{height:115px;flex-shrink:0;position:relative;border-top:1px solid var(--border);}
 #rsiCanvas{width:100%;height:100%;}
@@ -192,20 +252,26 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 #macdCanvas{width:100%;height:100%;}
 #macdLabel{position:absolute;top:4px;left:10px;font-size:11px;color:var(--text2);font-weight:700;z-index:10;display:flex;gap:8px;}
 
-/* ── RIGHT PANEL ── */
+/* ── RIGHT PANEL — card rounded-3xl overflow ── */
 #rightPanel{
   width:290px;background:var(--bg2);border-left:1px solid var(--border);
   display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;
 }
-/* Tabs */
-#panelTabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
-.ptab{
-  flex:1;padding:10px 4px;text-align:center;font-size:11px;font-weight:700;
-  color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;
-  text-transform:uppercase;letter-spacing:.5px;
+
+/* Panel Tabs — rounded-full pills */
+#panelTabs{
+  display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--border);
+  flex-shrink:0;overflow-x:auto;
 }
-.ptab.active{color:var(--accent);border-bottom-color:var(--accent);}
-.ptab:hover{color:var(--text);}
+.ptab{
+  flex:1;padding:6px 8px;text-align:center;font-size:10px;font-weight:700;
+  color:var(--text2);cursor:pointer;
+  border-radius:var(--r-full);transition:all .15s;
+  text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;
+  background:var(--bg3);
+}
+.ptab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.25);}
+.ptab:hover:not(.active){color:var(--text);background:var(--bg4);}
 .panel-page{display:none;flex-direction:column;}
 .panel-page.active{display:flex;}
 
@@ -213,14 +279,33 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .panel-title{font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
 
 .stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-.stat-label{color:var(--text2);font-size:12px;}
-.stat-val{font-size:12px;font-weight:700;}
+.stat-label{color:var(--text2);font-size:12px;font-weight:500;}
+.stat-val{font-size:12px;font-weight:900;font-variant-numeric:tabular-nums;}
 .stat-val.green{color:var(--green);} .stat-val.red{color:var(--red);} .stat-val.yellow{color:var(--yellow);}
+
+/* ── BADGES — rounded-full, semantic colors ── */
+.badge{
+  display:inline-flex;align-items:center;
+  height:20px;padding:0 8px;
+  border-radius:var(--r-full);
+  font-size:11px;font-weight:700;
+  border:1px solid transparent;
+}
+.badge-green{background:rgba(16,185,129,.1);color:#059669;border-color:rgba(16,185,129,.2);}
+.badge-red  {background:rgba(239,68,68,.1); color:#dc2626;border-color:rgba(239,68,68,.2);}
+.badge-amber{background:rgba(245,158,11,.1);color:#d97706;border-color:rgba(245,158,11,.2);}
+.badge-blue {background:rgba(37,99,235,.1); color:#2563eb;border-color:rgba(37,99,235,.2);}
+.badge-gray {background:rgba(100,116,139,.1);color:#475569;border-color:rgba(100,116,139,.2);}
+[data-theme="dark"] .badge-green{background:rgba(16,185,129,.15);color:#34d399;border-color:rgba(16,185,129,.25);}
+[data-theme="dark"] .badge-red  {background:rgba(239,68,68,.15); color:#f87171;border-color:rgba(239,68,68,.25);}
+[data-theme="dark"] .badge-amber{background:rgba(245,158,11,.15);color:#fbbf24;border-color:rgba(245,158,11,.25);}
+[data-theme="dark"] .badge-blue {background:rgba(37,99,235,.15); color:#60a5fa;border-color:rgba(37,99,235,.25);}
+[data-theme="dark"] .badge-gray {background:rgba(100,116,139,.15);color:#94a3b8;border-color:rgba(100,116,139,.25);}
 
 /* Gauge */
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px;}
 #gaugeCanvas{width:170px;height:96px;}
-.gauge-label{font-size:13px;font-weight:800;margin-top:2px;}
+.gauge-label{font-size:13px;font-weight:900;margin-top:2px;}
 .gauge-sub{font-size:10px;color:var(--text2);margin-top:1px;}
 .score-bars{display:flex;gap:3px;margin-top:8px;justify-content:center;}
 .score-bar{height:6px;width:18px;border-radius:3px;background:var(--bg3);}
@@ -229,53 +314,55 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .score-bar.neut{background:var(--yellow);}
 
 /* Key Levels */
-.level-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+.level-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
 .level-item:last-child{border:none;}
-.level-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;}
-.level-badge.res{background:rgba(242,54,69,.12);color:var(--red);}
-.level-badge.sup{background:rgba(8,153,129,.12);color:var(--green);}
-.level-price{font-size:13px;font-weight:800;}
+.level-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:var(--r-full);}
+.level-badge.res{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.level-badge.sup{background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2);}
+.level-price{font-size:13px;font-weight:900;font-variant-numeric:tabular-nums;}
 .level-dist{font-size:10px;color:var(--text2);}
 
-/* AI Signals */
-.ai-signal{background:var(--bg3);border-radius:8px;padding:11px;margin-bottom:8px;border:1px solid var(--border);}
+/* AI Signals — small card rounded-2xl */
+.ai-signal{
+  background:var(--bg3);border-radius:var(--r-lg);padding:12px;
+  margin-bottom:8px;border:1px solid var(--border);
+}
 .signal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .signal-name{font-size:11px;font-weight:700;color:var(--text);}
-.signal-badge{font-size:10px;font-weight:800;padding:2px 9px;border-radius:10px;}
-.signal-badge.bull{background:rgba(8,153,129,.15);color:var(--green);}
-.signal-badge.bear{background:rgba(242,54,69,.15);color:var(--red);}
-.signal-badge.neut{background:rgba(120,123,134,.15);color:var(--text2);}
+.signal-badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:var(--r-full);}
+.signal-badge.bull{background:rgba(16,185,129,.12);color:var(--green);}
+.signal-badge.bear{background:rgba(239,68,68,.12);color:var(--red);}
+.signal-badge.neut{background:rgba(100,116,139,.12);color:var(--text2);}
 .signal-desc{font-size:11px;color:var(--text2);line-height:1.55;}
 
 /* ── FORECAST PANEL ── */
 .forecast-header{
   background:linear-gradient(135deg,var(--accent),var(--purple));
-  padding:14px 12px;color:#fff;flex-shrink:0;
+  padding:16px 14px;color:#fff;flex-shrink:0;
 }
-.forecast-header h3{font-size:13px;font-weight:800;margin-bottom:2px;}
+.forecast-header h3{font-size:14px;font-weight:900;margin-bottom:2px;}
 .forecast-header p{font-size:11px;opacity:.8;}
 
 .fc-targets{display:flex;gap:6px;padding:12px;flex-shrink:0;}
 .fc-target{
-  flex:1;background:var(--bg3);border-radius:8px;padding:10px 8px;
-  text-align:center;border:1.5px solid var(--border);transition:border-color .15s;
+  flex:1;background:var(--bg3);border-radius:var(--r-lg);padding:10px 8px;
+  text-align:center;border:1px solid var(--border);transition:border-color .15s;
 }
 .fc-target:hover{border-color:var(--accent);}
 .fc-target-label{font-size:9px;font-weight:800;text-transform:uppercase;color:var(--text2);letter-spacing:.5px;margin-bottom:4px;}
-.fc-target-price{font-size:14px;font-weight:800;}
+.fc-target-price{font-size:14px;font-weight:900;font-variant-numeric:tabular-nums;}
 .fc-target-pct{font-size:10px;font-weight:700;margin-top:2px;}
-.fc-target.bull-t .fc-target-price{color:var(--green);}
-.fc-target.bull-t .fc-target-pct{color:var(--green);}
-.fc-target.base-t .fc-target-price{color:var(--yellow);}
-.fc-target.base-t .fc-target-pct{color:var(--yellow);}
-.fc-target.bear-t .fc-target-price{color:var(--red);}
-.fc-target.bear-t .fc-target-pct{color:var(--red);}
+.fc-target.bull-t .fc-target-price,.fc-target.bull-t .fc-target-pct{color:var(--green);}
+.fc-target.base-t .fc-target-price,.fc-target.base-t .fc-target-pct{color:var(--yellow);}
+.fc-target.bear-t .fc-target-price,.fc-target.bear-t .fc-target-pct{color:var(--red);}
 
+/* Horizon buttons — rounded-full pills */
 .fc-horizon{display:flex;gap:4px;padding:0 12px 10px;flex-shrink:0;}
 .fc-h-btn{
-  flex:1;background:var(--bg3);border:1.5px solid var(--border);border-radius:6px;
-  color:var(--text2);font-size:11px;font-weight:700;padding:5px 4px;cursor:pointer;
-  text-align:center;transition:all .15s;
+  flex:1;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r-full);color:var(--text2);
+  font-size:11px;font-weight:700;height:28px;
+  cursor:pointer;transition:all .15s;
 }
 .fc-h-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .fc-h-btn:hover:not(.active){color:var(--text);}
@@ -283,59 +370,65 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 /* Forecast confidence bar */
 .fc-conf{padding:0 12px 12px;}
 .fc-conf-label{font-size:10px;color:var(--text2);font-weight:700;margin-bottom:5px;display:flex;justify-content:space-between;}
-.fc-conf-bar{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;}
-.fc-conf-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .5s;}
+.fc-conf-bar{height:6px;background:var(--bg3);border-radius:var(--r-full);overflow:hidden;}
+.fc-conf-fill{height:100%;border-radius:var(--r-full);background:linear-gradient(90deg,var(--accent),var(--green));transition:width .5s;}
 
-/* Pattern cards */
+/* Pattern cards — rounded-2xl */
 .pattern-card{
-  background:var(--bg3);border-radius:8px;padding:10px 11px;margin-bottom:6px;
+  background:var(--bg3);border-radius:var(--r-lg);padding:10px 12px;margin-bottom:6px;
   border-left:3px solid var(--accent);display:flex;align-items:center;gap:10px;
 }
 .pattern-icon{font-size:22px;flex-shrink:0;}
-.pattern-info .pattern-name{font-size:12px;font-weight:800;color:var(--text);}
+.pattern-info .pattern-name{font-size:12px;font-weight:900;color:var(--text);}
 .pattern-info .pattern-desc{font-size:10px;color:var(--text2);margin-top:2px;line-height:1.4;}
-.pattern-signal{font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;flex-shrink:0;}
-.pattern-signal.bull{background:rgba(8,153,129,.15);color:var(--green);}
-.pattern-signal.bear{background:rgba(242,54,69,.15);color:var(--red);}
-.pattern-signal.neut{background:rgba(120,123,134,.15);color:var(--text2);}
+.pattern-signal{font-size:10px;font-weight:800;padding:2px 8px;border-radius:var(--r-full);flex-shrink:0;}
+.pattern-signal.bull{background:rgba(16,185,129,.12);color:var(--green);}
+.pattern-signal.bear{background:rgba(239,68,68,.12);color:var(--red);}
+.pattern-signal.neut{background:rgba(100,116,139,.12);color:var(--text2);}
 
-/* Forecast chart area */
+/* Forecast chart */
 .fc-chart-wrap{padding:0 12px 12px;}
 .fc-chart-title{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--text2);letter-spacing:.6px;margin-bottom:6px;}
-#fcMiniChart{width:100%;height:120px;background:var(--bg3);border-radius:8px;position:relative;overflow:hidden;}
+#fcMiniChart{width:100%;height:120px;background:var(--bg3);border-radius:var(--r-lg);position:relative;overflow:hidden;}
 
-/* Watchlist */
+/* ── WATCHLIST ── */
 .wl-item{
   display:flex;align-items:center;justify-content:space-between;
-  padding:8px 12px;cursor:pointer;transition:background .15s;
+  padding:10px 12px;cursor:pointer;transition:background .15s;
   border-bottom:1px solid var(--border);
 }
 .wl-item:hover{background:var(--bg3);}
-.wl-item.active{background:rgba(41,98,255,.08);border-left:2px solid var(--accent);}
-.wl-sym{font-size:13px;font-weight:800;}
-.wl-name{font-size:10px;color:var(--text2);}
+.wl-item.active{background:rgba(37,99,235,.08);border-left:3px solid var(--accent);}
+.wl-sym{font-size:13px;font-weight:900;}
+.wl-name{font-size:10px;color:var(--text2);font-weight:500;}
 .wl-price{text-align:right;}
-.wl-p{font-size:13px;font-weight:700;}
+.wl-p{font-size:13px;font-weight:900;font-variant-numeric:tabular-nums;}
 .wl-chg{font-size:10px;font-weight:700;}
+.wl-session{font-size:9px;font-weight:800;padding:1px 5px;border-radius:var(--r-full);}
 .up{color:var(--green);} .dn{color:var(--red);}
 
 /* Crosshair info */
 #crosshairInfo{
   position:absolute;top:8px;left:60px;z-index:20;
   display:flex;gap:14px;font-size:12px;pointer-events:none;
-  background:var(--bg2);padding:4px 10px;border-radius:6px;
-  border:1px solid var(--border);opacity:.95;
+  background:var(--bg2);padding:5px 12px;
+  border-radius:var(--r-full);
+  border:1px solid var(--border);
+  box-shadow:0 2px 8px var(--shadow);
 }
-.chi{color:var(--text2);}
+.chi{color:var(--text2);font-weight:500;}
 .chi span{color:var(--text);font-weight:700;}
 
 /* Loading */
 #loadOverlay{
-  position:absolute;bottom:20px;left:20px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;
-  display:flex;flex-direction:row;align-items:center;justify-content:center;z-index:50;padding:6px 16px;gap:10px;box-shadow:var(--shadow);
+  position:absolute;bottom:16px;left:16px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r-full);
+  display:flex;align-items:center;z-index:50;
+  padding:6px 16px;gap:10px;
+  box-shadow:0 4px 16px var(--shadow);
 }
-[data-theme="dark"] #loadOverlay{background:var(--bg2);}
-.spinner{width:34px;height:34px;border:3px solid var(--bg3);border-top-color:var(--accent);border-radius:50%;animation:spin .65s linear infinite;margin:0;}
+.spinner{width:20px;height:20px;border:2px solid var(--bg3);border-top-color:var(--accent);border-radius:50%;animation:spin .65s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 #loadText{color:var(--text2);font-size:12px;font-weight:600;}
 
@@ -347,47 +440,40 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 #marketStatusBar{
   display:flex;align-items:center;
   background:var(--bg2);border-bottom:1px solid var(--border);
-  padding:4px 14px;font-size:11px;flex-shrink:0;
-  box-shadow:0 1px 3px var(--shadow);min-height:24px;
+  padding:4px 14px;font-size:11px;flex-shrink:0;min-height:26px;
 }
 
 /* ── LIVE ANIMATIONS ── */
-@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(8,153,129,.6)}50%{box-shadow:0 0 0 4px rgba(8,153,129,0)}}
-@keyframes pulse-yellow{0%,100%{box-shadow:0 0 0 0 rgba(224,168,0,.6)}50%{box-shadow:0 0 0 4px rgba(224,168,0,0)}}
-@keyframes flash-up{0%{background:rgba(8,153,129,.25)}100%{background:transparent}}
-@keyframes flash-dn{0%{background:rgba(242,54,69,.25)}100%{background:transparent}}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{box-shadow:0 0 0 4px rgba(16,185,129,0)}}
+@keyframes flash-up{0%{background:rgba(16,185,129,.2)}100%{background:transparent}}
+@keyframes flash-dn{0%{background:rgba(239,68,68,.2)}100%{background:transparent}}
 @keyframes countup{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .flash-up{animation:flash-up .6s ease forwards;}
 .flash-dn{animation:flash-dn .6s ease forwards;}
 .countup{animation:countup .3s ease forwards;}
 
-/* Live clock */
 #liveClock{font-size:11px;color:var(--text2);margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600;}
-
-/* Price flash */
 #curPrice{transition:color .3s;}
-.price-up{color:var(--green) !important;}
-.price-dn{color:var(--red)   !important;}
+.price-up{color:var(--green)!important;}
+.price-dn{color:var(--red)!important;}
 
-/* Scrollbar */
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
-::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px;}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:var(--r-full);}
 
 /* ── FIBONACCI PANEL ── */
 .fib-header{
-  background:linear-gradient(135deg,#e0a800,#f59e0b);
-  padding:14px 12px;color:#fff;flex-shrink:0;
+  background:linear-gradient(135deg,#f59e0b,#d97706);
+  padding:16px 14px;color:#fff;flex-shrink:0;
 }
-.fib-header h3{font-size:13px;font-weight:800;margin-bottom:2px;}
+.fib-header h3{font-size:14px;font-weight:900;margin-bottom:2px;}
 .fib-header p{font-size:11px;opacity:.85;}
 
 .fib-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);}
 .fib-toggle-label{font-size:12px;font-weight:700;color:var(--text);}
 .toggle-switch{position:relative;width:36px;height:20px;cursor:pointer;}
 .toggle-switch input{opacity:0;width:0;height:0;}
-.toggle-track{position:absolute;inset:0;background:var(--bg4);border-radius:10px;transition:.2s;}
+.toggle-track{position:absolute;inset:0;background:var(--bg4);border-radius:var(--r-full);transition:.2s;}
 .toggle-switch input:checked + .toggle-track{background:var(--yellow);}
 .toggle-thumb{position:absolute;left:3px;top:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:.2s;}
 .toggle-switch input:checked ~ .toggle-thumb{left:19px;}
@@ -395,46 +481,56 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .fib-swing-info{padding:10px 12px;background:var(--bg3);border-bottom:1px solid var(--border);}
 .fib-swing-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
 .fib-swing-label{font-size:11px;color:var(--text2);font-weight:600;}
-.fib-swing-val{font-size:12px;font-weight:800;}
+.fib-swing-val{font-size:12px;font-weight:900;}
 
+/* ── TABLE — rounded-2xl container ── */
 .fib-levels-table{width:100%;border-collapse:collapse;}
-.fib-levels-table th{font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;padding:5px 10px;border-bottom:2px solid var(--border);text-align:left;}
-.fib-levels-table td{padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;transition:background .1s;}
+.fib-levels-table th{
+  font-size:10px;font-weight:800;color:var(--text2);
+  text-transform:uppercase;letter-spacing:.05em;
+  padding:10px 10px;border-bottom:2px solid var(--border);
+  text-align:left;background:var(--bg3);
+}
+.fib-levels-table td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;transition:background .1s;font-weight:500;}
+.fib-levels-table tr:hover td{background:var(--bg3);}
 .fib-levels-table tr:last-child td{border:none;}
-.fib-level-row.current-zone td{background:rgba(224,168,0,.12);font-weight:800;}
+.fib-level-row.current-zone td{background:rgba(245,158,11,.1);font-weight:800;}
 .fib-level-row.current-zone td .fib-ratio{color:var(--yellow);}
 .fib-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}
-.fib-ratio{font-weight:800;font-size:12px;}
-.fib-price{font-size:12px;font-weight:700;}
+.fib-ratio{font-weight:900;font-size:12px;}
+.fib-price{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
 .fib-dist{font-size:10px;color:var(--text2);}
-.fib-type{font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;}
-.fib-type.sup{background:rgba(8,153,129,.12);color:var(--green);}
-.fib-type.res{background:rgba(242,54,69,.12);color:var(--red);}
-.fib-type.cur{background:rgba(224,168,0,.15);color:var(--yellow);}
+.fib-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:var(--r-full);}
+.fib-type.sup{background:rgba(16,185,129,.1);color:var(--green);}
+.fib-type.res{background:rgba(239,68,68,.1);color:var(--red);}
+.fib-type.cur{background:rgba(245,158,11,.1);color:var(--yellow);}
 
 .fib-recommendation{
-  margin:12px;background:var(--bg3);border-radius:10px;padding:14px;
-  border:1.5px solid var(--border);
+  margin:12px;background:var(--bg3);border-radius:var(--r-lg);padding:14px;
+  border:1px solid var(--border);
 }
 .fib-rec-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .fib-rec-icon{font-size:22px;}
-.fib-rec-title{font-size:13px;font-weight:800;color:var(--text);}
-.fib-rec-badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;margin-left:auto;}
-.fib-rec-badge.bull{background:rgba(8,153,129,.15);color:var(--green);}
-.fib-rec-badge.bear{background:rgba(242,54,69,.15);color:var(--red);}
-.fib-rec-badge.neut{background:rgba(120,123,134,.15);color:var(--text2);}
+.fib-rec-title{font-size:13px;font-weight:900;color:var(--text);}
+.fib-rec-badge{font-size:10px;font-weight:800;padding:2px 10px;border-radius:var(--r-full);margin-left:auto;}
+.fib-rec-badge.bull{background:rgba(16,185,129,.12);color:var(--green);}
+.fib-rec-badge.bear{background:rgba(239,68,68,.12);color:var(--red);}
+.fib-rec-badge.neut{background:rgba(100,116,139,.12);color:var(--text2);}
 .fib-rec-text{font-size:11px;color:var(--text2);line-height:1.6;}
 .fib-rec-targets{display:flex;gap:6px;margin-top:10px;}
-.fib-rec-target{flex:1;background:var(--bg4);border-radius:6px;padding:7px;text-align:center;}
+.fib-rec-target{flex:1;background:var(--bg4);border-radius:var(--r-md);padding:7px;text-align:center;}
 .fib-rec-target .label{font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase;margin-bottom:2px;}
-.fib-rec-target .val{font-size:12px;font-weight:800;}
+.fib-rec-target .val{font-size:12px;font-weight:900;font-variant-numeric:tabular-nums;}
 
 .fib-lookback-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);}
 .fib-lookback-label{font-size:11px;color:var(--text2);}
-.fib-lookback-select{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 6px;font-size:11px;font-weight:600;cursor:pointer;}
+.fib-lookback-select{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--r-full);padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;
+}
 
 /* AI Forecast score ring */
-.ring-wrap{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:10px;margin-bottom:10px;}
+.ring-wrap{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:var(--r-lg);margin-bottom:10px;}
 .ring-canvas-wrap{position:relative;flex-shrink:0;}
 .ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;}
 .ring-info .ring-title{font-size:13px;font-weight:800;color:var(--text);}
@@ -471,58 +567,72 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 <body>
 
 <div id="topbar">
-  <div id="logo">Trade<em>Pro</em> <sup>AI</sup></div>
+  <!-- ROW 1 -->
+  <div class="topbar-row">
+    <div id="logo">Trade<em>Pro</em> <sup>AI</sup></div>
 
-  <div class="search-wrap" style="min-width:140px;max-width:200px;">
-    <span class="search-icon">⌕</span>
-    <input id="symbolInput" type="text" placeholder="Simbol... (Enter pentru căutare)" autocomplete="off" style="width:100%;" title="Scrie simbolul si apasă Enter sau alege din lista"/>
-  </div>
-  <button id="signalBtn" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);margin-left:4px;padding:0 10px;border-radius:8px;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;" onclick="forceShowSignal()" title="Semnal AI">Semnal AI</button>
-  <button id="deepForecastBtn" style="background:linear-gradient(45deg, #7b1fa2, #4a148c);border:1px solid rgba(255,255,255,0.2);color:#fff;margin-left:4px;padding:0 10px;border-radius:8px;font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;box-shadow:0 0 8px rgba(123,31,162,0.4);" onclick="openDeepForecastModal()" title="Deep Forecast">Forecast Avansat</button>
-  <div class="sep"></div>
-
-  <div class="tf-group" style="gap:1px;">
-    <button class="tf-btn" data-tf="5m">5m</button>
-    <button class="tf-btn" data-tf="15m">15m</button>
-    <button class="tf-btn" data-tf="30m">30m</button>
-    <button class="tf-btn" data-tf="1h">1h</button>
-    <button class="tf-btn" data-tf="4h">4h</button>
-    <button class="tf-btn active" data-tf="1d">1 Zi</button>
-    <button class="tf-btn" data-tf="1wk">1 Sapt</button>
-    <button class="tf-btn" data-tf="1mo">1 Luna</button>
-  </div>
-  <div class="sep"></div>
-
-  <div class="ind-group" style="gap:1px;">
-    <button class="ind-btn active" data-ind="ma">MA</button>
-    <button class="ind-btn active" data-ind="bb">Benz</button>
-    <button class="ind-btn active" data-ind="vol">Volum</button>
-    <button class="ind-btn active" data-ind="rsi">RSI</button>
-    <button class="ind-btn active" data-ind="macd">MACD</button>
-    <button class="ind-btn" data-ind="ema">EMA21</button>
-    <button class="ind-btn" data-ind="vwap">VWAP</button>
-    <button class="ind-btn active" data-ind="forecast">Prognoze</button>
-  </div>
-  <div class="sep"></div>
-
-  <button id="themeBtn" title="Schimbă tema" style="padding:0 6px;font-size:13px;flex-shrink:0;">☀️</button>
-
-  <div id="priceInfo" style="flex-shrink:0;">
-    <div style="display:flex;flex-direction:column;justify-content:center;">
-      <span id="curSymbol" style="font-size:14px;font-weight:800;line-height:1.2;">---</span>
-      <span id="curCompanyName" style="font-size:10px;color:var(--text2);font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">---</span>
+    <div class="search-wrap" style="min-width:180px;max-width:240px;margin-left:12px;">
+      <span class="search-icon">⌕</span>
+      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
     </div>
-    <span id="curPrice">—</span>
-    <span id="curChange" class="up">—</span>
-    <!-- Extended hours card — apare doar în pre/after market -->
-    <div id="extHoursCard" style="display:none;background:rgba(224,168,0,.1);border:1.5px solid rgba(224,168,0,.4);border-radius:7px;padding:4px 10px;margin-left:4px;">
-      <div style="font-size:9px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;" id="extHoursLabel">PRE-MARKET</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:1px;">
-        <span style="font-size:15px;font-weight:800;" id="extHoursPrice">—</span>
-        <span style="font-size:11px;font-weight:700;" id="extHoursChange">—</span>
+    
+    <button id="signalBtn" onclick="forceShowSignal()" title="Semnal AI">Semnal AI</button>
+    <button id="deepForecastBtn" onclick="openDeepForecastModal()" title="Deep Forecast">Forecast Avansat</button>
+
+    <div id="priceInfo">
+      <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:36px;height:36px;border-radius:50%;display:none;margin-right:10px;object-fit:contain;background:#fff;padding:3px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
+      <div style="display:flex;flex-direction:column;justify-content:center;">
+        <span id="curSymbol">---</span>
+        <span id="curCompanyName" style="font-size:11px; color:var(--text2);">---</span>
+      </div>
+      <span id="curPrice">—</span>
+      <span id="curChange" class="up">—</span>
+      <!-- Extended hours card -->
+      <div id="extHoursCard" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--r-md);padding:4px 10px;margin-left:8px;">
+        <div style="font-size:9px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;" id="extHoursLabel">PRE-MARKET</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:1px;">
+          <span style="font-size:15px;font-weight:800;" id="extHoursPrice">—</span>
+          <span style="font-size:11px;font-weight:700;" id="extHoursChange">—</span>
+        </div>
+      </div>
+    </div>
+
+    <button id="themeBtn" title="Schimbă tema"></button>
+  </div>
+
+  <!-- ROW 2 -->
+  <div class="topbar-row">
+    <div class="tf-group">
+      <button class="tf-btn" data-tf="5m">5m</button>
+      <button class="tf-btn" data-tf="15m">15m</button>
+      <button class="tf-btn" data-tf="30m">30m</button>
+      <button class="tf-btn" data-tf="1h">1h</button>
+      <button class="tf-btn" data-tf="4h">4h</button>
+      <button class="tf-btn active" data-tf="1d">1 Zi</button>
+      <button class="tf-btn" data-tf="1wk">1 Sapt</button>
+      <button class="tf-btn" data-tf="1mo">1 Luna</button>
+    </div>
+    <div class="sep"></div>
+    <div style="position:relative;" onmouseenter="document.getElementById('indMenu').style.display='flex'" onmouseleave="document.getElementById('indMenu').style.display='none'">
+      <button style="background:transparent; border:none; color:var(--text); font-weight:700; cursor:pointer; padding:6px 12px; display:flex; align-items:center; gap:6px; border-radius:6px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l5-5 4 4 5-5"/></svg>
+        Indicators
+      </button>
+      <div id="indMenu" class="ind-group" style="display:none; position:absolute; top:100%; left:0; background:var(--bg2); border:1px solid var(--border); border-radius:6px; flex-direction:column; width:160px; padding:8px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,0.3); gap:4px;">
+        <button class="ind-btn active" data-ind="ma" style="text-align:left; justify-content:flex-start; padding:6px 8px;">MA (Moving Avg)</button>
+        <button class="ind-btn active" data-ind="bb" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Bollinger Bands</button>
+        <button class="ind-btn active" data-ind="vol" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Volume</button>
+        <button class="ind-btn active" data-ind="rsi" style="text-align:left; justify-content:flex-start; padding:6px 8px;">RSI (Relative Str)</button>
+        <button class="ind-btn active" data-ind="macd" style="text-align:left; justify-content:flex-start; padding:6px 8px;">MACD</button>
+        <button class="ind-btn" data-ind="ema" style="text-align:left; justify-content:flex-start; padding:6px 8px;">EMA 21</button>
+        <button class="ind-btn" data-ind="vwap" style="text-align:left; justify-content:flex-start; padding:6px 8px;">VWAP</button>
+        <button class="ind-btn active" data-ind="smc" style="text-align:left; justify-content:flex-start; padding:6px 8px;">SMC (Smart Money)</button>
+        <button class="ind-btn active" data-ind="vpvr" style="text-align:left; justify-content:flex-start; padding:6px 8px;">VPVR (Vol Profile)</button>
+        <button class="ind-btn active" data-ind="forecast" style="text-align:left; justify-content:flex-start; padding:6px 8px;">AI Forecast</button>
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <!-- STATUS BAR -->
@@ -548,16 +658,47 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <button class="tool-btn active"  id="toolFib"     title="Fibonacci Auto" onclick="openFibPanel()">Φ</button>
     <div class="sidebar-sep"></div>
     <button class="tool-btn" title="Undo" onclick="undoDrawing()">↩</button>
-    <button class="tool-btn" title="Șterge tot" onclick="clearDrawings()">🗑</button>
+    <button class="tool-btn" title="Șterge tot" onclick="clearDrawings()"></button>
     <div class="sidebar-sep"></div>
     <button class="tool-btn" title="Fullscreen" onclick="toggleFS()">⛶</button>
   </div>
 
   <!-- CHART AREA -->
   <div id="chartArea">
-    <div id="chartMain">
+    <!-- CONTEXT MENU -->
+    <div id="chartCtxMenu">
+      <div class="ctx-item" onclick="ctxResetChart()"><span class="ctx-icon">&#8635;</span>Resetare grafic<span class="ctx-key">Ctrl+R</span></div>
+      <div class="ctx-item" onclick="ctxCopyPrice()"><span class="ctx-icon">&#128203;</span>Copiaza pretul <span id="ctxPriceLabel" style="color:#7c3aed;font-weight:700;"></span></div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" onclick="ctxAddAlert()"><span class="ctx-icon">&#9881;</span>Adauga alerta la <span id="ctxAlertLabel" style="margin-left:4px;color:#e0a800;"></span></div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item ctx-buy" onclick="ctxBuy('limit')"><span class="ctx-icon">&#8679;</span>Cumpara 1 <span id="ctxSymBuy" style="margin:0 4px;"></span> @ <span id="ctxBuyPrice" style="margin-left:4px;"></span> limit</div>
+      <div class="ctx-item ctx-buy" onclick="ctxBuy('market')"><span class="ctx-icon">&#9654;</span>Cumpara la piata (Market)</div>
+      <div class="ctx-item ctx-sell" onclick="ctxSell('stop')"><span class="ctx-icon">&#8681;</span>Vinde 1 <span id="ctxSymSell" style="margin:0 4px;"></span> @ <span id="ctxSellPrice" style="margin-left:4px;"></span> stop</div>
+      <div class="ctx-item ctx-sell" onclick="ctxSell('market')"><span class="ctx-icon">&#9654;</span>Vinde la piata (Market)</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" onclick="clearDrawings()"><span class="ctx-icon">&#128465;</span>Sterge desenele de pe grafic</div>
+      <div class="ctx-item" onclick="closeCtxMenu()"><span class="ctx-icon">&#9881;</span>Inchide meniu</div>
+    </div>
+    <div id="chartMain" style="position:relative;">
+      <!-- Floating Order Panel (TradingView Style) -->
+      <div id="floatingOrderPanel" style="position:absolute; top:12px; left:12px; z-index:20; display:none; align-items:center; background:var(--bg2); border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); overflow:hidden;">
+        <div onclick="alert('Sell Market Order')" style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-right:1px solid var(--border); cursor:pointer; border-top: 2px solid var(--red); background:rgba(242,54,69,0.05); transition:background 0.2s;" onmouseover="this.style.background='rgba(242,54,69,0.1)'" onmouseout="this.style.background='rgba(242,54,69,0.05)'">
+          <span style="color:var(--red); font-size:13px; font-weight:800;" id="floatSellPrice">—</span>
+          <span style="color:var(--red); font-size:9px; font-weight:700; text-transform:uppercase;">SELL</span>
+        </div>
+        <div style="padding:0 8px; font-size:11px; font-weight:800; color:var(--text2); background:var(--bg3);" id="floatSpread">0.01</div>
+        <div onclick="alert('Buy Market Order')" style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-left:1px solid var(--border); cursor:pointer; border-top: 2px solid var(--accent); background:rgba(41,98,255,0.05); transition:background 0.2s;" onmouseover="this.style.background='rgba(41,98,255,0.1)'" onmouseout="this.style.background='rgba(41,98,255,0.05)'">
+          <span style="color:var(--accent); font-size:13px; font-weight:800;" id="floatBuyPrice">—</span>
+          <span style="color:var(--accent); font-size:9px; font-weight:700; text-transform:uppercase;">BUY</span>
+        </div>
+      </div>
       <div id="chartCanvas"></div>
       <div id="crosshairInfo"></div>
+      <!-- On-Chart Legend -->
+      <div id="onChartLegend" style="position:absolute; top:60px; left:12px; z-index:15; display:flex; flex-direction:column; gap:2px; pointer-events:none;">
+        <!-- Filled by JS -->
+      </div>
       <div id="loadOverlay">
         <div class="spinner"></div>
         <div id="loadText">Se încarcă datele…</div>
@@ -579,10 +720,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   <div id="rightPanel">
     <!-- Tabs -->
     <div id="panelTabs">
-      <div class="ptab" data-page="analysis">📊</div>
+      <div class="ptab" data-page="analysis"></div>
       <div class="ptab" data-page="fibonacci">Φ Fib</div>
-      <div class="ptab" data-page="forecast">🔮</div>
-      <div class="ptab active" data-page="watchlist">👁 Watchlist</div>
+      <div class="ptab" data-page="forecast"></div>
+      <div class="ptab active" data-page="watchlist"> Watchlist</div>
     </div>
 
     <!-- ── PAGE: ANALYSIS ── -->
@@ -597,11 +738,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         <div class="stat-row"><span class="stat-label">Variație zi</span><span class="stat-val" id="stat24h">—</span></div>
         <!-- Extended hours rows — vizibile doar când e pre/after -->
         <div id="statPreRow" class="stat-row" style="display:none;">
-          <span class="stat-label" style="color:var(--yellow);">🌅 Pre-Market</span>
+          <span class="stat-label" style="color:var(--yellow);"> Pre-Market</span>
           <span class="stat-val yellow" id="statPre">—</span>
         </div>
         <div id="statPostRow" class="stat-row" style="display:none;">
-          <span class="stat-label" style="color:var(--yellow);">🌆 After-Hours</span>
+          <span class="stat-label" style="color:var(--yellow);"> After-Hours</span>
           <span class="stat-val yellow" id="statPost">—</span>
         </div>
         <div id="statExtChgRow" class="stat-row" style="display:none;">
@@ -661,15 +802,15 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <!-- Swing info -->
       <div class="fib-swing-info" id="fibSwingInfo">
         <div class="fib-swing-row">
-          <span class="fib-swing-label">📈 Swing High</span>
+          <span class="fib-swing-label"> Swing High</span>
           <span class="fib-swing-val green" id="fibSwingHigh">—</span>
         </div>
         <div class="fib-swing-row">
-          <span class="fib-swing-label">📉 Swing Low</span>
+          <span class="fib-swing-label"> Swing Low</span>
           <span class="fib-swing-val red" id="fibSwingLow">—</span>
         </div>
         <div class="fib-swing-row" style="margin:0">
-          <span class="fib-swing-label">📏 Amplitudine</span>
+          <span class="fib-swing-label"> Amplitudine</span>
           <span class="fib-swing-val yellow" id="fibAmplitude">—</span>
         </div>
       </div>
@@ -706,7 +847,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <!-- ── PAGE: FORECAST ── -->
     <div class="panel-page" id="page-forecast">
       <div class="forecast-header">
-        <h3>🔮 AI Price Forecast</h3>
+        <h3> AI Price Forecast</h3>
         <p>Regresie liniară · Momentum · Pattern · Volatilitate</p>
       </div>
 
@@ -735,7 +876,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <!-- Price targets -->
       <div class="fc-targets" id="fcTargets">
         <div class="fc-target bull-t">
-          <div class="fc-target-label">📈 Optimist</div>
+          <div class="fc-target-label"> Optimist</div>
           <div class="fc-target-price" id="fcBull">—</div>
           <div class="fc-target-pct" id="fcBullPct">—</div>
         </div>
@@ -745,7 +886,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
           <div class="fc-target-pct" id="fcBasePct">—</div>
         </div>
         <div class="fc-target bear-t">
-          <div class="fc-target-label">📉 Pesimist</div>
+          <div class="fc-target-label"> Pesimist</div>
           <div class="fc-target-price" id="fcBear">—</div>
           <div class="fc-target-pct" id="fcBearPct">—</div>
         </div>
@@ -760,6 +901,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         <div class="fc-conf-bar"><div class="fc-conf-fill" id="fcConfFill" style="width:0%"></div></div>
       </div>
 
+      <!-- Forecast table -->
       <!-- Forecast table -->
       <div style="padding:0 12px 10px;">
         <div class="panel-title">Prognoze pe Orizonturi</div>
@@ -794,7 +936,17 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <div style="padding:10px 12px 8px;border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <span class="panel-title" style="margin:0">Watchlist</span>
-          <button onclick="resetWatchlist()" title="Resetează la default" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">↺ Reset</button>
+          <div style="display:flex;gap:4px;">
+            <button onclick="resetWatchlist()" title="Resetează la default" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">Reset</button>
+          </div>
+        </div>
+        
+        <!-- Table Header -->
+        <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:4px; padding: 12px 8px 4px; font-size: 10px; color: var(--text2); text-transform: uppercase; font-weight: 800;">
+          <div>Simbol</div>
+          <div style="text-align:right;">Preț</div>
+          <div style="text-align:right;">Variație</div>
+          <div style="text-align:right;">Var %</div>
         </div>
       </div>
       
@@ -808,6 +960,29 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
       <!-- Grup Unic: Toate Simbolurile (Draggable) -->
       <div id="watchlistUser" style="flex:1;overflow-y:auto;padding-top:4px;"></div>
+      
+      <!-- DETAILS WIDGET (Stil TradingView) -->
+      <div id="detailsWidget" style="border-top:1px solid var(--border); padding:16px; display:flex; flex-direction:column; background:var(--bg); min-height:160px;">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+          <img id="dwLogo" src="" style="width:40px; height:40px; border-radius:50%; background:#fff; object-fit:contain; padding:2px; display:none;" onerror="this.style.display='none'" />
+          <div style="display:flex; flex-direction:column;">
+            <span id="dwSym" style="font-size:18px; font-weight:900;">---</span>
+            <span id="dwName" style="font-size:11px; color:var(--text2);">---</span>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;">
+          <span id="dwPrice" style="font-size:24px; font-weight:800;">---</span>
+          <span id="dwChg" style="font-size:13px; font-weight:700;">---</span>
+        </div>
+        <div style="font-size:10px; color:var(--text2); display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span style="text-transform:uppercase; font-weight:800;">Day's Range</span>
+          <span id="dwRangeText" style="font-weight:700;">---</span>
+        </div>
+        <div style="width:100%; height:4px; background:var(--bg3); border-radius:2px; overflow:hidden; position:relative;">
+          <div id="dwRangeBar" style="height:100%; background:var(--accent); width:0%; position:absolute; left:0;"></div>
+          <div id="dwRangeDot" style="height:8px; width:4px; background:var(--text); position:absolute; top:-2px; border-radius:2px; transform:translateX(-50%);"></div>
+        </div>
+      </div>
     </div>
   </div><!-- /rightPanel -->
 </div><!-- /main -->
@@ -834,9 +1009,56 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 //  STATE
 // ════════════════════════════════════════════════════════════
 let currentSymbol = '';
-let currentTF = '1d';
+
+function getFallbackIconHTML(sym, size, id='') {
+  let svg = '';
+  const c = 'var(--text)';
+  if (sym.includes('=F')) {
+    if (sym.includes('CL') || sym.includes('BZ') || sym.includes('HO')) {
+      // Oil drop
+      svg = `<svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
+    } else if (sym.includes('GC') || sym.includes('SI') || sym.includes('HG')) {
+      // Gold/Silver coins
+      svg = `<svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/></svg>`;
+    } else {
+      // Index chart
+      svg = `<svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`;
+    }
+  } else if (sym.includes('=X')) {
+    // Forex
+    svg = `<svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+  } else if (sym.includes('-USD')) {
+    // Crypto
+    svg = `<svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 20h-7v-16h7a4 4 0 0 1 0 8 4 4 0 0 1 0 8z"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="14" y1="12" x2="7" y2="12"/></svg>`;
+  } else {
+    // Generic Stock
+    svg = `<span style="font-size:${size>30?16:10}px;font-weight:bold;color:${c}">${sym.charAt(0)}</span>`;
+  }
+  return `<div ${id ? `id="${id}"` : ''} style="width:${size}px;height:${size}px;border-radius:50%;background:var(--card-bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${svg}</div>`;
+}
+
+function cleanCompanyName(name, sym) {
+  if (!name) return sym;
+  if (sym === 'NQ=F') return 'Nasdaq 100';
+  if (sym === 'ES=F') return 'S&P 500';
+  if (sym === 'YM=F') return 'Dow Jones';
+  if (sym === 'RTY=F') return 'Russell 2000';
+  if (sym === 'CL=F') return 'Crude Oil';
+  if (sym === 'BZ=F') return 'Brent Oil';
+  if (sym === 'GC=F') return 'Gold';
+  if (sym === 'SI=F') return 'Silver';
+  if (sym === 'EURUSD=X') return 'EUR/USD';
+  if (sym.includes('-USD')) return name.replace(' USD', '');
+  return name.replace(/,?\s+(Inc\.|Inc|Corporation|Corp\.|Corp|Company|Co\.|Ltd\.|Ltd|plc|LLC)\b/ig, '').trim();
+}
+
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const PROXY_BASE = IS_LOCAL ? 'http://localhost:3457/proxy' : '/.netlify/functions/proxy';
+
+let currentTF = localStorage.getItem('tradeProTF') || '1d';
 let allData = [];
-let indicators = { ma:true, bb:true, vol:true, rsi:true, macd:true, ema:false, vwap:false, forecast:true };
+// Nu mai incarcam din localStorage ca sa nu aglomeram graficul utilizatorului vechi
+let indicators = { ma:false, bb:false, vol:true, rsi:false, macd:false, ema:false, vwap:false, forecast:false, smc:false, vpvr:false };
 let activeTool = 'cursor';
 let forecastHorizon = 7;
 let lastForecast = null;
@@ -844,13 +1066,16 @@ let lastForecast = null;
 // Charts
 let mainChart, candleSeries, volumeSeries;
 let ma20S, ma50S, ma200S, bbU, bbM, bbL, emaS, vwapS;
+let vwapU1, vwapL1, vwapU2, vwapL2, vwapU3, vwapL3;
+let pocLine = null;
+let sigMarkers = [];
 let fcLineS, fcBandU, fcBandL;
 let rsiChart, rsiS, rsiOB, rsiOS;
 let macdChart, macdHistS, macdLineS, macdSigS;
 
 // Multiple CORS proxies — tried in order until one works
 const PROXIES = [
-  url => `http://localhost:3457/proxy?url=${encodeURIComponent(url)}`
+  url => `${PROXY_BASE}?url=${encodeURIComponent(url)}`
 ];
 
 async function fetchJSON(url, timeoutMs = 8000) {
@@ -931,18 +1156,30 @@ function resetWatchlist() {
 let watchlistData = loadWatchlist();
 
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  THEME
 // ════════════════════════════════════════════════════════════
-let isDark = false;
+const savedTheme = localStorage.getItem('tradeProTheme') || 'dark';
+let isDark = savedTheme === 'dark';
+
+// Aplica tema la start
+document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+document.getElementById('themeBtn').textContent = isDark ? '' : '';
+
 document.getElementById('themeBtn').addEventListener('click', () => {
   isDark = !isDark;
-  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-  document.getElementById('themeBtn').textContent = isDark ? '🌙' : '☀️';
+  const newTheme = isDark ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  document.getElementById('themeBtn').textContent = isDark ? '' : '';
+  
+  // Salveaza preferinta
+  localStorage.setItem('tradeProTheme', newTheme);
+  
   if (mainChart) {
-    const bg = isDark ? '#131722' : '#ffffff';
-    const grid = isDark ? '#1e222d' : '#f0f3fa';
-    const tc = isDark ? '#d1d4dc' : '#131722';
-    const bc = isDark ? '#2a2e39' : '#dde2ef';
+    const bg = isDark ? '#020617' : '#ffffff';
+    const grid = isDark ? '#1e293b' : '#f1f5f9';
+    const tc = isDark ? '#ffffff' : '#0f172a';
+    const bc = isDark ? '#334155' : '#e2e8f0';
     [mainChart, rsiChart, macdChart].forEach(c => {
       if (!c) return;
       c.applyOptions({ layout:{background:{color:bg},textColor:tc}, grid:{vertLines:{color:grid},horzLines:{color:grid}}, timeScale:{borderColor:bc}, rightPriceScale:{borderColor:bc} });
@@ -976,13 +1213,18 @@ document.querySelectorAll('.fc-h-btn').forEach(btn => {
 //  INIT CHARTS
 // ════════════════════════════════════════════════════════════
 function chartOpts(w, h) {
+  const bg = isDark ? '#020617' : '#ffffff';
+  const grid = isDark ? '#1e293b' : '#f1f5f9';
+  const tc = isDark ? '#ffffff' : '#0f172a';
+  const bc = isDark ? '#334155' : '#e2e8f0';
+
   return {
     width: w, height: h,
-    layout: { background:{color:'#ffffff'}, textColor:'#131722' },
-    grid: { vertLines:{color:'#f0f3fa'}, horzLines:{color:'#f0f3fa'} },
+    layout: { background:{color:bg}, textColor:tc },
+    grid: { vertLines:{color:grid}, horzLines:{color:grid} },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    timeScale: { borderColor:'#dde2ef', timeVisible:true, secondsVisible:false },
-    rightPriceScale: { borderColor:'#dde2ef' },
+    timeScale: { borderColor:bc, timeVisible:true, secondsVisible:false },
+    rightPriceScale: { borderColor:bc },
     handleScroll: { mouseWheel:true, pressedMouseMove:true },
     handleScale: { mouseWheel:true, pinch:true },
   };
@@ -999,6 +1241,11 @@ function initCharts() {
     upColor:'#089981', downColor:'#f23645',
     borderUpColor:'#089981', borderDownColor:'#f23645',
     wickUpColor:'#089981', wickDownColor:'#f23645',
+    lastValueVisible: true,
+    priceLineVisible: true,
+    priceLineColor: '#2962ff',
+    priceLineWidth: 1,
+    priceLineStyle: LightweightCharts.LineStyle.Dashed,
   });
 
   volumeSeries = mainChart.addHistogramSeries({ priceFormat:{type:'volume'}, priceScaleId:'volume' });
@@ -1011,7 +1258,14 @@ function initCharts() {
   bbM    = mainChart.addLineSeries({ color:'rgba(124,58,237,0.25)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
   bbL    = mainChart.addLineSeries({ color:'rgba(124,58,237,0.5)', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
   emaS   = mainChart.addLineSeries({ color:'#00bcd4', lineWidth:1, priceLineVisible:false, lastValueVisible:false });
-  vwapS  = mainChart.addLineSeries({ color:'#ff5722', lineWidth:1, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dotted });
+  
+  vwapS  = mainChart.addLineSeries({ color:'#ff5722', lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+  vwapU1 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.4)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, priceLineVisible:false, lastValueVisible:false });
+  vwapL1 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.4)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, priceLineVisible:false, lastValueVisible:false });
+  vwapU2 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.2)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, priceLineVisible:false, lastValueVisible:false });
+  vwapL2 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.2)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, priceLineVisible:false, lastValueVisible:false });
+  vwapU3 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.1)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, priceLineVisible:false, lastValueVisible:false });
+  vwapL3 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.1)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, priceLineVisible:false, lastValueVisible:false });
 
   // Forecast series
   fcLineS = mainChart.addLineSeries({ color:'rgba(124,58,237,0.9)', lineWidth:2, priceLineVisible:false, lastValueVisible:true, lineStyle:LightweightCharts.LineStyle.Dashed });
@@ -1037,9 +1291,119 @@ function initCharts() {
     if (indicators.macd) macdChart.timeScale().setVisibleLogicalRange(range);
   });
 
+  // Context menu pe clic dreapta
+  document.getElementById('chartCanvas').addEventListener('contextmenu', e => {
+    e.preventDefault();
+    showCtxMenu(e.clientX, e.clientY);
+  });
+
   window.addEventListener('resize', handleResize);
   handleResize();
 }
+
+// ════════════════════════════════════════════════════════════
+//  CONTEXT MENU (clic dreapta grafic)
+// ════════════════════════════════════════════════════════════
+let ctxMenuPrice = 0; // pretul curent la pozitia crosshair-ului
+
+function showCtxMenu(x, y) {
+  const menu = document.getElementById('chartCtxMenu');
+  const price = ctxMenuPrice || (allData.length ? allData[allData.length-1].close : 0);
+  const priceStr = fmt(price);
+  const sym = currentSymbol || '---';
+
+  document.getElementById('ctxPriceLabel').textContent  = priceStr;
+  document.getElementById('ctxAlertLabel').textContent  = priceStr;
+  document.getElementById('ctxSymBuy').textContent       = sym;
+  document.getElementById('ctxBuyPrice').textContent    = priceStr;
+  document.getElementById('ctxSymSell').textContent      = sym;
+  document.getElementById('ctxSellPrice').textContent   = priceStr;
+
+  // Pozitionare - nu iesi din ecran
+  const mw = 230, mh = 280;
+  const left = Math.min(x, window.innerWidth  - mw - 8);
+  const top  = Math.min(y, window.innerHeight - mh - 8);
+  menu.style.left    = left + 'px';
+  menu.style.top     = top  + 'px';
+  menu.style.display = 'block';
+
+  // Inchide la clic oriunde
+  setTimeout(() => document.addEventListener('click', closeCtxMenuOnce, {once:true}), 0);
+}
+
+function closeCtxMenuOnce() {
+  document.getElementById('chartCtxMenu').style.display = 'none';
+}
+function closeCtxMenu() {
+  document.getElementById('chartCtxMenu').style.display = 'none';
+}
+
+function ctxResetChart() {
+  closeCtxMenu();
+  if (mainChart) mainChart.timeScale().fitContent();
+}
+function ctxCopyPrice() {
+  closeCtxMenu();
+  const p = ctxMenuPrice || (allData.length ? allData[allData.length-1].close : 0);
+  navigator.clipboard.writeText(fmt(p)).catch(()=>{});
+  showToast(`Pret copiat: ${fmt(p)}`);
+}
+function ctxAddAlert() {
+  closeCtxMenu();
+  const p = ctxMenuPrice || (allData.length ? allData[allData.length-1].close : 0);
+  // Adauga o linie de alerta pe grafic
+  if (candleSeries) {
+    candleSeries.createPriceLine({
+      price: p,
+      color: '#e0a800',
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: `Alerta ${fmt(p)}`,
+    });
+  }
+  showToast(`Alerta setata la ${fmt(p)}`);
+}
+function ctxBuy(type) {
+  closeCtxMenu();
+  const p = ctxMenuPrice || (allData.length ? allData[allData.length-1].close : 0);
+  const sym = currentSymbol || '---';
+  if (candleSeries) {
+    candleSeries.createPriceLine({
+      price: p,
+      color: '#089981',
+      lineWidth: 2,
+      lineStyle: LightweightCharts.LineStyle.Solid,
+      axisLabelVisible: true,
+      title: `BUY ${sym} ${type.toUpperCase()} ${fmt(p)}`,
+    });
+  }
+  showToast(`Ordin BUY ${type}: ${sym} @ ${fmt(p)}`);
+}
+function ctxSell(type) {
+  closeCtxMenu();
+  const p = ctxMenuPrice || (allData.length ? allData[allData.length-1].close : 0);
+  const sym = currentSymbol || '---';
+  if (candleSeries) {
+    candleSeries.createPriceLine({
+      price: p,
+      color: '#f23645',
+      lineWidth: 2,
+      lineStyle: LightweightCharts.LineStyle.Solid,
+      axisLabelVisible: true,
+      title: `SELL ${sym} ${type.toUpperCase()} ${fmt(p)}`,
+    });
+  }
+  showToast(`Ordin SELL ${type}: ${sym} @ ${fmt(p)}`);
+}
+
+// Shortcut Ctrl+R pentru reset chart
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+    e.preventDefault();
+    if (mainChart) mainChart.timeScale().fitContent();
+  }
+});
 
 function handleResize() {
   const ce = document.getElementById('chartCanvas');
@@ -1315,9 +1679,96 @@ function calcMACD(data, f=12, sl=26, sg=9) {
   return { line:ml.map(d=>({time:d.time,value:d.close})), signal:sig.map(d=>({time:d.time,value:d.value})), hist };
 }
 
-function calcVWAP(data) {
-  let pv=0,v=0;
-  return data.map(d => { const tp=(d.high+d.low+d.close)/3; pv+=tp*d.volume; v+=d.volume; return {time:d.time,value:v>0?pv/v:d.close}; });
+function calcVWAPBands(data) {
+  let pv=0, v=0;
+  let squaredDevSum = 0;
+  return data.map(d => { 
+    const tp=(d.high+d.low+d.close)/3; 
+    pv+=tp*d.volume; 
+    v+=d.volume; 
+    const vwap = v>0?pv/v:d.close; 
+    
+    squaredDevSum += d.volume * Math.pow(tp - vwap, 2);
+    const variance = v > 0 ? squaredDevSum / v : 0;
+    const stdDev = Math.sqrt(variance);
+
+    return {
+      time: d.time,
+      vwap: vwap,
+      u1: vwap + stdDev, l1: vwap - stdDev,
+      u2: vwap + (stdDev * 2), l2: vwap - (stdDev * 2),
+      u3: vwap + (stdDev * 3), l3: vwap - (stdDev * 3)
+    }; 
+  });
+}
+
+function calcFVG(data) {
+  let unmitigatedBulls = [];
+  let unmitigatedBears = [];
+  
+  for (let i = 2; i < data.length; i++) {
+    const c1 = data[i-2], c2 = data[i-1], c3 = data[i];
+    
+    // Filtrare FVG-uri acoperite (mitigated)
+    unmitigatedBulls = unmitigatedBulls.filter(fvg => c3.low > fvg.top);
+    unmitigatedBears = unmitigatedBears.filter(fvg => c3.high < fvg.bottom);
+    
+    // Bullish FVG
+    if (c1.high < c3.low && c2.close > c2.open) {
+      const gap = (c3.low - c1.high) / c1.high * 100;
+      if (gap > 0.05) unmitigatedBulls.push({ top: c1.high, bottom: c3.low, time: c3.time });
+    }
+    // Bearish FVG
+    if (c1.low > c3.high && c2.close < c2.open) {
+      const gap = (c1.low - c3.high) / c3.high * 100;
+      if (gap > 0.05) unmitigatedBears.push({ top: c1.low, bottom: c3.high, time: c3.time });
+    }
+  }
+  
+  let markers = [];
+  // Păstrăm doar ultimele 5 FVG-uri neacoperite (SMC instituțional curat)
+  unmitigatedBulls.slice(-5).forEach(fvg => {
+    markers.push({ time: fvg.time, position: 'belowBar', color: 'rgba(52,211,153,1)', shape: 'circle' });
+  });
+  unmitigatedBears.slice(-5).forEach(fvg => {
+    markers.push({ time: fvg.time, position: 'aboveBar', color: 'rgba(248,113,113,1)', shape: 'circle' });
+  });
+  
+  markers.sort((a, b) => a.time - b.time);
+  return markers;
+}
+
+function updateVPVR(data) {
+  if (pocLine) { candleSeries.removePriceLine(pocLine); pocLine = null; }
+  if (!indicators.vpvr || data.length === 0) return;
+  
+  let minP = Infinity, maxP = -Infinity;
+  data.forEach(d => { minP = Math.min(minP, d.low); maxP = Math.max(maxP, d.high); });
+  const bins = 50;
+  const binSize = (maxP - minP) / bins;
+  if(binSize === 0) return;
+  let profile = new Array(bins).fill(0);
+  
+  data.forEach(d => {
+    const tp = (d.high + d.low + d.close) / 3;
+    const binIdx = Math.floor((tp - minP) / binSize);
+    if(binIdx >= 0 && binIdx < bins) profile[binIdx] += d.volume;
+  });
+  
+  let maxVol = 0, pocIdx = 0;
+  for(let i=0; i<bins; i++) {
+    if(profile[i] > maxVol) { maxVol = profile[i]; pocIdx = i; }
+  }
+  const pocPrice = minP + (pocIdx * binSize) + (binSize/2);
+  
+  pocLine = candleSeries.createPriceLine({
+    price: pocPrice,
+    color: '#ef4444',
+    lineWidth: 2,
+    lineStyle: LightweightCharts.LineStyle.Solid,
+    axisLabelVisible: true,
+    title: 'POC',
+  });
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1344,7 +1795,30 @@ function renderAll(data) {
   } else { bbU.setData([]); bbM.setData([]); bbL.setData([]); }
 
   emaS.setData(indicators.ema ? ema(data,21) : []);
-  vwapS.setData(indicators.vwap ? calcVWAP(data) : []);
+  
+  if (indicators.vwap) {
+    const vBands = calcVWAPBands(data);
+    vwapS.setData(vBands.map(d=>({time:d.time, value:d.vwap})));
+    vwapU1.setData(vBands.map(d=>({time:d.time, value:d.u1})));
+    vwapL1.setData(vBands.map(d=>({time:d.time, value:d.l1})));
+    vwapU2.setData(vBands.map(d=>({time:d.time, value:d.u2})));
+    vwapL2.setData(vBands.map(d=>({time:d.time, value:d.l2})));
+    vwapU3.setData(vBands.map(d=>({time:d.time, value:d.u3})));
+    vwapL3.setData(vBands.map(d=>({time:d.time, value:d.l3})));
+  } else {
+    vwapS.setData([]); vwapU1.setData([]); vwapL1.setData([]);
+    vwapU2.setData([]); vwapL2.setData([]); vwapU3.setData([]); vwapL3.setData([]);
+  }
+
+  updateVPVR(data);
+
+  // Markers merge (Signals + FVG)
+  let allChartMarkers = [...sigMarkers];
+  if (indicators.smc) {
+    allChartMarkers = allChartMarkers.concat(calcFVG(data));
+  }
+  allChartMarkers.sort((a,b) => a.time - b.time);
+  candleSeries.setMarkers(allChartMarkers);
 
   // RSI
   const showRSI = indicators.rsi;
@@ -1378,8 +1852,45 @@ function renderAll(data) {
   // Fibonacci auto
   renderFibonacci(data);
 
+  // High / Low markers (TradingView style)
+  updateHighLowLines(data);
+
   handleResize();
   setTimeout(handleResize, 100);
+}
+
+// Globale pentru price lines High/Low
+let hlHighLine = null;
+let hlLowLine  = null;
+
+function updateHighLowLines(data) {
+  if (!candleSeries || !data.length) return;
+  
+  // Sterge liniile anterioare
+  if (hlHighLine) { try { candleSeries.removePriceLine(hlHighLine); } catch(e){} }
+  if (hlLowLine)  { try { candleSeries.removePriceLine(hlLowLine);  } catch(e){} }
+
+  // Calculeaza High/Low pe tot range-ul vizibil
+  const periodHigh = Math.max(...data.map(d => d.high));
+  const periodLow  = Math.min(...data.map(d => d.low));
+
+  hlHighLine = candleSeries.createPriceLine({
+    price: periodHigh,
+    color: '#089981',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dotted,
+    axisLabelVisible: true,
+    title: `H ${fmt(periodHigh)}`,
+  });
+
+  hlLowLine = candleSeries.createPriceLine({
+    price: periodLow,
+    color: '#f23645',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dotted,
+    axisLabelVisible: true,
+    title: `L ${fmt(periodLow)}`,
+  });
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1494,7 +2005,7 @@ function buildForecast(data) {
   // Direction & summary
   const bullish = basePct > 0.5;
   const bearish = basePct < -0.5;
-  document.getElementById('fcDirection').textContent = bullish ? '🟢 Direcție: BULLISH' : bearish ? '🔴 Direcție: BEARISH' : '🟡 Direcție: LATERAL';
+  document.getElementById('fcDirection').textContent = bullish ? ' Direcție: BULLISH' : bearish ? ' Direcție: BEARISH' : ' Direcție: LATERAL';
   document.getElementById('fcSummary').textContent =
     `Regresia liniară pe ${lookback} bare proiectează prețul la ${fmt(basePrice)} (${basePct>=0?'+':''}${basePct.toFixed(1)}%) în ${n} zile. Volatilitate: ${(vol*100).toFixed(1)}%/perioadă.`;
 
@@ -1514,7 +2025,7 @@ function buildForecast(data) {
       <td>${h} zile</td>
       <td class="${sig}">${fmt(p)}</td>
       <td class="${sig}">${pct>=0?'+':''}${pct.toFixed(2)}%</td>
-      <td class="${sig}">${sig==='bull'?'📈 Optimist':sig==='bear'?'📉 Pesimist':'➡️ Neutru'}</td>
+      <td class="${sig}">${sig==='bull'?' Optimist':sig==='bear'?' Pesimist':'➡️ Neutru'}</td>
     </tr>`;
   }).join('');
 
@@ -1610,30 +2121,30 @@ function detectPatterns(data) {
   // Higher Highs + Higher Lows → Uptrend
   const hh = highs[highs.length-1] > highs[Math.floor(highs.length*0.5)];
   const hl = lows[lows.length-1] > lows[Math.floor(lows.length*0.5)];
-  if (hh && hl) patterns.push({icon:'📈', name:'Trend Ascendent', desc:'Maxime și minime mai ridicate în ultimele 30 de bare. Structura bullish confirmată.', signal:'bull'});
+  if (hh && hl) patterns.push({icon:'', name:'Trend Ascendent', desc:'Maxime și minime mai ridicate în ultimele 30 de bare. Structura bullish confirmată.', signal:'bull'});
 
   // Lower Highs + Lower Lows → Downtrend
   const lh = highs[highs.length-1] < highs[Math.floor(highs.length*0.5)];
   const ll2 = lows[lows.length-1] < lows[Math.floor(lows.length*0.5)];
-  if (lh && ll2) patterns.push({icon:'📉', name:'Trend Descendent', desc:'Maxime și minime mai joase în ultimele 30 de bare. Structura bearish confirmată.', signal:'bear'});
+  if (lh && ll2) patterns.push({icon:'', name:'Trend Descendent', desc:'Maxime și minime mai joase în ultimele 30 de bare. Structura bearish confirmată.', signal:'bear'});
 
   // Double Top detection (simplified)
   const maxIdx1 = highs.indexOf(Math.max(...highs.slice(0, 15)));
   const maxIdx2 = highs.slice(15).indexOf(Math.max(...highs.slice(15))) + 15;
   const maxH1 = highs[maxIdx1], maxH2 = highs[maxIdx2];
   if (Math.abs(maxH1 - maxH2) / maxH1 < 0.02 && Math.abs(maxIdx1 - maxIdx2) > 5 && last < maxH1 * 0.98)
-    patterns.push({icon:'🔱', name:'Double Top', desc:`Două maxime apropiate la ~${fmt(maxH1)}. Semnal de inversare bearish la nivelul ${fmt(last)}.`, signal:'bear'});
+    patterns.push({icon:'', name:'Double Top', desc:`Două maxime apropiate la ~${fmt(maxH1)}. Semnal de inversare bearish la nivelul ${fmt(last)}.`, signal:'bear'});
 
   // Double Bottom
   const minIdx1 = lows.indexOf(Math.min(...lows.slice(0,15)));
   const minIdx2 = lows.slice(15).indexOf(Math.min(...lows.slice(15))) + 15;
   const minL1 = lows[minIdx1], minL2 = lows[minIdx2];
   if (Math.abs(minL1 - minL2) / minL1 < 0.02 && Math.abs(minIdx1 - minIdx2) > 5 && last > minL1 * 1.02)
-    patterns.push({icon:'⛸️', name:'Double Bottom', desc:`Două minime la ~${fmt(minL1)}. Semnal de inversare bullish. Target: ${fmt(last * 1.05)}.`, signal:'bull'});
+    patterns.push({icon:'', name:'Double Bottom', desc:`Două minime la ~${fmt(minL1)}. Semnal de inversare bullish. Target: ${fmt(last * 1.05)}.`, signal:'bull'});
 
   // Consolidation (narrow range)
   const rangeRatio = (Math.max(...highs.slice(-10)) - Math.min(...lows.slice(-10))) / last;
-  if (rangeRatio < 0.04) patterns.push({icon:'🔲', name:'Consolidare / Flag', desc:`Prețul oscilează în interval îngust (±${(rangeRatio*50).toFixed(1)}%). Urmează un breakout.`, signal:'neut'});
+  if (rangeRatio < 0.04) patterns.push({icon:'', name:'Consolidare / Flag', desc:`Prețul oscilează în interval îngust (±${(rangeRatio*50).toFixed(1)}%). Urmează un breakout.`, signal:'neut'});
 
   // RSI divergence (simplified)
   const rsiData = calcRSI(data);
@@ -1642,10 +2153,10 @@ function detectPatterns(data) {
     const prevRSI = rsiData[rsiData.length-10].value;
     const priceUp = last > data[data.length-10].close;
     const rsiDown = lastRSI < prevRSI;
-    if (priceUp && rsiDown && lastRSI > 55) patterns.push({icon:'⚠️', name:'Divergență Bearish RSI', desc:`Prețul a urcat dar RSI a scăzut (${prevRSI.toFixed(0)} → ${lastRSI.toFixed(0)}). Posibilă slăbire a trendului.`, signal:'bear'});
+    if (priceUp && rsiDown && lastRSI > 55) patterns.push({icon:'', name:'Divergență Bearish RSI', desc:`Prețul a urcat dar RSI a scăzut (${prevRSI.toFixed(0)} → ${lastRSI.toFixed(0)}). Posibilă slăbire a trendului.`, signal:'bear'});
     const priceDown = last < data[data.length-10].close;
     const rsiUp = lastRSI > prevRSI;
-    if (priceDown && rsiUp && lastRSI < 45) patterns.push({icon:'💡', name:'Divergență Bullish RSI', desc:`Prețul a scăzut dar RSI a crescut (${prevRSI.toFixed(0)} → ${lastRSI.toFixed(0)}). Posibil rebound.`, signal:'bull'});
+    if (priceDown && rsiUp && lastRSI < 45) patterns.push({icon:'', name:'Divergență Bullish RSI', desc:`Prețul a scăzut dar RSI a crescut (${prevRSI.toFixed(0)} → ${lastRSI.toFixed(0)}). Posibil rebound.`, signal:'bull'});
   }
 
   // Breakout above MA200
@@ -1653,11 +2164,11 @@ function detectPatterns(data) {
   if (ma200data.length) {
     const ma200last = ma200data[ma200data.length-1].value;
     if (last > ma200last * 1.01 && data[data.length-5].close < ma200last)
-      patterns.push({icon:'🚀', name:'Breakout MA200', desc:`Prețul a depășit MA200 (${fmt(ma200last)}) — semnal major bullish pe termen lung.`, signal:'bull'});
+      patterns.push({icon:'', name:'Breakout MA200', desc:`Prețul a depășit MA200 (${fmt(ma200last)}) — semnal major bullish pe termen lung.`, signal:'bull'});
   }
 
   if (patterns.length === 0)
-    patterns.push({icon:'🔍', name:'Fără pattern clar', desc:'Nu s-au detectat pattern-uri semnificative pe datele curente. Monitorizați consolidarea.', signal:'neut'});
+    patterns.push({icon:'', name:'Fără pattern clar', desc:'Nu s-au detectat pattern-uri semnificative pe datele curente. Monitorizați consolidarea.', signal:'neut'});
 
   document.getElementById('patternCards').innerHTML = patterns.map(p => `
     <div class="pattern-card" style="border-left-color:${p.signal==='bull'?'var(--green)':p.signal==='bear'?'var(--red)':'var(--accent)'}">
@@ -1705,8 +2216,9 @@ function runAnalysis(data, meta) {
   const last = data[data.length-1];
   const prev = data[data.length-2];
   const chg = (last.close - prev.close) / prev.close * 100;
-
   document.getElementById('curSymbol').textContent = currentSymbol;
+  
+  // (Logo update logic has been moved to applyQuoteToDOM to prevent duplicate fallback circle generation)
   
   // Afiseaza numele companiei daca e disponibil in meta
   const companyNameEl = document.getElementById('curCompanyName');
@@ -1776,7 +2288,7 @@ function runAnalysis(data, meta) {
 
   const desc = {
     trend: tBull ? `Preț deasupra MA50 (${fmt(lma50)}) și MA20 > MA50. Trend bullish puternic.` : last.close < lma50 ? `Prețul sub MA50 (${fmt(lma50)}). Presiune bearish.` : 'Prețul oscilează în jurul mediilor. Direcție neclară.',
-    rsi:   rsi > 70 ? `RSI=${rsi.toFixed(1)} — Supracumpărat ⚠️. Risc de corecție.` : rsi < 30 ? `RSI=${rsi.toFixed(1)} — Supravândut 🟢. Posibil rebound.` : `RSI=${rsi.toFixed(1)} — Zona neutră (30–70).`,
+    rsi:   rsi > 70 ? `RSI=${rsi.toFixed(1)} — Supracumpărat . Risc de corecție.` : rsi < 30 ? `RSI=${rsi.toFixed(1)} — Supravândut . Posibil rebound.` : `RSI=${rsi.toFixed(1)} — Zona neutră (30–70).`,
     macd:  lmacd > 0 ? `Histogramă pozitivă (+${lmacd.toFixed(4)}). Momentum bullish activ.` : `Histogramă negativă (${lmacd.toFixed(4)}). Momentum bearish.`,
     bb:    lbb ? (last.close >= lbb.upper ? `La banda superioară (${fmt(lbb.upper)}). Posibilă răsturnare.` : last.close <= lbb.lower ? `La banda inferioară (${fmt(lbb.lower)}). Posibil rebound.` : `În interiorul benzilor (${fmt(lbb.lower)}–${fmt(lbb.upper)}).`) : '—',
     vol:   volR > 1.5 ? `Volum ${fmtVol(last.volume)} = ${volR.toFixed(1)}× media. Confirmare ${chg>0?'cumpărare':'vânzare'}.` : `Volum normal (${(volR*100).toFixed(0)}% din medie).`,
@@ -1804,12 +2316,12 @@ function runAnalysis(data, meta) {
   let totalSigs = sigs.length;
 
   const reasons = [];
-  if (tBull) reasons.push(`🟢 Prețul a urcat peste MA50 (${fmt(lma50)})`);
-  else if (last.close < lma50) reasons.push(`🔴 Prețul este sub MA50 (${fmt(lma50)})`);
-  if (rsi < 30) reasons.push(`🟢 RSI indică Supravânzare severă (${rsi.toFixed(1)})`);
-  else if (rsi > 70) reasons.push(`🔴 RSI indică Supracumpărare severă (${rsi.toFixed(1)})`);
-  if (lmacd > 0) reasons.push(`🟢 MACD arată un momentum crescător (+${lmacd.toFixed(4)})`);
-  else reasons.push(`🔴 MACD arată un momentum descrescător (${lmacd.toFixed(4)})`);
+  if (tBull) reasons.push(` Prețul a urcat peste MA50 (${fmt(lma50)})`);
+  else if (last.close < lma50) reasons.push(` Prețul este sub MA50 (${fmt(lma50)})`);
+  if (rsi < 30) reasons.push(` RSI indică Supravânzare severă (${rsi.toFixed(1)})`);
+  else if (rsi > 70) reasons.push(` RSI indică Supracumpărare severă (${rsi.toFixed(1)})`);
+  if (lmacd > 0) reasons.push(` MACD arată un momentum crescător (+${lmacd.toFixed(4)})`);
+  else reasons.push(` MACD arată un momentum descrescător (${lmacd.toFixed(4)})`);
 
   let newsSentiment = 0;
   if (meta && meta.news && meta.news.length > 0) {
@@ -1819,14 +2331,14 @@ function runAnalysis(data, meta) {
     let posCount = posWords.reduce((c, w) => c + (newsText.split(w).length - 1), 0);
     let negCount = negWords.reduce((c, w) => c + (newsText.split(w).length - 1), 0);
     
-    if (posCount > negCount + 1) { newsSentiment = 1; bulls++; totalSigs++; reasons.push(`📰 Știri Recente: Pozitive (${posCount} semnale)`); }
-    else if (negCount > posCount + 1) { newsSentiment = -1; bears++; totalSigs++; reasons.push(`📰 Știri Recente: Negative (${negCount} semnale)`); }
-    else { reasons.push(`📰 Știri Recente: Neutre / Mixte`); }
+    if (posCount > negCount + 1) { newsSentiment = 1; bulls++; totalSigs++; reasons.push(` Știri Recente: Pozitive (${posCount} semnale)`); }
+    else if (negCount > posCount + 1) { newsSentiment = -1; bears++; totalSigs++; reasons.push(` Știri Recente: Negative (${negCount} semnale)`); }
+    else { reasons.push(` Știri Recente: Neutre / Mixte`); }
   }
 
   const score = (bulls - bears) / totalSigs;
   drawGauge(score);
-  const lbl = score > 0.4 ? '🟢 CUMPĂRARE PUTERNICĂ' : score > 0.1 ? '🟢 CUMPĂRARE' : score < -0.4 ? '🔴 VÂNZARE PUTERNICĂ' : score < -0.1 ? '🔴 VÂNZARE' : '🟡 NEUTRU';
+  const lbl = score > 0.4 ? ' CUMPĂRARE PUTERNICĂ' : score > 0.1 ? ' CUMPĂRARE' : score < -0.4 ? ' VÂNZARE PUTERNICĂ' : score < -0.1 ? ' VÂNZARE' : ' NEUTRU';
   document.getElementById('gaugeLabel').textContent = lbl;
   document.getElementById('gaugeSub').textContent = `${bulls}/${totalSigs} indicatori bullish`;
 
@@ -1967,7 +2479,7 @@ function triggerSignalNotification(score, labelText, price, reasons = [], bulls 
         Ignoră
       </button>
     </div>
-    <div style="font-size:9px;color:var(--text2);margin-top:8px;opacity:.7;">⚠️ Nu constituie sfat financiar. Decizii pe propria răspundere.</div>
+    <div style="font-size:9px;color:var(--text2);margin-top:8px;opacity:.7;"> Nu constituie sfat financiar. Decizii pe propria răspundere.</div>
   `;
   document.body.appendChild(popup);
 
@@ -1975,7 +2487,7 @@ function triggerSignalNotification(score, labelText, price, reasons = [], bulls 
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification(`TradePro AI — ${action} ${currentSymbol}`, {
       body: `${currentSymbol} @ ${fmt(price)} | Încredere: ${conf}%`,
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28">📈</text></svg>'
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28"></text></svg>'
     });
   }
 
@@ -2035,12 +2547,20 @@ function updateCrosshairInfo(param) {
   if (!param.point || !param.seriesData?.size) { el.style.display='none'; return; }
   const d = param.seriesData.get(candleSeries);
   if (!d) return;
+  
+  // Actualizeaza pretul pentru context menu
+  ctxMenuPrice = d.close;
+  
+  const chg = allData.length >= 2 ? ((d.close - allData[allData.length-2].close) / allData[allData.length-2].close * 100) : 0;
+  const chgColor = chg >= 0 ? 'var(--green)' : 'var(--red)';
   el.style.display='flex';
   el.innerHTML = `
+    <span style="font-weight:800;color:var(--text);margin-right:8px;">${currentSymbol}</span>
     <span class="chi">O: <span>${fmt(d.open)}</span></span>
     <span class="chi">H: <span style="color:var(--green)">${fmt(d.high)}</span></span>
     <span class="chi">L: <span style="color:var(--red)">${fmt(d.low)}</span></span>
-    <span class="chi">C: <span>${fmt(d.close)}</span></span>`;
+    <span class="chi">C: <span style="font-weight:800">${fmt(d.close)}</span></span>
+    <span class="chi" style="color:${chgColor}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>`;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2111,10 +2631,49 @@ function handleWlDragEnd(e) {
   draggedWlItemIndex = null;
 }
 
+// ── LOGOS MAPPING ──
+function getBestLogoUrl(sym) {
+  const s = sym.toUpperCase().replace(/=X|-USD|=F/g, '');
+  const map = {
+    'TSLA': 'https://logo.clearbit.com/tesla.com',
+    'MSFT': 'https://logo.clearbit.com/microsoft.com',
+    'NVDA': 'https://logo.clearbit.com/nvidia.com',
+    'AAPL': 'https://logo.clearbit.com/apple.com',
+    'AMZN': 'https://logo.clearbit.com/amazon.com',
+    'META': 'https://logo.clearbit.com/meta.com',
+    'GOOGL': 'https://logo.clearbit.com/abc.xyz',
+    'GOOG': 'https://logo.clearbit.com/abc.xyz',
+    'NFLX': 'https://logo.clearbit.com/netflix.com',
+    'LULU': 'https://logo.clearbit.com/lululemon.com',
+    'APPS': 'https://logo.clearbit.com/digitalturbine.com',
+    'NQ': 'https://logo.clearbit.com/nasdaq.com', // Nasdaq
+    'ES': 'https://logo.clearbit.com/spglobal.com', // S&P 500
+    'SPY': 'https://logo.clearbit.com/spglobal.com',
+    'QQQ': 'https://logo.clearbit.com/nasdaq.com',
+    'CL': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Oil Drop
+    'BZ': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Brent Oil
+    'GC': 'https://cdn-icons-png.flaticon.com/512/1487/1487777.png', // Gold
+    'SI': 'https://cdn-icons-png.flaticon.com/512/4627/4627341.png', // Silver
+    'BTC': 'https://cryptologos.cc/logos/bitcoin-btc-logo.png',
+    'ETH': 'https://cryptologos.cc/logos/ethereum-eth-logo.png',
+    'SOL': 'https://cryptologos.cc/logos/solana-sol-logo.png'
+  };
+  return map[s] || `https://logo.clearbit.com/${s.toLowerCase()}.com`; // Fallback la clearbit generic
+}
+
 function wlItemHTML(w, idx) {
   const delBtn = `<button onclick="event.stopPropagation();removeFromWatchlist('${w.sym}')"
-       style="background:none;border:none;color:var(--text2);font-size:11px;cursor:pointer;padding:0 2px;opacity:.5;line-height:1;"
+       style="background:none;border:none;color:var(--text2);font-size:11px;cursor:pointer;padding:0;opacity:.5;line-height:1;"
        title="Șterge din watchlist">✕</button>`;
+  
+  const symClean = safe(w.sym).replace('-USD','');
+  const logoUrl = getBestLogoUrl(w.sym);
+  const logoHtml = `
+    <img src="${logoUrl}" 
+         onerror="this.src='https://eodhd.com/img/logos/US/${symClean}.png'; this.onerror=function(){this.src='https://financialmodelingprep.com/image-stock/${symClean}.png'; this.onerror=function(){this.style.display='none';};};" 
+         style="width:24px;height:24px;border-radius:50%;margin-right:6px;background:#fff;object-fit:contain;flex-shrink:0;padding:2px;" />
+  `;
+
   return `
     <div class="wl-item ${w.sym===currentSymbol?'active':''}" 
          draggable="true" 
@@ -2122,21 +2681,25 @@ function wlItemHTML(w, idx) {
          ondragover="handleWlDragOver(event)" 
          ondrop="handleWlDrop(event, ${idx})" 
          ondragend="handleWlDragEnd(event)"
-         onclick="loadSymbol('${w.sym}')">
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:4px;">
-          <div class="wl-sym" style="cursor:grab;">${w.sym}</div>
-          ${delBtn}
+         onclick="loadSymbol('${w.sym}')"
+         style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 4px; align-items: center; padding: 8px 12px;">
+      
+      <div style="display: flex; align-items: center; gap: 4px; min-width: 0;">
+        ${logoHtml}
+        <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div class="wl-sym" style="font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis;">${w.sym}</div>
+            ${delBtn}
+          </div>
+          <div class="wl-name" id="wln-${safe(w.sym)}" style="font-size:9px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${cleanCompanyName(w.name, w.sym)}</div>
         </div>
-        <div class="wl-name">${w.name}</div>
       </div>
-      <div class="wl-price">
-        <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;">
-          <span id="wls-${safe(w.sym)}" style="display:none;font-size:8px;font-weight:800;color:var(--yellow);background:rgba(224,168,0,.15);padding:1px 4px;border-radius:3px;"></span>
-          <div class="wl-p" id="wlp-${safe(w.sym)}" style="transition:color .3s;">${w.price!=null?fmt(w.price):'—'}</div>
-        </div>
-        <div class="wl-chg ${(w.chg||0)>=0?'up':'dn'}" id="wlc-${safe(w.sym)}">${w.chg!=null?(w.chg>=0?'+':'')+w.chg.toFixed(2)+'%':''}</div>
-      </div>
+      
+      <div class="wl-p" id="wlp-${safe(w.sym)}" style="text-align: right; transition:color .3s; font-size:12px; font-weight:700;">${w.price!=null?fmt(w.price):'—'}</div>
+      
+      <div class="wl-chg-abs" id="wlca-${safe(w.sym)}" style="text-align: right; font-size:12px; font-weight:700; color:${(w.chg||0)>=0?'var(--green)':'var(--red)'}">${w.chgVal!=null?(w.chgVal>=0?'+':'')+w.chgVal.toFixed(2):'—'}</div>
+      
+      <div class="wl-chg ${(w.chg||0)>=0?'up':'dn'}" id="wlc-${safe(w.sym)}" style="text-align: right; font-size:12px; font-weight:700;">${w.chg!=null?(w.chg>=0?'+':'')+w.chg.toFixed(2)+'%':''}</div>
     </div>`;
 }
 
@@ -2218,9 +2781,21 @@ function applyQuoteToDOM(sym, q) {
     ce.className   = `wl-chg ${liveChg >= 0 ? 'up' : 'dn'}`;
   }
 
+  const cae = document.getElementById('wlca-' + id);
+  if (cae && liveChg != null) {
+    cae.textContent = (liveChg >= 0 ? '+' : '') + liveChg.toFixed(2);
+    cae.style.color = liveChg >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
   if (se) {
     se.textContent  = sessionLabel === 'pre' ? 'PRE' : sessionLabel === 'post' ? 'POST' : '';
     se.style.display = sessionLabel !== 'reg' ? 'inline' : 'none';
+  }
+
+  // Update watchlist name
+  const wlNameEl = document.getElementById(`wln-${safe(sym)}`);
+  if (wlNameEl && (q.shortName || q.longName)) {
+    wlNameEl.textContent = cleanCompanyName(q.shortName || q.longName, sym);
   }
 
   // Actualizează topbar + extended hours dacă e simbolul curent
@@ -2228,11 +2803,62 @@ function applyQuoteToDOM(sym, q) {
     animatePrice(livePrice);
     document.getElementById('curPrice').textContent = fmt(livePrice);
     
-    // Afiseaza numele companiei din quote
+    // Update floating order panel on chart
+    const fPanel = document.getElementById('floatingOrderPanel');
+    const fSell = document.getElementById('floatSellPrice');
+    const fBuy = document.getElementById('floatBuyPrice');
+    const fSpread = document.getElementById('floatSpread');
+    if (fPanel && livePrice != null) {
+      fPanel.style.display = 'flex';
+      // Simulate Bid/Ask based on a small spread if real bid/ask not provided
+      const spreadPct = livePrice > 100 ? 0.0001 : 0.001; 
+      const bid = q.bid || (livePrice * (1 - spreadPct));
+      const ask = q.ask || (livePrice * (1 + spreadPct));
+      fSell.textContent = fmt(bid);
+      fBuy.textContent = fmt(ask);
+      fSpread.textContent = fmt(ask - bid);
+    }
+
+    // Afiseaza numele companiei din quote si logo-ul corect
     const nameEl = document.getElementById('curCompanyName');
+    const compName = cleanCompanyName(q.shortName || q.longName, sym);
     if (nameEl && (q.shortName || q.longName)) {
-      nameEl.textContent = q.shortName || q.longName;
+      nameEl.textContent = compName;
       nameEl.title = q.shortName || q.longName;
+    }
+    const logoEl = document.getElementById('curLogo');
+    const logoUrl = getBestLogoUrl(sym);
+    if (logoEl) {
+      logoEl.src = logoUrl;
+      logoEl.style.display = 'block';
+    }
+    
+    // Populeaza Details Widget (Sidebar)
+    document.getElementById('dwSym').textContent = sym;
+    document.getElementById('dwName').textContent = compName;
+    const dwLogo = document.getElementById('dwLogo');
+    if (dwLogo) { dwLogo.src = logoUrl; dwLogo.style.display = 'block'; }
+    const dwPrice = document.getElementById('dwPrice');
+    const dwChg = document.getElementById('dwChg');
+    if (dwPrice && livePrice != null) {
+      dwPrice.textContent = fmt(livePrice);
+      dwPrice.style.color = liveChg >= 0 ? 'var(--green)' : 'var(--red)';
+      dwChg.textContent = `${liveChg>=0?'+':''}${fmt(liveChg)} (${liveChgPct.toFixed(2)}%)`;
+      dwChg.style.color = liveChg >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+    // Update Day's Range in Details Widget
+    const dwRangeText = document.getElementById('dwRangeText');
+    const dwRangeBar = document.getElementById('dwRangeBar');
+    const dwRangeDot = document.getElementById('dwRangeDot');
+    if (dwRangeText && q.regularMarketDayLow && q.regularMarketDayHigh) {
+      const low = q.regularMarketDayLow;
+      const high = q.regularMarketDayHigh;
+      dwRangeText.textContent = `${fmt(low)} - ${fmt(high)}`;
+      if (high > low) {
+        const pct = Math.max(0, Math.min(100, ((livePrice - low) / (high - low)) * 100));
+        dwRangeBar.style.width = pct + '%';
+        dwRangeDot.style.left = pct + '%';
+      }
     }
     
     if (liveChg != null) {
@@ -2292,7 +2918,7 @@ function applyQuoteToDOM(sym, q) {
       const ehPrice = inPre  ? q.preMarketPrice  : q.postMarketPrice;
       const ehChg   = inPre  ? q.preMarketChange : q.postMarketChange;
       const ehChgPct= inPre  ? q.preMarketChangePercent : q.postMarketChangePercent;
-      const ehLabel = inPre  ? '🌅 PRE-MARKET' : '🌆 AFTER-HOURS';
+      const ehLabel = inPre  ? ' PRE-MARKET' : ' AFTER-HOURS';
 
       extCard.style.display   = 'block';
       extLabel.textContent    = ehLabel;
@@ -2304,7 +2930,7 @@ function applyQuoteToDOM(sym, q) {
       // Și în extChgRow din stats panel
       if (extChgRow && statExtChg) {
         extChgRow.style.display    = 'flex';
-        statExtChgLabel.textContent= inPre ? '📊 Var. pre-mkt' : '📊 Var. after-hrs';
+        statExtChgLabel.textContent= inPre ? ' Var. pre-mkt' : ' Var. after-hrs';
         statExtChg.textContent     = `${ehChgPct>=0?'+':''}${ehChgPct.toFixed(2)}%`;
         statExtChg.className       = `stat-val ${ehChgPct>=0?'yellow':'red'}`;
       }
@@ -2387,7 +3013,7 @@ async function loadSymbol(symbol, tf) {
     if (meta && meta.demo) {
       const badge = document.createElement('div');
       badge.id = 'demoBadge';
-      badge.innerHTML = `⚠️ DATE DEMO — Proxy Error: ${meta.err || 'Unknown'}`;
+      badge.innerHTML = ` DATE DEMO — Proxy Error: ${meta.err || 'Unknown'}`;
       badge.style.cssText = 'position:absolute;top:8px;right:8px;z-index:30;background:rgba(224,168,0,.15);border:1px solid var(--yellow);color:var(--yellow);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;pointer-events:none;';
       document.getElementById('chartMain').appendChild(badge);
     }
@@ -2416,19 +3042,56 @@ function fmtVol(v) {
 function safe(s) { return s.replace(/[^a-z0-9]/gi,''); }
 
 // ════════════════════════════════════════════════════════════
+//  TOGGLES
+// ════════════════════════════════════════════════════════════
+document.querySelectorAll('.ind-btn').forEach(btn => btn.addEventListener('click', () => {
+  const ind = btn.dataset.ind;
+  indicators[ind] = !indicators[ind];
+  btn.classList.toggle('active', indicators[ind]);
+  localStorage.setItem('tradeProInds', JSON.stringify(indicators));
+  updateChartLegend();
+  if (typeof allData !== 'undefined' && allData.length) renderAll(allData);
+}));
+
+function updateChartLegend() {
+  const leg = document.getElementById('onChartLegend');
+  if (!leg) return;
+  leg.innerHTML = '';
+  
+  const colors = {
+    'ma': 'var(--yellow)', 'bb': 'var(--purple)', 'vol': 'var(--text2)', 
+    'rsi': 'var(--purple)', 'macd': 'var(--accent)', 'ema': 'var(--cyan)',
+    'vwap': 'var(--green)', 'smc': 'var(--accent)', 'vpvr': 'var(--text)',
+    'forecast': 'var(--orange)'
+  };
+  const labels = {
+    'ma': 'MA 50', 'bb': 'Bollinger Bands 20,2', 'vol': 'Volume', 
+    'rsi': 'RSI 14', 'macd': 'MACD 12,26,9', 'ema': 'EMA 21',
+    'vwap': 'VWAP', 'smc': 'SMC (FVG & BOS)', 'vpvr': 'VPVR Profile',
+    'forecast': 'AI Deep Forecast'
+  };
+
+  document.querySelectorAll('.ind-btn.active').forEach(btn => {
+    const ind = btn.dataset.ind;
+    const div = document.createElement('div');
+    div.style.cssText = 'pointer-events:auto; font-size:11px; color:var(--text); background:transparent; display:flex; align-items:center; gap:6px;';
+    div.innerHTML = `
+      <span style="color:${colors[ind]}; font-weight:700;">${labels[ind]}</span>
+      <span style="cursor:pointer; opacity:0.6; padding:0 2px;" onclick="document.querySelector('[data-ind=\\'${ind}\\']').click()" title="Hide">✕</span>
+    `;
+    leg.appendChild(div);
+  });
+}
+
+// ════════════════════════════════════════════════════════════
 //  BIND BUTTONS
 // ════════════════════════════════════════════════════════════
 document.querySelectorAll('.tf-btn').forEach(btn => btn.addEventListener('click', () => {
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  loadSymbol(currentSymbol, btn.dataset.tf);
-}));
-
-document.querySelectorAll('.ind-btn').forEach(btn => btn.addEventListener('click', () => {
-  const ind = btn.dataset.ind;
-  indicators[ind] = !indicators[ind];
-  btn.classList.toggle('active', indicators[ind]);
-  if (allData.length) renderAll(allData);
+  const tf = btn.dataset.tf;
+  localStorage.setItem('tradeProTF', tf);
+  loadSymbol(currentSymbol, tf);
 }));
 
 // Cautare prin Enter pe input (butonul Analizeaza a fost inlocuit cu Enter)
@@ -2557,7 +3220,6 @@ function analyzeFibonacci(currentPrice, levels, swingHigh, swingLow, trendUp) {
     ? ((swingHigh - currentPrice) / range * 100)
     : ((currentPrice - swingLow)  / range * 100);
 
-  // Cel mai apropiat nivel cheie
   const closestLevel = levels.reduce((best, l) => {
     const d = Math.abs(l.price - currentPrice);
     return d < Math.abs(best.price - currentPrice) ? l : best;
@@ -2570,36 +3232,36 @@ function analyzeFibonacci(currentPrice, levels, swingHigh, swingLow, trendUp) {
 
   if (closestLevel.label === '61.8' && atKey) {
     if (trendUp) {
-      signal = 'bull'; icon = '🟢';
+      signal = 'bull'; icon = '';
       title  = 'La Golden Ratio (61.8%) — Suport Major';
       text   = `Prețul testează nivelul Fibonacci 61.8% (${fmt(closestLevel.price)}) — cel mai important suport de retracement. Istoricul arată că trendurile ascendente reiau creșterea de la acest nivel. Probabilitate ridicată de bounce.`;
       targetBuy  = nearAbove ? nearAbove.price : swingHigh;
       stop       = levels.find(l=>l.label==='78.6')?.price || closestLevel.price * 0.99;
       targetSell = swingHigh;
     } else {
-      signal = 'bear'; icon = '🔴';
+      signal = 'bear'; icon = '';
       title  = 'La Golden Ratio (61.8%) — Rezistență Majoră';
       text   = `Prețul testează rezistența Fibonacci 61.8% (${fmt(closestLevel.price)}). Nivel extrem de important. Dacă nu îl depășește, poate urma o corecție.`;
       stop       = closestLevel.price * 1.005;
       targetSell = nearBelow ? nearBelow.price : swingLow;
     }
   } else if (closestLevel.label === '38.2' && atKey) {
-    signal = trendUp ? 'bull' : 'bear'; icon = trendUp ? '🟢' : '🔴';
+    signal = trendUp ? 'bull' : 'bear'; icon = trendUp ? '' : '';
     title  = `La 38.2% — ${trendUp ? 'Suport' : 'Rezistență'} Moderat`;
     text   = `Nivelul 38.2% (${fmt(closestLevel.price)}) este un suport/rezistență moderat în teoria Fibonacci. Retrasul clasic se oprește adesea aici.`;
     targetBuy  = trendUp ? (nearAbove?.price || swingHigh) : undefined;
     targetSell = !trendUp ? (nearBelow?.price || swingLow) : undefined;
     stop       = trendUp ? levels.find(l=>l.label==='50.0')?.price : levels.find(l=>l.label==='23.6')?.price;
   } else if (closestLevel.label === '50.0' && atKey) {
-    signal = 'neut'; icon = '🟡';
+    signal = 'neut'; icon = '';
     title  = 'La 50% — Nivel Pivot Psihologic';
     text   = `Prețul la exact 50% (${fmt(closestLevel.price)}) din mișcarea anterioară. Nivel important psihologic. Fii atent la confirmarea direcției cu volum.`;
   } else if (retracePct < 23.6) {
-    signal = trendUp ? 'bull' : 'bear'; icon = trendUp ? '🚀' : '📉';
+    signal = trendUp ? 'bull' : 'bear'; icon = trendUp ? '' : '';
     title  = trendUp ? 'Retracement Superficial — Trend Puternic' : 'Extensie Agresivă Bearish';
     text   = `Retrasul de ${retracePct.toFixed(1)}% sub 23.6% indică un trend ${trendUp?'bullish extrem de puternic':'bearish agresiv'}. Piața nu vrea să se corecteze — continuare probabilă.`;
   } else if (retracePct > 78.6) {
-    signal = trendUp ? 'bear' : 'bull'; icon = '⚠️';
+    signal = trendUp ? 'bear' : 'bull'; icon = '';
     title  = 'Retracement Adânc (>78.6%) — Pericol Inversare';
     text   = `Retrasul depășește 78.6% (${retracePct.toFixed(1)}%). Un retracement > 100% invalidează structura. Trendurile sănătoase nu retrasează atât de adânc. Risc de inversare.`;
   } else {
@@ -2646,9 +3308,9 @@ function renderFibonacci(data) {
     <div class="fib-rec-text">${analysis.text}</div>
     ${(analysis.targetBuy || analysis.targetSell || analysis.stop) ? `
     <div class="fib-rec-targets" style="margin-top:10px;">
-      ${analysis.targetBuy  ? `<div class="fib-rec-target"><div class="label">🎯 Target</div><div class="val" style="color:var(--green)">${fmt(analysis.targetBuy)}</div></div>` : ''}
-      ${analysis.stop       ? `<div class="fib-rec-target"><div class="label">🛑 Stop</div><div class="val" style="color:var(--red)">${fmt(analysis.stop)}</div></div>` : ''}
-      ${analysis.targetSell ? `<div class="fib-rec-target"><div class="label">📤 Ieșire</div><div class="val" style="color:var(--red)">${fmt(analysis.targetSell)}</div></div>` : ''}
+      ${analysis.targetBuy  ? `<div class="fib-rec-target"><div class="label"> Target</div><div class="val" style="color:var(--green)">${fmt(analysis.targetBuy)}</div></div>` : ''}
+      ${analysis.stop       ? `<div class="fib-rec-target"><div class="label"> Stop</div><div class="val" style="color:var(--red)">${fmt(analysis.stop)}</div></div>` : ''}
+      ${analysis.targetSell ? `<div class="fib-rec-target"><div class="label"> Ieșire</div><div class="val" style="color:var(--red)">${fmt(analysis.targetSell)}</div></div>` : ''}
       <div class="fib-rec-target"><div class="label">Retras</div><div class="val" style="color:var(--yellow)">${analysis.retracePct.toFixed(1)}%</div></div>
     </div>` : ''}
   `;
@@ -2687,6 +3349,7 @@ function renderFibonacci(data) {
 
 function onFibToggle() {
   fibVisible = document.getElementById('fibToggle').checked;
+  localStorage.setItem('tradeProFib', fibVisible);
   if (allData.length) {
     const lb = parseInt(document.getElementById('fibLookback').value);
     const { swingHigh, swingLow, trendUp } = detectSwings(allData, lb);
@@ -2883,9 +3546,11 @@ async function runDeepForecast() {
   const FRACTAL_LEN = 14;
   const FORECAST_LEN = 10;
   let matchesHtml = `<div style="color:var(--text2);font-size:12px;">Nu s-au putut extrage tipare istorice...</div>`;
+  let topMatches = [];
+  let currentSlice = [];
   
   if (allData.length > FRACTAL_LEN + FORECAST_LEN * 2) {
-      const currentSlice = allData.slice(-FRACTAL_LEN);
+      currentSlice = allData.slice(-FRACTAL_LEN);
       const currentBase = currentSlice[0].close;
       const currentNorm = currentSlice.map(d => d.close / currentBase);
       const currentMom = (currentSlice[FRACTAL_LEN-1].close / currentBase) - 1;
@@ -2921,7 +3586,7 @@ async function runDeepForecast() {
       }
       
       matches.sort((a,b) => a.error - b.error);
-      const topMatches = matches.slice(0, 3);
+      topMatches = matches.slice(0, 3);
       
       if (topMatches.length > 0) {
           matchesHtml = topMatches.map((m, idx) => `
@@ -3077,6 +3742,19 @@ function drawBarChart(topMatches, isBull) {
 function drawForecastChart(currentSlice, topMatches, target1, stopLoss, isBull) {
   const canvas = document.getElementById('dfCanvas');
   if (!canvas || !topMatches[0]?.afterSlice?.length) return;
+
+  // Reset
+  document.querySelectorAll('.ind-btn').forEach(b => {
+    const ind = b.dataset.ind;
+    // Turn off most by default so chart isn't cluttered
+    if (['vol'].includes(ind)) {
+      b.classList.add('active'); indicators[ind] = true;
+    } else {
+      b.classList.remove('active'); indicators[ind] = false;
+    }
+  });
+  localStorage.setItem('tradeProInds', JSON.stringify(indicators));
+  updateChartLegend();
 
   // Dimensiuni fixe - nu depinde de layout
   const W = 660, H = 240;
@@ -3294,6 +3972,7 @@ function setupAutocomplete(inputId, onSelectCallback) {
 
 document.addEventListener('DOMContentLoaded', () => {
   initCharts();
+  updateChartLegend();
   showMarketStatus();
   tickClock();
   renderWatchlist();
@@ -3315,7 +3994,22 @@ document.addEventListener('DOMContentLoaded', () => {
       lastSym = userSyms.length > 0 ? userSyms[0].sym : wl[0]?.sym || 'TSLA';
   }
   
-  loadSymbol(lastSym, '1d');
+  // Seteaza UI-ul conform starii salvate
+  document.querySelectorAll('.tf-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tf === currentTF);
+  });
+  document.querySelectorAll('.ind-btn').forEach(b => {
+    b.classList.toggle('active', !!indicators[b.dataset.ind]);
+  });
+  const fibSaved = localStorage.getItem('tradeProFib');
+  if (fibSaved !== null) {
+    const isFib = fibSaved === 'true';
+    fibVisible = isFib;
+    const fibToggleEl = document.getElementById('fibToggle');
+    if(fibToggleEl) fibToggleEl.checked = isFib;
+  }
+  
+  loadSymbol(lastSym, currentTF);
 
   // Prima actualizare la 2s după load
   setTimeout(updateWatchlistPrices, 2000);
