@@ -562,6 +562,42 @@ button{border:none;cursor:pointer;transition:all .15s;}
     width: auto !important; z-index: 9999;
   }
 }
+/* ── MOBILE RESPONSIVENESS ── */
+@media (max-width: 768px) {
+  #topbar { height: auto; padding: 12px; }
+  .topbar-row { flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+  #logo { font-size: 16px; }
+  #symbolInput { width: 100%; max-width: 100%; min-width: unset; margin-bottom: 8px; }
+  #priceInfo { margin-left: 0; width: 100%; justify-content: flex-start; }
+  
+  #main { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+  
+  #sidebar { 
+    width: 100%; height: auto; flex-direction: row; 
+    border-right: none; border-bottom: 1px solid var(--border);
+    padding: 8px; overflow-x: auto; flex-wrap: nowrap;
+    align-items: center; justify-content: flex-start;
+  }
+  .sidebar-sep { width: 1px; height: 20px; margin: 0 8px; }
+  
+  #chartArea { min-height: 400px; flex: none; height: 60vh; }
+  
+  #rightPanel { 
+    width: 100%; border-left: none; border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; flex: none;
+  }
+  
+  #floatingOrderPanel {
+    top: 10px !important;
+    left: 10px !important;
+    transform: scale(0.9);
+    transform-origin: top left;
+  }
+  
+  #onChartLegend {
+    top: 50px !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -2738,22 +2774,14 @@ function applyQuoteToDOM(sym, q) {
   const state = q.marketState || 'REGULAR'; // PRE, REGULAR, POST, CLOSED
   let livePrice, liveChg, liveChgPct, sessionLabel;
 
-  if (state === 'PRE' && q.preMarketPrice != null) {
-    livePrice  = q.preMarketPrice;
-    liveChg    = q.preMarketChange;
-    liveChgPct = q.preMarketChangePercent;
-    sessionLabel = 'pre';
-  } else if ((state === 'POST' || state === 'POSTPOST') && q.postMarketPrice != null) {
-    livePrice  = q.postMarketPrice;
-    liveChg    = q.postMarketChange;
-    liveChgPct = q.postMarketChangePercent;
-    sessionLabel = 'post';
-  } else {
-    livePrice  = q.regularMarketPrice;
-    liveChg    = q.regularMarketChange;
-    liveChgPct = q.regularMarketChangePercent;
-    sessionLabel = 'reg';
-  }
+  // Fix: Main price is ALWAYS regularMarketPrice.
+  livePrice  = q.regularMarketPrice;
+  liveChg    = q.regularMarketChange;
+  liveChgPct = q.regularMarketChangePercent;
+  
+  if (state === 'PRE') sessionLabel = 'pre';
+  else if (state === 'POST' || state === 'POSTPOST') sessionLabel = 'post';
+  else sessionLabel = 'reg';
 
   if (livePrice == null || isNaN(livePrice)) return;
 
@@ -2911,14 +2939,16 @@ function applyQuoteToDOM(sym, q) {
     }
 
     // Cardul vizibil din topbar — arată prețul sesiunii active extended
-    const inPre  = state === 'PRE'  && hasPre;
-    const inPost = (state === 'POST' || state === 'POSTPOST') && hasPost;
+    // Show Extended Hours Card if there is any pre/post market data
+    // Daca suntem in PRE, aratam pre-market. Altfel, daca exista post-market, il aratam pe ala.
+    const showPre = q.preMarketPrice != null && (state === 'PRE' || state === 'PREPRE');
+    const showPost = q.postMarketPrice != null && !showPre;
 
-    if ((inPre || inPost) && extCard) {
-      const ehPrice = inPre  ? q.preMarketPrice  : q.postMarketPrice;
-      const ehChg   = inPre  ? q.preMarketChange : q.postMarketChange;
-      const ehChgPct= inPre  ? q.preMarketChangePercent : q.postMarketChangePercent;
-      const ehLabel = inPre  ? ' PRE-MARKET' : ' AFTER-HOURS';
+    if ((showPre || showPost) && extCard) {
+      const ehPrice = showPre  ? q.preMarketPrice  : q.postMarketPrice;
+      const ehChg   = showPre  ? q.preMarketChange : q.postMarketChange;
+      const ehChgPct= showPre  ? q.preMarketChangePercent : q.postMarketChangePercent;
+      const ehLabel = showPre  ? ' PRE-MARKET' : ' AFTER-HOURS';
 
       extCard.style.display   = 'block';
       extLabel.textContent    = ehLabel;
@@ -2930,7 +2960,7 @@ function applyQuoteToDOM(sym, q) {
       // Și în extChgRow din stats panel
       if (extChgRow && statExtChg) {
         extChgRow.style.display    = 'flex';
-        statExtChgLabel.textContent= inPre ? ' Var. pre-mkt' : ' Var. after-hrs';
+        statExtChgLabel.textContent= showPre ? ' Var. pre-mkt' : ' Var. after-hrs';
         statExtChg.textContent     = `${ehChgPct>=0?'+':''}${ehChgPct.toFixed(2)}%`;
         statExtChg.className       = `stat-val ${ehChgPct>=0?'yellow':'red'}`;
       }
