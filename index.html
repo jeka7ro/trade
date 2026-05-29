@@ -565,14 +565,34 @@ button{border:none;cursor:pointer;transition:all .15s;}
 /* ── MOBILE RESPONSIVENESS ── */
 @media (max-width: 768px) {
   #topbar { height: auto; padding: 12px; }
-  .topbar-row { flex-wrap: wrap; gap: 8px; justify-content: space-between; }
-  #logo { font-size: 16px; display: block; width: 100%; text-align: center; margin-bottom: 4px; }
-  .search-wrap { width: 100% !important; min-width: unset !important; max-width: unset !important; margin: 4px 0 !important; }
-  #symbolInput { width: 100%; max-width: unset; min-width: unset; margin-bottom: 0; }
-  #priceInfo { margin-left: 0; width: 100%; justify-content: flex-start; }
   
-  body { padding-bottom: 60px; }
-  #main { flex-direction: column; overflow: hidden; height: calc(100vh - 160px); }
+  /* Row 1: Logo and Search */
+  .topbar-row { display: flex; flex-wrap: wrap; width: 100%; gap: 8px; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .topbar-row:last-child { margin-bottom: 0; }
+  
+  #logo { display: none; } /* Hide logo to save space */
+  .search-wrap { width: 100% !important; min-width: 100% !important; max-width: 100% !important; margin: 0 !important; order: 1; }
+  #symbolInput { width: 100%; height: 40px; margin: 0; border-radius: 8px; }
+  
+  /* Buttons: Semnal AI & Forecast */
+  #signalBtn { flex: 1; order: 2; height: 38px; font-size: 13px; margin: 0; border-radius: 8px; }
+  #deepForecastBtn { flex: 1; order: 2; height: 38px; font-size: 13px; margin: 0; border-radius: 8px; }
+  
+  /* Price Info & Theme Button */
+  #priceInfo { order: 3; flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; }
+  #themeBtn { order: 3; flex: none; height: 38px; width: 38px; display: flex; align-items: center; justify-content: center; margin: 0; border-radius: 8px; }
+  
+  /* Row 2: Timeframes & Indicators */
+  .tf-group { flex: 1; display: flex; overflow-x: auto; flex-wrap: nowrap; gap: 4px; padding-bottom: 4px; scrollbar-width: none; }
+  .tf-group::-webkit-scrollbar { display: none; }
+  .tf-btn { padding: 6px 12px; flex: none; font-size: 13px; border-radius: 6px; }
+  .sep { display: none; }
+  .topbar-row > div[style*="position:relative"] { display: flex; align-items: center; }
+  .topbar-row > div[style*="position:relative"] > button { padding: 6px 10px !important; font-size: 13px; height: auto; border-radius: 6px; }
+
+  /* Main Layout */
+  body { padding-bottom: 64px; }
+  #main { flex-direction: column; overflow: hidden; height: calc(100vh - 190px); }
   
   #sidebar { 
     width: 100%; height: auto; flex-direction: row; 
@@ -589,19 +609,32 @@ button{border:none;cursor:pointer;transition:all .15s;}
     display: none; flex-direction: column; flex: 1; height: 100%;
   }
   
-  #floatingOrderPanel {
-    top: 10px !important;
-    left: 10px !important;
-    transform: scale(0.9);
-    transform-origin: top left;
-  }
-  
-  #onChartLegend {
-    top: 50px !important;
-  }
+  #floatingOrderPanel { top: 10px !important; left: 10px !important; transform: scale(0.9); transform-origin: top left; }
+  #onChartLegend { top: 50px !important; }
 
-  #mobileBottomBar { display: flex; }
+  #mobileBottomBar { display: flex !important; }
 }
+
+/* MOBILE BOTTOM BAR STYLES */
+#mobileBottomBar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 64px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  z-index: 10000;
+  justify-content: space-around;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+}
+#mobileBottomBar .mbar-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--text2); gap: 4px; flex: 1; cursor: pointer; height: 100%; transition: color 0.2s;
+}
+#mobileBottomBar .mbar-btn span { font-size: 11px; font-weight: 700; text-transform: uppercase; }
+#mobileBottomBar .mbar-btn.active { color: var(--accent); }
 </style>
 </head>
 <body>
