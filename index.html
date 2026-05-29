@@ -1458,15 +1458,13 @@ function tfToYahoo(tf) {
   return m[tf] || m['1d'];
 }
 
-// Try Yahoo Finance v8 — includePrePost=true pentru date extended hours
+// Try Yahoo Finance v8 — FARA includePrePost pentru a evita spike-urile ciudate pe grafic
 function yahooUrls(symbol, interval, range) {
   const sym = encodeURIComponent(symbol);
-  // includePrePost=true adaugă lumânările pre-market și after-hours pe TF scurte
-  const prePost = ['5m','15m','30m','60m'].includes(interval) ? '&includePrePost=true' : '';
   return [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includeAdjustedClose=true${prePost}`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includeAdjustedClose=true${prePost}`,
-    `https://query1.finance.yahoo.com/v7/finance/chart/${sym}?interval=${interval}&range=${range}${prePost}`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includeAdjustedClose=true`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includeAdjustedClose=true`,
+    `https://query1.finance.yahoo.com/v7/finance/chart/${sym}?interval=${interval}&range=${range}`,
   ];
 }
 
