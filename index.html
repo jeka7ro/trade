@@ -1200,13 +1200,13 @@ let isDark = savedTheme === 'dark';
 
 // Aplica tema la start
 document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-document.getElementById('themeBtn').textContent = isDark ? '' : '';
+document.getElementById('themeBtn').textContent = isDark ? '🌙' : '☀️';
 
 document.getElementById('themeBtn').addEventListener('click', () => {
   isDark = !isDark;
   const newTheme = isDark ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', newTheme);
-  document.getElementById('themeBtn').textContent = isDark ? '' : '';
+  document.getElementById('themeBtn').textContent = isDark ? '🌙' : '☀️';
   
   // Salveaza preferinta
   localStorage.setItem('tradeProTheme', newTheme);
