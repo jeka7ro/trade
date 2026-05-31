@@ -1299,37 +1299,21 @@ function switchMobileTab(tab) {
   const chartArea = document.getElementById('chartArea');
   const sidebar = document.getElementById('sidebar');
   const rightPanel = document.getElementById('rightPanel');
-  
-  if (tab === 'chart') {
-    chartArea.style.display = 'flex';
-    sidebar.style.display = 'flex';
-    rightPanel.style.display = 'none';
-    document.getElementById('mbarChart').classList.add('active');
-    document.getElementById('mbarWatchlist').classList.remove('active');
-    if (chart) setTimeout(() => chart.timeScale().fitContent(), 50);
-  } else {
-    chartArea.style.display = 'none';
-    sidebar.style.display = 'none';
-    rightPanel.style.display = 'flex';
-    document.getElementById('mbarChart').classList.remove('active');
-    document.getElementById('mbarWatchlist').classList.add('active');
-  }
-}
 
-// MOBILE TAB SWITCHER
-function switchMobileTab(tab) {
-  if (window.innerWidth > 768) return;
-  const chartArea = document.getElementById('chartArea');
-  const sidebar = document.getElementById('sidebar');
-  const rightPanel = document.getElementById('rightPanel');
-  
   if (tab === 'chart') {
     chartArea.style.display = 'flex';
     sidebar.style.display = 'flex';
     rightPanel.style.display = 'none';
     document.getElementById('mbarChart').classList.add('active');
     document.getElementById('mbarWatchlist').classList.remove('active');
-    if (chart) setTimeout(() => chart.timeScale().fitContent(), 50);
+    // Forțează resize grafic după ce devine vizibil
+    setTimeout(() => {
+      if (mainChart) {
+        mainChart.applyOptions({ width: chartArea.clientWidth });
+        mainChart.timeScale().fitContent();
+      }
+      window.dispatchEvent(new Event('resize'));
+    }, 50);
   } else {
     chartArea.style.display = 'none';
     sidebar.style.display = 'none';
@@ -3312,6 +3296,12 @@ async function loadSymbol(symbol, tf) {
   if (!currentSymbol) return;
   currentTF = tf || currentTF;
   document.getElementById('symbolInput').value = currentSymbol;
+
+  // Pe mobil: trece automat la grafic când selectezi un simbol
+  if (window.innerWidth <= 768) {
+    switchMobileTab('chart');
+  }
+
   document.getElementById('loadOverlay').style.display = 'flex';
   setLoadText(`Se încarcă ${currentSymbol}…`);
 
