@@ -67,7 +67,9 @@ body{
   background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   font-size:13px;font-weight:500;
-  overflow:hidden;height:100vh;
+  overflow:hidden;
+  height:100vh;
+  height:100dvh;
   display:flex;flex-direction:column;
   transition:background .2s,color .2s;
 }
@@ -158,16 +160,16 @@ button{border:none;cursor:pointer;transition:all .15s;}
 }
 #themeBtn:hover{color:var(--text);border-color:var(--text2);}
 
-/* Chart Price Overlay */
+/* Chart Price Header */
 #chartPriceOverlay {
-  position: absolute;
-  top: 36px;
-  left: 12px;
-  z-index: 15;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  pointer-events: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .cpo-top {
   display: flex;
@@ -639,7 +641,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
   }
 
   /* Chart Price Overlay mobile adjustments */
-  #chartPriceOverlay { top: 28px; left: 8px; }
+  #chartPriceOverlay { padding: 8px 10px; flex-direction: column; align-items: flex-start; gap: 4px; }
   #curSymbol { font-size: 20px !important; }
   #curCompanyName { font-size: 11px !important; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #curPrice { font-size: 24px !important; }
@@ -747,7 +749,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
     transform-origin: top left;
   }
 
-  #onChartLegend { top: 75px !important; }
+  #onChartLegend { top: 110px !important; }
 
   /* Signal popup above bottom bar */
   #signalPopup {
@@ -817,8 +819,6 @@ button{border:none;cursor:pointer;transition:all .15s;}
     <button id="themeBtn" title="Schimbă tema"></button>
   </div>
 
-  </div>
-
   <!-- ROW 2: Timeframes + Indicators -->
   <div class="topbar-row">
     <div class="tf-group">
@@ -852,7 +852,6 @@ button{border:none;cursor:pointer;transition:all .15s;}
       </div>
     </div>
   </div>
-</div>
 </div>
 
 <!-- STATUS BAR -->
@@ -3216,6 +3215,34 @@ function drawGauge(score) {
 // ════════════════════════════════════════════════════════════
 //  RING CHART
 // ════════════════════════════════════════════════════════════
+function getBestLogoUrl(sym) {
+  const s = sym.toUpperCase().replace(/=X|-USD|=F/g, '');
+  const map = {
+    'TSLA': 'https://s3-symbol-logo.tradingview.com/tesla--big.svg',
+    'MSFT': 'https://s3-symbol-logo.tradingview.com/microsoft--big.svg',
+    'NVDA': 'https://s3-symbol-logo.tradingview.com/nvidia--big.svg',
+    'AAPL': 'https://s3-symbol-logo.tradingview.com/apple--big.svg',
+    'AMZN': 'https://s3-symbol-logo.tradingview.com/amazon--big.svg',
+    'META': 'https://s3-symbol-logo.tradingview.com/meta--big.svg',
+    'GOOGL': 'https://s3-symbol-logo.tradingview.com/alphabet--big.svg',
+    'GOOG': 'https://s3-symbol-logo.tradingview.com/alphabet--big.svg',
+    'NFLX': 'https://s3-symbol-logo.tradingview.com/netflix--big.svg',
+    'LULU': 'https://s3-symbol-logo.tradingview.com/lululemon--big.svg',
+    'APPS': 'https://s3-symbol-logo.tradingview.com/digital-turbine--big.svg',
+    'NQ': 'https://logo.clearbit.com/nasdaq.com', // Nasdaq
+    'ES': 'https://logo.clearbit.com/spglobal.com', // S&P 500
+    'SPY': 'https://logo.clearbit.com/spglobal.com',
+    'QQQ': 'https://logo.clearbit.com/nasdaq.com',
+    'CL': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Oil Drop
+    'BZ': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Brent Oil
+    'GC': 'https://cdn-icons-png.flaticon.com/512/1487/1487777.png', // Gold
+    'SI': 'https://cdn-icons-png.flaticon.com/512/4627/4627341.png', // Silver
+    'BTC': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCBTC--big.svg',
+    'ETH': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCETH--big.svg',
+    'SOL': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCSOL--big.svg'
+  };
+  return map[s] || `https://logo.clearbit.com/${s.toLowerCase()}.com`;
+}
 function drawRing(pct) {
   const canvas = document.getElementById('ringCanvas');
   const ctx = canvas.getContext('2d');
@@ -3320,34 +3347,7 @@ function handleWlDragEnd(e) {
 }
 
 // ── LOGOS MAPPING ──
-function getBestLogoUrl(sym) {
-  const s = sym.toUpperCase().replace(/=X|-USD|=F/g, '');
-  const map = {
-    'TSLA': 'https://logo.clearbit.com/tesla.com',
-    'MSFT': 'https://logo.clearbit.com/microsoft.com',
-    'NVDA': 'https://logo.clearbit.com/nvidia.com',
-    'AAPL': 'https://logo.clearbit.com/apple.com',
-    'AMZN': 'https://logo.clearbit.com/amazon.com',
-    'META': 'https://logo.clearbit.com/meta.com',
-    'GOOGL': 'https://logo.clearbit.com/abc.xyz',
-    'GOOG': 'https://logo.clearbit.com/abc.xyz',
-    'NFLX': 'https://logo.clearbit.com/netflix.com',
-    'LULU': 'https://logo.clearbit.com/lululemon.com',
-    'APPS': 'https://logo.clearbit.com/digitalturbine.com',
-    'NQ': 'https://logo.clearbit.com/nasdaq.com', // Nasdaq
-    'ES': 'https://logo.clearbit.com/spglobal.com', // S&P 500
-    'SPY': 'https://logo.clearbit.com/spglobal.com',
-    'QQQ': 'https://logo.clearbit.com/nasdaq.com',
-    'CL': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Oil Drop
-    'BZ': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Brent Oil
-    'GC': 'https://cdn-icons-png.flaticon.com/512/1487/1487777.png', // Gold
-    'SI': 'https://cdn-icons-png.flaticon.com/512/4627/4627341.png', // Silver
-    'BTC': 'https://cryptologos.cc/logos/bitcoin-btc-logo.png',
-    'ETH': 'https://cryptologos.cc/logos/ethereum-eth-logo.png',
-    'SOL': 'https://cryptologos.cc/logos/solana-sol-logo.png'
-  };
-  return map[s] || `https://logo.clearbit.com/${s.toLowerCase()}.com`; // Fallback la clearbit generic
-}
+
 
 function wlItemHTML(w, idx) {
   const delBtn = `<button onclick="event.stopPropagation();removeFromWatchlist('${w.sym}')"
