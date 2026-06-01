@@ -928,7 +928,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <div id="chartCanvas"></div>
       <div id="crosshairInfo"></div>
       <!-- On-Chart Legend -->
-      <div id="onChartLegend" style="position:absolute; top:85px; left:12px; z-index:15; display:flex; flex-direction:column; gap:2px; pointer-events:none;">
+      <div id="onChartLegend" style="position:absolute; top:130px; left:12px; z-index:15; display:flex; flex-direction:column; gap:2px; pointer-events:none;">
         <!-- Filled by JS -->
       </div>
       <div id="loadOverlay">
@@ -1218,7 +1218,8 @@ button{border:none;cursor:pointer;transition:all .15s;}
     </div>
   </div><!-- /rightPanel -->
     <!-- SIGNALS PANEL -->
-    <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px;">
+    <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px; position:relative;">
+      <button onclick="toggleSignalsPanel()" style="position:absolute; top:16px; right:16px; background:var(--bg3); border:1px solid var(--border); color:var(--text); width:32px; height:32px; border-radius:50%; cursor:pointer; font-weight:bold; font-size:16px;">✕</button>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <h2 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:8px;">
           <span style="font-size:24px;">🚀</span> Semnale AI
@@ -2733,6 +2734,14 @@ function runAnalysis(data, meta) {
     else { reasons.push(` Știri Recente: Neutre / Mixte`); }
   }
 
+  // Wolfe Waves check
+  let ww = calcWolfeWaves(data);
+  if (ww.lineEPA.length > 0) {
+    let type = ww.line135[0].value < ww.line135[1].value ? "Bearish" : "Bullish";
+    if (type === "Bullish") { bulls += 2; totalSigs += 2; reasons.push(` Tipar Wolfe Waves Bullish Detectat: Oportunitate Cumpărare (Target EPA: ${fmt(ww.lineEPA[2].value)})`); }
+    else { bears += 2; totalSigs += 2; reasons.push(` Tipar Wolfe Waves Bearish Detectat: Oportunitate Vânzare (Target EPA: ${fmt(ww.lineEPA[2].value)})`); }
+  }
+
   const score = (bulls - bears) / totalSigs;
   drawGauge(score);
   const lbl = score > 0.4 ? ' CUMPĂRARE PUTERNICĂ' : score > 0.1 ? ' CUMPĂRARE' : score < -0.4 ? ' VÂNZARE PUTERNICĂ' : score < -0.1 ? ' VÂNZARE' : ' NEUTRU';
@@ -2749,6 +2758,7 @@ function runAnalysis(data, meta) {
   showMarketStatus();
 
   // Salvează datele pentru a putea declanșa popup-ul manual
+  latestSignalData = { score, lbl, price: last.close, reasons, bulls, totalSigs };
   triggerSignalNotification(score, lbl, last.close, reasons, bulls, totalSigs);
 }
 
@@ -3659,7 +3669,14 @@ function removeFromWatchlist(sym) {
 //  MAIN LOAD
 // ════════════════════════════════════════════════════════════
 async function loadSymbol(symbol, tf) {
-  currentSymbol = (symbol || document.getElementById('symbolInput').value.trim()).toUpperCase();
+  let val = (symbol || document.getElementById('symbolInput').value.trim()).toUpperCase();
+  const aliases = {
+    'OIL': 'CL=F', 'GOLD': 'GC=F', 'SILVER': 'SI=F', 'NATURAL GAS': 'NG=F',
+    'SP500': '^GSPC', 'NASDAQ': '^IXIC', 'DOW': '^DJI',
+    'BITCOIN': 'BTC-USD', 'ETHEREUM': 'ETH-USD'
+  };
+  if (aliases[val]) val = aliases[val];
+  currentSymbol = val;
   if (!currentSymbol) return;
   currentTF = tf || currentTF;
   document.getElementById('symbolInput').value = currentSymbol;
