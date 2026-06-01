@@ -158,13 +158,31 @@ button{border:none;cursor:pointer;transition:all .15s;}
 }
 #themeBtn:hover{color:var(--text);border-color:var(--text2);}
 
-/* Price Info */
-#priceInfo{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0;}
-/* priceInfoRow is hidden on desktop (priceInfo is in row1 via flex) */
-#priceInfoRow { display: none; }
-#curSymbol{font-size:14px;font-weight:900;color:var(--text);}
-#curCompanyName{font-size:10px;color:var(--text2);font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#curPrice{font-size:19px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;}
+/* Chart Price Overlay */
+#chartPriceOverlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.cpo-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cpo-bottom {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
+#curSymbol { font-size: 24px; font-weight: 900; color: var(--text); }
+#curCompanyName { font-size: 13px; color: var(--text2); font-weight: 500; }
+#curPrice { font-size: 28px; font-weight: 900; color: var(--text); font-variant-numeric: tabular-nums; }
 #curChange{
   font-size:12px;font-weight:700;
   height:28px;padding:0 12px;
@@ -623,62 +641,13 @@ button{border:none;cursor:pointer;transition:all .15s;}
     font-size: 16px;
   }
 
-  /* ── ROW 1b: Price Info — single compact line ── */
-  #priceInfoRow {
-    display: flex !important;
-    padding: 2px 0 4px;
-    margin-bottom: 4px !important;
-  }
-  #priceInfo {
-    display: flex !important;
-    align-items: center;
-    width: 100%;
-    gap: 5px;
-    flex-wrap: nowrap;
-    overflow: hidden;
-    min-width: 0;
-  }
-  /* Logo small */
-  #curLogo {
-    width: 22px !important;
-    height: 22px !important;
-    flex: none;
-    border-radius: 50%;
-    display: block !important;
-  }
-  /* Symbol + Company on same line, symbol bold + dot separator */
-  #curSymbol {
-    font-size: 13px !important;
-    font-weight: 800;
-    white-space: nowrap;
-    flex: none;
-    color: var(--text);
-  }
-  #curCompanyName {
-    font-size: 11px !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 1 1 0;
-    min-width: 0;
-    color: var(--text2);
-  }
-  /* Price pushed to right */
-  #curPrice {
-    font-size: 14px !important;
-    font-weight: 800;
-    white-space: nowrap;
-    flex: none;
-    margin-left: auto;
-    padding-left: 6px;
-  }
-  /* Change next to price */
-  #curChange {
-    font-size: 11px !important;
-    font-weight: 700;
-    white-space: nowrap;
-    flex: none;
-  }
+  /* Chart Price Overlay mobile adjustments */
+  #chartPriceOverlay { top: 8px; left: 8px; }
+  #curSymbol { font-size: 20px !important; }
+  #curCompanyName { font-size: 11px !important; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #curPrice { font-size: 24px !important; }
+  #curChange { font-size: 13px !important; }
+  #curLogo { width: 24px !important; height: 24px !important; display: block !important; }
   #extHoursCard { display: none !important; }
 
   /* ── ROW 2: Timeframes + Indicators ── */
@@ -781,7 +750,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
     transform-origin: top left;
   }
 
-  #onChartLegend { top: 40px !important; }
+  #onChartLegend { top: 75px !important; }
 
   /* Signal popup above bottom bar */
   #signalPopup {
@@ -850,25 +819,6 @@ button{border:none;cursor:pointer;transition:all .15s;}
     <button id="themeBtn" title="Schimbă tema"></button>
   </div>
 
-  <!-- ROW 1b: Price Info (own row on mobile) -->
-  <div class="topbar-row" id="priceInfoRow">
-    <div id="priceInfo">
-      <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:36px;height:36px;border-radius:50%;display:none;margin-right:10px;object-fit:contain;background:#fff;padding:3px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
-      <div style="display:flex;flex-direction:column;justify-content:center;">
-        <span id="curSymbol">---</span>
-        <span id="curCompanyName" style="font-size:11px; color:var(--text2);">---</span>
-      </div>
-      <span id="curPrice">—</span>
-      <span id="curChange" class="up">—</span>
-      <!-- Extended hours card -->
-      <div id="extHoursCard" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--r-md);padding:4px 10px;margin-left:8px;">
-        <div style="font-size:9px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;" id="extHoursLabel">PRE-MARKET</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:1px;">
-          <span style="font-size:15px;font-weight:800;" id="extHoursPrice">—</span>
-          <span style="font-size:11px;font-weight:700;" id="extHoursChange">—</span>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- ROW 2: Timeframes + Indicators -->
@@ -952,6 +902,27 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <div class="ctx-item" onclick="closeCtxMenu()"><span class="ctx-icon">&#9881;</span>Inchide meniu</div>
     </div>
     <div id="chartMain" style="position:relative;">
+      <!-- Chart Price Overlay (TradingView style) -->
+      <div id="chartPriceOverlay">
+        <div class="cpo-top">
+          <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;display:none;object-fit:contain;background:#fff;padding:2px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
+          <span id="curSymbol">---</span>
+          <span id="curCompanyName">---</span>
+        </div>
+        <div class="cpo-bottom">
+          <span id="curPrice">—</span>
+          <span id="curChange" class="up">—</span>
+          <!-- Extended hours card -->
+          <div id="extHoursCard" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--r-md);padding:2px 6px;margin-left:8px;">
+            <div style="font-size:9px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;" id="extHoursLabel">PRE-MARKET</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:800;" id="extHoursPrice">—</span>
+              <span style="font-size:10px;font-weight:700;" id="extHoursChange">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Floating Order Panel (TradingView Style) -->
       <div id="floatingOrderPanel" style="position:absolute; top:12px; left:12px; z-index:20; display:none; align-items:center; background:var(--bg2); border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); overflow:hidden;">
         <div onclick="alert('Sell Market Order')" style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-right:1px solid var(--border); cursor:pointer; border-top: 2px solid var(--red); background:rgba(242,54,69,0.05); transition:background 0.2s;" onmouseover="this.style.background='rgba(242,54,69,0.1)'" onmouseout="this.style.background='rgba(242,54,69,0.05)'">
@@ -967,7 +938,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <div id="chartCanvas"></div>
       <div id="crosshairInfo"></div>
       <!-- On-Chart Legend -->
-      <div id="onChartLegend" style="position:absolute; top:60px; left:12px; z-index:15; display:flex; flex-direction:column; gap:2px; pointer-events:none;">
+      <div id="onChartLegend" style="position:absolute; top:85px; left:12px; z-index:15; display:flex; flex-direction:column; gap:2px; pointer-events:none;">
         <!-- Filled by JS -->
       </div>
       <div id="loadOverlay">
