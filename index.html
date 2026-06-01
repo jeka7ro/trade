@@ -161,7 +161,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
 /* Chart Price Overlay */
 #chartPriceOverlay {
   position: absolute;
-  top: 12px;
+  top: 36px;
   left: 12px;
   z-index: 15;
   display: flex;
@@ -429,12 +429,9 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
 /* Crosshair info */
 #crosshairInfo{
-  position:absolute;top:8px;left:60px;z-index:20;
+  position:absolute;top:8px;left:12px;z-index:20;
   display:flex;gap:14px;font-size:12px;pointer-events:none;
-  background:var(--bg2);padding:5px 12px;
-  border-radius:var(--r-full);
-  border:1px solid var(--border);
-  box-shadow:0 2px 8px var(--shadow);
+  background:transparent;padding:0;
 }
 .chi{color:var(--text2);font-weight:500;}
 .chi span{color:var(--text);font-weight:700;}
@@ -642,7 +639,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
   }
 
   /* Chart Price Overlay mobile adjustments */
-  #chartPriceOverlay { top: 8px; left: 8px; }
+  #chartPriceOverlay { top: 28px; left: 8px; }
   #curSymbol { font-size: 20px !important; }
   #curCompanyName { font-size: 11px !important; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #curPrice { font-size: 24px !important; }
@@ -923,17 +920,8 @@ button{border:none;cursor:pointer;transition:all .15s;}
         </div>
       </div>
 
-      <!-- Floating Order Panel (TradingView Style) -->
-      <div id="floatingOrderPanel" style="position:absolute; top:12px; left:12px; z-index:20; display:none; align-items:center; background:var(--bg2); border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); overflow:hidden;">
-        <div onclick="alert('Sell Market Order')" style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-right:1px solid var(--border); cursor:pointer; border-top: 2px solid var(--red); background:rgba(242,54,69,0.05); transition:background 0.2s;" onmouseover="this.style.background='rgba(242,54,69,0.1)'" onmouseout="this.style.background='rgba(242,54,69,0.05)'">
-          <span style="color:var(--red); font-size:13px; font-weight:800;" id="floatSellPrice">—</span>
-          <span style="color:var(--red); font-size:9px; font-weight:700; text-transform:uppercase;">SELL</span>
-        </div>
-        <div style="padding:0 8px; font-size:11px; font-weight:800; color:var(--text2); background:var(--bg3);" id="floatSpread">0.01</div>
-        <div onclick="alert('Buy Market Order')" style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-left:1px solid var(--border); cursor:pointer; border-top: 2px solid var(--accent); background:rgba(41,98,255,0.05); transition:background 0.2s;" onmouseover="this.style.background='rgba(41,98,255,0.1)'" onmouseout="this.style.background='rgba(41,98,255,0.05)'">
-          <span style="color:var(--accent); font-size:13px; font-weight:800;" id="floatBuyPrice">—</span>
-          <span style="color:var(--accent); font-size:9px; font-weight:700; text-transform:uppercase;">BUY</span>
-        </div>
+      <!-- Floating Order Panel (TradingView Style) - HIDDEN -->
+      <div id="floatingOrderPanel" style="display:none !important;">
       </div>
       <div id="chartCanvas"></div>
       <div id="crosshairInfo"></div>
