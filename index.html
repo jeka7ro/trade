@@ -813,7 +813,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
     </div>
     
-    <button id="signalBtn" onclick="forceShowSignal()" title="Semnal AI">Semnal AI</button>
+    <button id="signalBtn" onclick="toggleSignalsPanel()" title="Semnale AI">Semnale AI</button>
     <button id="deepForecastBtn" onclick="openDeepForecastModal()" title="Deep Forecast">Forecast Avansat</button>
 
     <button id="themeBtn" title="Schimbă tema"></button>
@@ -1229,6 +1229,28 @@ button{border:none;cursor:pointer;transition:all .15s;}
   </div><!-- /rightPanel -->
 </div><!-- /main -->
 
+  <!-- SIGNALS PANEL -->
+  <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:8px;">
+        <span style="font-size:24px;">🚀</span> Semnale AI
+      </h2>
+      <button onclick="scanMarket()" style="background:var(--accent); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 5 18 3-9h5"/></svg>
+        Scanează
+      </button>
+    </div>
+    
+    <div id="signalsStatus" style="font-size:12px; color:var(--text2); margin-bottom:16px; text-align:center; display:none;"></div>
+    
+    <div id="signalsList" style="display:flex; flex-direction:column; gap:12px;">
+      <div style="text-align:center; color:var(--text2); padding:40px; font-size:14px;">
+        Apasă "Scanează" pentru a analiza piața în timp real folosind algoritmul fractal.
+      </div>
+    </div>
+  </div>
+
+
   <!-- DEEP FORECAST MODAL -->
   <div id="dfModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);z-index:99999;align-items:center;justify-content:center;">
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;width:90%;max-width:800px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.8);position:relative;">
@@ -1252,6 +1274,10 @@ button{border:none;cursor:pointer;transition:all .15s;}
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 14l5-5 4 4 5-5"/></svg>
     <span>Grafic</span>
   </div>
+  <div class="mbar-btn" onclick="switchMobileTab('signals')" id="mbarSignals">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 5 18 3-9h5"/></svg>
+    <span>Semnale</span>
+  </div>
   <div class="mbar-btn" onclick="switchMobileTab('watchlist')" id="mbarWatchlist">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
     <span>Watchlist</span>
@@ -1270,13 +1296,22 @@ function switchMobileTab(tab) {
   const chartArea = document.getElementById('chartArea');
   const sidebar = document.getElementById('sidebar');
   const rightPanel = document.getElementById('rightPanel');
+  const signalsPanel = document.getElementById('signalsPanel');
+
+  // Reset all tabs
+  chartArea.style.display = 'none';
+  sidebar.style.display = 'none';
+  rightPanel.style.display = 'none';
+  signalsPanel.style.display = 'none';
+  
+  document.getElementById('mbarChart').classList.remove('active');
+  document.getElementById('mbarWatchlist').classList.remove('active');
+  document.getElementById('mbarSignals').classList.remove('active');
 
   if (tab === 'chart') {
     chartArea.style.display = 'flex';
     sidebar.style.display = 'flex';
-    rightPanel.style.display = 'none';
     document.getElementById('mbarChart').classList.add('active');
-    document.getElementById('mbarWatchlist').classList.remove('active');
     // Forțează resize grafic după ce devine vizibil
     setTimeout(() => {
       if (mainChart) {
@@ -1285,11 +1320,12 @@ function switchMobileTab(tab) {
       }
       window.dispatchEvent(new Event('resize'));
     }, 50);
+  } else if (tab === 'signals') {
+    signalsPanel.style.display = 'flex';
+    document.getElementById('mbarSignals').classList.add('active');
+    if (typeof loadCachedSignals === 'function') loadCachedSignals();
   } else {
-    chartArea.style.display = 'none';
-    sidebar.style.display = 'none';
     rightPanel.style.display = 'flex';
-    document.getElementById('mbarChart').classList.remove('active');
     document.getElementById('mbarWatchlist').classList.add('active');
   }
 }
@@ -2634,11 +2670,210 @@ function runAnalysis(data, meta) {
   showMarketStatus();
 
   // Salvează datele pentru a putea declanșa popup-ul manual
-  latestSignalData = { score, lbl, price: last.close, reasons, bulls, totalSigs };
-
-  // ── Pop-up recommendation
   triggerSignalNotification(score, lbl, last.close, reasons, bulls, totalSigs);
 }
+
+// ==========================================
+// CLIENT-SIDE AI SCREENER (Replaces Telegram Bot)
+// ==========================================
+const FAVORITES = ['TSLA', 'NVDA', 'AAPL', 'MSFT', 'META', 'AMZN', 'GOOGL', 'BTC-USD', 'ETH-USD', 'APPS', 'CL=F'];
+
+function toggleSignalsPanel() {
+  const panel = document.getElementById('signalsPanel');
+  if (window.innerWidth <= 768) {
+    switchMobileTab('signals');
+  } else {
+    // Desktop modal behavior
+    if (panel.style.display === 'flex') {
+      panel.style.display = 'none';
+    } else {
+      panel.style.display = 'flex';
+      panel.style.position = 'fixed';
+      panel.style.top = '50%';
+      panel.style.left = '50%';
+      panel.style.transform = 'translate(-50%, -50%)';
+      panel.style.width = '800px';
+      panel.style.height = '80vh';
+      panel.style.zIndex = '99999';
+      panel.style.boxShadow = '0 10px 50px rgba(0,0,0,0.8)';
+      panel.style.borderRadius = '12px';
+      panel.style.border = '1px solid var(--border)';
+      
+      if (!document.getElementById('sigCloseBtn')) {
+        const closeBtn = document.createElement('button');
+        closeBtn.id = 'sigCloseBtn';
+        closeBtn.innerHTML = '✕';
+        closeBtn.style.cssText = 'position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.1); border:none; color:#fff; border-radius:50%; width:32px; height:32px; cursor:pointer;';
+        closeBtn.onclick = () => panel.style.display = 'none';
+        panel.appendChild(closeBtn);
+      }
+      
+      if (typeof loadCachedSignals === 'function') loadCachedSignals();
+    }
+  }
+}
+
+function calcRSI14_local(data) {
+    if (data.length < 15) return 50;
+    let gains = 0, losses = 0;
+    for (let i = data.length - 14; i < data.length; i++) {
+        let diff = data[i].close - data[i - 1].close;
+        if (diff > 0) gains += diff;
+        else losses -= diff;
+    }
+    let avgGain = gains / 14;
+    let avgLoss = losses / 14;
+    if (avgLoss === 0) return 100;
+    let rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+}
+
+function getReason_local(rsi, isUp) {
+    let reason = "";
+    if (isUp) {
+        if (rsi < 35) reason += "📊 RSI arată o zonă de <b>supravânzare (Oversold)</b> extremă. Istoricul prețului confirmă un tipar de revenire în formă de V (Reversal). Balenele acumulează la reducere.";
+        else if (rsi > 65) reason += "🔥 Momentum uriaș. Indicatorii arată un <b>trend ascendent agresiv</b> care abia s-a validat (Breakout). Tiparele similare din trecut au continuat să explodeze.";
+        else reason += "📈 Prețul a creat o <b>bază solidă de acumulare</b> neutră. Geometria actuală a prețului a coincis în trecut cu o izbucnire bruscă în sus (Pump iminent).";
+    } else {
+        if (rsi > 65) reason += "⚠️ RSI indică o zonă de <b>supracumpărare (Overbought)</b>. Euforia a atins vârful, iar cumpărătorii sunt epuizați. Tiparele istorice arată o cădere bruscă de aici.";
+        else if (rsi < 35) reason += "🩸 Presiune masivă de vânzare. Algoritmul detectează ruperea unor <b>suporturi critice</b>, ceea ce în trecut a dus la panică și capitulare continuă (Dump).";
+        else reason += "📉 Graficul a format un <b>tipar periculos de distribuție</b>. Instituțiile își descarcă tăcut pozițiile. Istoricul arată că după o astfel de structură urmează o prăbușire.";
+    }
+    return reason;
+}
+
+function loadCachedSignals() {
+  const cached = localStorage.getItem('tradeProSignals');
+  if (cached) {
+    try {
+      const data = JSON.parse(cached);
+      if (Date.now() - data.timestamp < 4 * 60 * 60 * 1000) {
+        renderSignals(data.signals, new Date(data.timestamp));
+        return;
+      }
+    } catch(e) {}
+  }
+}
+
+async function scanMarket() {
+  const statusEl = document.getElementById('signalsStatus');
+  const listEl = document.getElementById('signalsList');
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Inițializare scanare globală...';
+  listEl.innerHTML = '<div style="text-align:center; padding:40px;"><div class="spinner" style="margin:0 auto 16px;"></div>Se scanează piața... Așteaptă 10-20 secunde.</div>';
+
+  const FRACTAL_LEN = 14;
+  const FORECAST_LEN = 10;
+  let allSignals = [];
+  
+  const ALL_SYMBOLS = FAVORITES; 
+
+  for (let idx = 0; idx < ALL_SYMBOLS.length; idx++) {
+    const sym = ALL_SYMBOLS[idx];
+    statusEl.textContent = `Analizez ${sym} (${idx + 1}/${ALL_SYMBOLS.length})...`;
+    try {
+      const { raw } = await fetchData(sym, '1d');
+      if (!raw || raw.length < 50) continue;
+      
+      const currentSlice = raw.slice(-FRACTAL_LEN);
+      const currentBase = currentSlice[0].close;
+      const currentNorm = currentSlice.map(d => d.close / currentBase);
+      const currentMom = (currentSlice[FRACTAL_LEN-1].close / currentBase) - 1;
+      
+      let matches = [];
+      for (let i = 0; i < raw.length - FRACTAL_LEN - FORECAST_LEN - Math.max(10, FRACTAL_LEN); i++) {
+        const histSlice = raw.slice(i, i + FRACTAL_LEN);
+        const histBase = histSlice[0].close;
+        const histNorm = histSlice.map(d => d.close / histBase);
+        const histMom = (histSlice[FRACTAL_LEN-1].close / histBase) - 1;
+        
+        if (Math.sign(currentMom) !== Math.sign(histMom)) continue;
+        if (Math.abs(currentMom) > 0.03 && Math.abs(histMom) < Math.abs(currentMom) * 0.3) continue;
+        
+        let error = 0;
+        for (let j = 0; j < FRACTAL_LEN; j++) {
+            error += Math.abs(currentNorm[j] - histNorm[j]);
+        }
+        
+        const afterSlice = raw.slice(i + FRACTAL_LEN, i + FRACTAL_LEN + FORECAST_LEN);
+        const resultBase = histSlice[FRACTAL_LEN-1].close;
+        const resultFinal = afterSlice[afterSlice.length-1].close;
+        const resultPct = ((resultFinal / resultBase) - 1) * 100;
+        
+        matches.push({ error, resultPct });
+      }
+      
+      if (matches.length > 0) {
+        matches.sort((a,b) => a.error - b.error);
+        const topMatches = matches.slice(0, 3);
+        const avgPct = topMatches.reduce((sum, m) => sum + m.resultPct, 0) / topMatches.length;
+        
+        if (Math.abs(avgPct) >= 5) {
+          const rsi = calcRSI14_local(raw);
+          allSignals.push({
+            sym,
+            avgPct,
+            price: raw[raw.length - 1].close,
+            reason: getReason_local(rsi, avgPct > 0)
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Scan error on', sym, e);
+    }
+  }
+
+  localStorage.setItem('tradeProSignals', JSON.stringify({
+    timestamp: Date.now(),
+    signals: allSignals
+  }));
+
+  renderSignals(allSignals, new Date());
+  statusEl.textContent = 'Scanare completă!';
+  setTimeout(() => statusEl.style.display = 'none', 3000);
+}
+
+function renderSignals(signals, dateObj) {
+  const listEl = document.getElementById('signalsList');
+  if (signals.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text2);">Nu s-au găsit semnale majore (>5%) în acest moment.</div>';
+    return;
+  }
+  
+  listEl.innerHTML = `<div style="font-size:11px; color:var(--text2); text-align:right; margin-bottom:8px;">Ultima scanare: ${dateObj.toLocaleString()}</div>`;
+  
+  signals.sort((a,b) => Math.abs(b.avgPct) - Math.abs(a.avgPct)).forEach(sig => {
+    const isUp = sig.avgPct > 0;
+    const color = isUp ? 'var(--green)' : 'var(--red)';
+    const bg = isUp ? 'rgba(38, 166, 154, 0.1)' : 'rgba(239, 83, 80, 0.1)';
+    const dirTxt = isUp ? '📈 CREȘTERE' : '📉 SCĂDERE';
+    
+    listEl.innerHTML += `
+      <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; position:relative; overflow:hidden;" onclick="toggleSignalsPanel(); loadSymbol('${sig.sym}')">
+        <div style="position:absolute; top:0; left:0; width:4px; height:100%; background:${color};"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:40px; height:40px; border-radius:50%; background:${bg}; display:flex; align-items:center; justify-content:center; font-size:20px;">
+              ${isUp ? '🚀' : '🩸'}
+            </div>
+            <div>
+              <div style="font-weight:900; font-size:16px;">${sig.sym}</div>
+              <div style="font-size:12px; color:var(--text2);">Preț: $${sig.price.toFixed(2)}</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:12px; font-weight:800; color:${color}; margin-bottom:2px;">${dirTxt}</div>
+            <div style="font-size:18px; font-weight:900; color:${color};">${sig.avgPct > 0 ? '+' : ''}${sig.avgPct.toFixed(2)}%</div>
+          </div>
+        </div>
+        <div style="font-size:13px; color:var(--text); line-height:1.5; background:var(--bg3); padding:12px; border-radius:8px;">
+          ${sig.reason}
+        </div>
+      </div>
+    `;
+  });
+}
+
 
 // ════════════════════════════════════════════════════════════
 //  MARKET STATUS (aftermarket / premarket)
