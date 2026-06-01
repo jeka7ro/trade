@@ -941,9 +941,12 @@ button{border:none;cursor:pointer;transition:all .15s;}
     <div id="chartPriceOverlay">
       <div class="cpo-top" style="flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;display:none;object-fit:contain;background:#fff;padding:2px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
+          <div id="curLogoWrap" style="width:32px;height:32px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+            <img id="curLogo" src="" alt="" style="width:100%;height:100%;object-fit:contain;display:none;" />
+            <span id="curLogoFallback" style="font-size:14px;font-weight:800;color:var(--text);display:block;">?</span>
+          </div>
           <span id="curSymbol">---</span>
-          <span id="curCompanyName">---</span>
+          <span id="curCompanyName" style="color:var(--text2);font-size:13px;">---</span>
         </div>
         
         <!-- STATUS BAR REMOVED FROM HERE -->
@@ -3668,23 +3671,36 @@ function applyQuoteToDOM(sym, q) {
       fSpread.textContent = fmt(ask - bid);
     }
 
-    // Afiseaza numele companiei din quote si logo-ul corect
+    // Company name — don't show if same as ticker symbol
     const nameEl = document.getElementById('curCompanyName');
-    const compName = cleanCompanyName(q.shortName || q.longName, sym);
-    if (nameEl && (q.shortName || q.longName)) {
-      nameEl.textContent = compName;
-      nameEl.title = q.shortName || q.longName;
+    const rawName = q.shortName || q.longName || '';
+    const compName = cleanCompanyName(rawName, sym);
+    if (nameEl) {
+      // Only show if name is different from the ticker
+      nameEl.textContent = (compName && compName !== sym) ? compName : '';
+      nameEl.title = compName || sym;
     }
+    
+    // Logo: try image first, fallback to letter
     const logoEl = document.getElementById('curLogo');
+    const logoFb = document.getElementById('curLogoFallback');
     const logoUrl = getBestLogoUrl(sym);
+    const symLetter = sym.replace(/=X|-USD|=F/g,'').charAt(0);
+    if (logoFb) logoFb.textContent = symLetter;
     if (logoEl && logoUrl) {
-      logoEl.src = logoUrl;
       logoEl.style.display = 'block';
+      logoEl.src = logoUrl;
       logoEl.onerror = function() {
-        // TradingView logo failed, try clearbit then show initial
         const s = sym.replace(/=X|-USD|=F/g,'').toLowerCase();
         this.src = `https://logo.clearbit.com/${s}.com`;
-        this.onerror = function() { this.style.display='none'; };
+        this.onerror = function() {
+          this.style.display = 'none';
+          if (logoFb) logoFb.style.display = 'block';
+        };
+      };
+      logoEl.onload = function() {
+        if (logoFb) logoFb.style.display = 'none';
+        this.style.display = 'block';
       };
     }
     
