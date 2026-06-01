@@ -810,7 +810,8 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
     </div>
     
-    <button id="signalBtn" onclick="toggleSignalsPanel()" title="Semnale AI">Semnale AI</button>
+    <button id="signalBtn" onclick="forceShowSignal()" title="Analiză Simbol Curent">Semnal Local</button>
+    <button id="scannerBtn" onclick="toggleSignalsPanel()" title="Scanner Piață Globală">Scanner Global AI</button>
     <button id="deepForecastBtn" onclick="openDeepForecastModal()" title="Deep Forecast">Forecast Avansat</button>
 
     <button id="themeBtn" title="Schimbă tema"></button>
