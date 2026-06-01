@@ -3820,20 +3820,30 @@ async function updateWatchlistPrices() {
   if (liveUpdateRunning) return;
   liveUpdateRunning = true;
   try {
-    const syms  = watchlistData.map(w => w.sym);
-    const quotes = await fetchBatchQuotes(syms);
-    liveQuotes  = { ...liveQuotes, ...quotes };
-    syms.forEach(sym => { if (quotes[sym]) applyQuoteToDOM(sym, quotes[sym]); });
-    // Actualizează și simbolul curent dacă nu e în watchlist
-    if (!syms.includes(currentSymbol) && currentSymbol) {
-      const singleQuotes = await fetchBatchQuotes([currentSymbol]);
-      if (singleQuotes[currentSymbol]) applyQuoteToDOM(currentSymbol, singleQuotes[currentSymbol]);
+    const syms = watchlistData.map(w => w.sym);
+    // Split into chunks of 5 to avoid Yahoo blocking large batch requests
+    const CHUNK = 5;
+    for (let i = 0; i < syms.length; i += CHUNK) {
+      const chunk = syms.slice(i, i + CHUNK);
+      try {
+        const quotes = await fetchBatchQuotes(chunk);
+        liveQuotes = { ...liveQuotes, ...quotes };
+        // Update DOM immediately for each chunk received
+        chunk.forEach(sym => { if (quotes[sym]) applyQuoteToDOM(sym, quotes[sym]); });
+      } catch(e) {
+        console.warn('Chunk quote fail:', chunk.join(','), e.message);
+      }
     }
-    // Update indicator live în status bar
+    // Also update current symbol if not in watchlist
+    if (!syms.includes(currentSymbol) && currentSymbol) {
+      try {
+        const sq = await fetchBatchQuotes([currentSymbol]);
+        if (sq[currentSymbol]) applyQuoteToDOM(currentSymbol, sq[currentSymbol]);
+      } catch(e) {}
+    }
+    // Blink the live dot
     const dotEl = document.getElementById('liveUpdateDot');
     if (dotEl) { dotEl.style.opacity='1'; setTimeout(()=>{ dotEl.style.opacity='.3'; }, 400); }
-  } catch(e) {
-    console.warn('Batch quote fail:', e.message);
   } finally {
     liveUpdateRunning = false;
   }
