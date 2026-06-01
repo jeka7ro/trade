@@ -3352,6 +3352,7 @@ function getBestLogoUrl(sym) {
     return currentSymbolMeta.logoUrl;
   }
   const s = sym.toUpperCase().replace(/=X|-USD|=F/g, '');
+  // Hardcoded high-quality logos
   const map = {
     'TSLA': 'https://s3-symbol-logo.tradingview.com/tesla--big.svg',
     'MSFT': 'https://s3-symbol-logo.tradingview.com/microsoft--big.svg',
@@ -3364,19 +3365,37 @@ function getBestLogoUrl(sym) {
     'NFLX': 'https://s3-symbol-logo.tradingview.com/netflix--big.svg',
     'LULU': 'https://s3-symbol-logo.tradingview.com/lululemon--big.svg',
     'APPS': 'https://s3-symbol-logo.tradingview.com/digital-turbine--big.svg',
-    'NQ': 'https://logo.clearbit.com/nasdaq.com', // Nasdaq
-    'ES': 'https://logo.clearbit.com/spglobal.com', // S&P 500
-    'SPY': 'https://logo.clearbit.com/spglobal.com',
-    'QQQ': 'https://logo.clearbit.com/nasdaq.com',
-    'CL': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Oil Drop
-    'BZ': 'https://cdn-icons-png.flaticon.com/512/1154/1154378.png', // Brent Oil
-    'GC': 'https://cdn-icons-png.flaticon.com/512/1487/1487777.png', // Gold
-    'SI': 'https://cdn-icons-png.flaticon.com/512/4627/4627341.png', // Silver
-    'BTC': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCBTC--big.svg',
-    'ETH': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCETH--big.svg',
-    'SOL': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCSOL--big.svg'
+    'SPY':  'https://s3-symbol-logo.tradingview.com/spdr-sp-500-etf-trust--big.svg',
+    'QQQ':  'https://s3-symbol-logo.tradingview.com/invesco--big.svg',
+    'BTC':  'https://s3-symbol-logo.tradingview.com/crypto/XTVCBTC--big.svg',
+    'ETH':  'https://s3-symbol-logo.tradingview.com/crypto/XTVCETH--big.svg',
+    'SOL':  'https://s3-symbol-logo.tradingview.com/crypto/XTVCSOL--big.svg',
+    'GC':   'https://s3-symbol-logo.tradingview.com/commodity/gold--big.svg',
+    'CL':   'https://s3-symbol-logo.tradingview.com/commodity/crude-oil--big.svg',
+    'SI':   'https://s3-symbol-logo.tradingview.com/commodity/silver--big.svg',
+    'CRWD': 'https://s3-symbol-logo.tradingview.com/crowdstrike--big.svg',
+    'PLTR': 'https://s3-symbol-logo.tradingview.com/palantir--big.svg',
+    'COIN': 'https://s3-symbol-logo.tradingview.com/coinbase-global--big.svg',
+    'AMD':  'https://s3-symbol-logo.tradingview.com/advanced-micro-devices--big.svg',
+    'INTC': 'https://s3-symbol-logo.tradingview.com/intel--big.svg',
+    'AVGO': 'https://s3-symbol-logo.tradingview.com/broadcom--big.svg',
+    'JPM':  'https://s3-symbol-logo.tradingview.com/jp-morgan-chase--big.svg',
+    'BAC':  'https://s3-symbol-logo.tradingview.com/bank-of-america--big.svg',
+    'DIS':  'https://s3-symbol-logo.tradingview.com/walt-disney--big.svg',
+    'UBER': 'https://s3-symbol-logo.tradingview.com/uber--big.svg',
+    'LYFT': 'https://s3-symbol-logo.tradingview.com/lyft--big.svg',
+    'SQ':   'https://s3-symbol-logo.tradingview.com/block--big.svg',
+    'PYPL': 'https://s3-symbol-logo.tradingview.com/paypal--big.svg',
+    'SHOP': 'https://s3-symbol-logo.tradingview.com/shopify--big.svg',
+    'SPOT': 'https://s3-symbol-logo.tradingview.com/spotify--big.svg',
+    'SNAP': 'https://s3-symbol-logo.tradingview.com/snapchat--big.svg',
+    'X':    'https://s3-symbol-logo.tradingview.com/x--big.svg',
+    'BIDU': 'https://s3-symbol-logo.tradingview.com/baidu--big.svg',
+    'BABA': 'https://s3-symbol-logo.tradingview.com/alibaba--big.svg',
   };
-  return map[s] || `https://logo.clearbit.com/${s.toLowerCase()}.com`;
+  if (map[s]) return map[s];
+  // Universal TradingView logo pattern - works for most US stocks
+  return `https://s3-symbol-logo.tradingview.com/${s.toLowerCase()}--big.svg`;
 }
 function drawRing(pct) {
   const canvas = document.getElementById('ringCanvas');
@@ -3548,8 +3567,23 @@ async function fetchBatchQuotes(symbols) {
     'marketState'
   ].join(',');
   const syms = symbols.join(',');
-  const url  = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${fields}&lang=en&region=US`;
-  const json = await fetchJSON(url, 8000);
+  const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${fields}&lang=en&region=US`;
+  
+  // Try via proxy first, fall back to direct Yahoo
+  let json = null;
+  try {
+    json = await fetchJSON(yahooUrl, 8000);
+  } catch(e) {
+    // proxy failed, try direct (works in PRE-MARKET / some regions)
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(yahooUrl, { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
+      clearTimeout(tid);
+      if (res.ok) json = await res.json();
+    } catch(e2) { console.warn('Direct Yahoo also failed:', e2.message); }
+  }
+  
   const results = json?.quoteResponse?.result || [];
   const map = {};
   results.forEach(q => { map[q.symbol] = q; });
@@ -3643,9 +3677,15 @@ function applyQuoteToDOM(sym, q) {
     }
     const logoEl = document.getElementById('curLogo');
     const logoUrl = getBestLogoUrl(sym);
-    if (logoEl) {
+    if (logoEl && logoUrl) {
       logoEl.src = logoUrl;
       logoEl.style.display = 'block';
+      logoEl.onerror = function() {
+        // TradingView logo failed, try clearbit then show initial
+        const s = sym.replace(/=X|-USD|=F/g,'').toLowerCase();
+        this.src = `https://logo.clearbit.com/${s}.com`;
+        this.onerror = function() { this.style.display='none'; };
+      };
     }
     
     // Populeaza Details Widget (Sidebar)
