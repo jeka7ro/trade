@@ -928,7 +928,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <div id="chartCanvas"></div>
       <div id="crosshairInfo"></div>
       <!-- On-Chart Legend -->
-      <div id="onChartLegend" style="position:absolute; top:130px; left:12px; z-index:15; display:flex; flex-direction:column; gap:2px; pointer-events:none;">
+      <div id="onChartLegend" style="position:absolute; top:85px; left:12px; z-index:15; display:flex; flex-direction:column; gap:2px; pointer-events:none;">
         <!-- Filled by JS -->
       </div>
       <div id="loadOverlay">
@@ -1218,9 +1218,8 @@ button{border:none;cursor:pointer;transition:all .15s;}
     </div>
   </div><!-- /rightPanel -->
     <!-- SIGNALS PANEL -->
-    <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px; position:relative;">
-      <button onclick="toggleSignalsPanel()" style="position:absolute; top:16px; right:16px; background:var(--bg3); border:1px solid var(--border); color:var(--text); width:32px; height:32px; border-radius:50%; cursor:pointer; font-weight:bold; font-size:16px;">✕</button>
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+    <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <h2 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:8px;">
           <span style="font-size:24px;">🚀</span> Semnale AI
         </h2>
@@ -1279,16 +1278,6 @@ button{border:none;cursor:pointer;transition:all .15s;}
 //  STATE
 // ════════════════════════════════════════════════════════════
 let currentSymbol = '';
-
-async function loadSymbol(sym = null, tf = null) {
-  let val = sym || document.getElementById('symbolInput').value.trim().toUpperCase() || 'AAPL';
-  const aliases = {
-    'OIL': 'CL=F', 'GOLD': 'GC=F', 'SILVER': 'SI=F', 'NATURAL GAS': 'NG=F',
-    'SP500': '^GSPC', 'NASDAQ': '^IXIC', 'DOW': '^DJI',
-    'BITCOIN': 'BTC-USD', 'ETHEREUM': 'ETH-USD'
-  };
-  if (aliases[val]) val = aliases[val];
-  currentSymbol = val;
 
 // MOBILE TAB SWITCHER
 function switchMobileTab(tab) {
@@ -2443,7 +2432,7 @@ function buildForecast(data) {
   // Patterns
   detectPatterns(data);
 
-  // Sentiment
+  // Sentiment pills
   buildSentimentPills(data);
 
   buildForecastChart(data);
@@ -2626,6 +2615,8 @@ function runAnalysis(data, meta) {
   const chg = (last.close - prev.close) / prev.close * 100;
   document.getElementById('curSymbol').textContent = currentSymbol;
   
+  // (Logo update logic has been moved to applyQuoteToDOM to prevent duplicate fallback circle generation)
+  
   // Afiseaza numele companiei daca e disponibil in meta
   const companyNameEl = document.getElementById('curCompanyName');
   if (companyNameEl) {
@@ -2742,14 +2733,6 @@ function runAnalysis(data, meta) {
     else { reasons.push(` Știri Recente: Neutre / Mixte`); }
   }
 
-  // Wolfe Waves check
-  let ww = calcWolfeWaves(data);
-  if (ww.lineEPA.length > 0) {
-    let type = ww.line135[0].value < ww.line135[1].value ? "Bearish" : "Bullish";
-    if (type === "Bullish") { bulls += 2; totalSigs += 2; reasons.push(` Tipar Wolfe Waves Bullish Detectat: Oportunitate Cumpărare (Target EPA: ${fmt(ww.lineEPA[2].value)})`); }
-    else { bears += 2; totalSigs += 2; reasons.push(` Tipar Wolfe Waves Bearish Detectat: Oportunitate Vânzare (Target EPA: ${fmt(ww.lineEPA[2].value)})`); }
-  }
-
   const score = (bulls - bears) / totalSigs;
   drawGauge(score);
   const lbl = score > 0.4 ? ' CUMPĂRARE PUTERNICĂ' : score > 0.1 ? ' CUMPĂRARE' : score < -0.4 ? ' VÂNZARE PUTERNICĂ' : score < -0.1 ? ' VÂNZARE' : ' NEUTRU';
@@ -2766,7 +2749,6 @@ function runAnalysis(data, meta) {
   showMarketStatus();
 
   // Salvează datele pentru a putea declanșa popup-ul manual
-  latestSignalData = { score, lbl, price: last.close, reasons, bulls, totalSigs };
   triggerSignalNotification(score, lbl, last.close, reasons, bulls, totalSigs);
 }
 
@@ -2795,6 +2777,15 @@ function toggleSignalsPanel() {
       panel.style.boxShadow = '0 10px 50px rgba(0,0,0,0.8)';
       panel.style.borderRadius = '12px';
       panel.style.border = '1px solid var(--border)';
+      
+      if (!document.getElementById('sigCloseBtn')) {
+        const closeBtn = document.createElement('button');
+        closeBtn.id = 'sigCloseBtn';
+        closeBtn.innerHTML = '✕';
+        closeBtn.style.cssText = 'position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.1); border:none; color:#fff; border-radius:50%; width:32px; height:32px; cursor:pointer;';
+        closeBtn.onclick = () => panel.style.display = 'none';
+        panel.appendChild(closeBtn);
+      }
       
       if (typeof loadCachedSignals === 'function') loadCachedSignals();
     }
