@@ -574,7 +574,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
   /* ── Topbar wrapper ── */
   #topbar {
-    padding: 8px 10px 6px;
+    padding: max(8px, env(safe-area-inset-top)) 10px 6px;
     height: auto;
     overflow: hidden;
   }
@@ -3678,6 +3678,19 @@ async function loadSymbol(symbol, tf) {
   if (aliases[val]) val = aliases[val];
   currentSymbol = val;
   if (!currentSymbol) return;
+  
+  try {
+    const savedInds = localStorage.getItem('tradeProInds_' + currentSymbol) || localStorage.getItem('tradeProInds');
+    if (savedInds) {
+      const parsed = JSON.parse(savedInds);
+      Object.keys(indicators).forEach(k => indicators[k] = false); // reset
+      Object.assign(indicators, parsed);
+      document.querySelectorAll('.ind-btn').forEach(b => {
+        b.classList.toggle('active', !!indicators[b.dataset.ind]);
+      });
+    }
+  } catch(e) {}
+  
   currentTF = tf || currentTF;
   document.getElementById('symbolInput').value = currentSymbol;
 
@@ -3743,7 +3756,8 @@ document.querySelectorAll('.ind-btn').forEach(btn => btn.addEventListener('click
   const ind = btn.dataset.ind;
   indicators[ind] = !indicators[ind];
   btn.classList.toggle('active', indicators[ind]);
-  localStorage.setItem('tradeProInds', JSON.stringify(indicators));
+  localStorage.setItem('tradeProInds_' + currentSymbol, JSON.stringify(indicators));
+  localStorage.setItem('tradeProInds', JSON.stringify(indicators)); // fallback global
   updateChartLegend();
   if (typeof allData !== 'undefined' && allData.length) renderAll(allData);
 }));
