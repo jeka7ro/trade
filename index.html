@@ -108,13 +108,16 @@ body{
 button{border:none;cursor:pointer;transition:all .15s;}
 
 #signalBtn, #scannerBtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background:var(--bg3);border:1px solid var(--border);color:var(--text);
   height:40px;padding:0 16px;border-radius:var(--r-full);
   font-weight:700;font-size:12px;white-space:nowrap;
 }
+.btn-icon { display: none; }
 #signalBtn:hover, #scannerBtn:hover {background:var(--bg4);color:var(--text);}
 
 #deepForecastBtn{
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background:linear-gradient(135deg,#7c3aed,#4c1d95);
   border:1px solid rgba(255,255,255,.15);
   color:#fff;height:40px;padding:0 16px;
@@ -618,12 +621,14 @@ button{border:none;cursor:pointer;transition:all .15s;}
   }
   .topbar-row::-webkit-scrollbar { display: none; }
   
+  .btn-icon { display: block; }
+  .btn-text { display: none; }
+
   #signalBtn, #scannerBtn, #deepForecastBtn {
     flex: none;
-    white-space: nowrap;
+    width: 36px;
     height: 36px;
-    font-size: 11px;
-    padding: 0 12px;
+    padding: 0;
     border-radius: var(--r-full);
     margin: 0;
   }
@@ -804,14 +809,18 @@ button{border:none;cursor:pointer;transition:all .15s;}
   <div class="topbar-row">
     <div id="logo">Trade<em>Pro</em> <sup>AI</sup></div>
 
-    <div class="search-wrap" style="min-width:180px;max-width:240px;margin-left:12px;">
-      <span class="search-icon">⌕</span>
-      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
-    </div>
-    
-    <button id="signalBtn" onclick="forceShowSignal()" title="Analiză Simbol Curent">Semnal Local</button>
-    <button id="scannerBtn" onclick="toggleSignalsPanel()" title="Scanner Piață Globală">Scanner Global AI</button>
-    <button id="deepForecastBtn" onclick="openDeepForecastModal()" title="Deep Forecast">Forecast Avansat</button>
+    <button id="signalBtn" style="margin-left:auto;" onclick="forceShowSignal()" title="Analiză Simbol Curent">
+      <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span class="btn-text">Semnal Local</span>
+    </button>
+    <button id="scannerBtn" onclick="toggleSignalsPanel()" title="Scanner Piață Globală">
+      <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <span class="btn-text">Scanner Global AI</span>
+    </button>
+    <button id="deepForecastBtn" onclick="openDeepForecastModal()" title="Deep Forecast">
+      <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l2-5 4 10 2-5h4"/></svg>
+      <span class="btn-text">Forecast Avansat</span>
+    </button>
 
     <button id="themeBtn" title="Schimbă tema"></button>
   </div>
@@ -865,7 +874,12 @@ button{border:none;cursor:pointer;transition:all .15s;}
 <div id="main">
 
   <!-- SIDEBAR -->
-  <div id="sidebar">
+  <div id="sidebar" style="display:flex; align-items:center;">
+    <div class="search-wrap" style="min-width:140px;max-width:200px;margin-right:12px;">
+      <span class="search-icon">⌕</span>
+      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
+    </div>
+    <div class="sidebar-sep"></div>
     <button class="tool-btn active" id="toolCursor"  title="Cursor" onclick="setTool('cursor')">↖</button>
     <button class="tool-btn"        id="toolTrend"   title="Linie Trend" onclick="setTool('trend')">╱</button>
     <button class="tool-btn"        id="toolHline"   title="Linie Orizontală" onclick="setTool('hline')">—</button>
