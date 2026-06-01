@@ -62,6 +62,40 @@ const server = http.createServer(async (req, res) => {
     }
 
     const parsedUrl = url.parse(req.url, true);
+    
+    if (parsedUrl.pathname === '/api/meta') {
+        const sym = parsedUrl.query.symbol;
+        if (!sym) {
+            res.writeHead(400);
+            return res.end(JSON.stringify({ error: "Missing symbol parameter" }));
+        }
+        try {
+            const YahooFinance = require('yahoo-finance2').default;
+            const quoteData = await YahooFinance.quoteSummary(sym, { modules: ['summaryProfile', 'price'] });
+            const searchData = await YahooFinance.search(sym, { newsCount: 3, quotesCount: 0 });
+            
+            let logoUrl = null;
+            if (quoteData?.summaryProfile?.website) {
+                try {
+                    let host = new URL(quoteData.summaryProfile.website).hostname;
+                    logoUrl = `https://logo.clearbit.com/${host}`;
+                } catch(e){}
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                name: quoteData?.price?.shortName || sym,
+                logoUrl,
+                news: searchData?.news || []
+            }));
+        } catch (e) {
+            console.error('[API META ERROR]', e.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+    }
+
     if (parsedUrl.pathname !== '/proxy') {
         res.writeHead(404);
         res.end('Not found');

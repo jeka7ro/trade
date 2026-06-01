@@ -42,6 +42,7 @@ async function sendAlert(message, logoUrl = null) {
 async function getCompanyMeta(sym) {
     try {
         const res = await yahooFinance.quoteSummary(sym, { modules: ['summaryProfile', 'price'] });
+        const searchData = await yahooFinance.search(sym, { newsCount: 2, quotesCount: 0 });
         const name = res?.price?.shortName || res?.price?.longName || sym;
         const website = res?.summaryProfile?.website || null;
         let logoUrl = null;
@@ -51,9 +52,9 @@ async function getCompanyMeta(sym) {
                 logoUrl = `https://logo.clearbit.com/${host}`;
             } catch(e){}
         }
-        return { name, logoUrl };
+        return { name, logoUrl, news: searchData?.news || [] };
     } catch(e) {
-        return { name: sym, logoUrl: null };
+        return { name: sym, logoUrl: null, news: [] };
     }
 }
 
@@ -179,7 +180,10 @@ async function runScreener() {
                     
                     const rsi = calcRSI14(allData);
                     const isUp = avgPct > 0;
-                    const reasonTxt = getReason(rsi, isUp);
+                    let reasonTxt = getReason(rsi, isUp);
+                    if (meta.news && meta.news.length > 0) {
+                        reasonTxt += `\n\n📰 <b>Context Fundamental (Știri):</b>\n${meta.news[0].title}`;
+                    }
 
                     const msg = `🚨 <b>ALERTA AI: ${meta.name} (${sym})</b> (${listType}) 🚨\n\nDirecție: <b>${direction}</b>\nPredicție: <b>${avgPct > 0 ? '+' : ''}${avgPct.toFixed(2)}%</b>\nPreț curent: $${lastPrice}\n\n${reasonTxt}`;
                     await sendAlert(msg, meta.logoUrl);
