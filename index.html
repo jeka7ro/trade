@@ -142,6 +142,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
 }
 .tf-btn:hover{color:var(--text);}
 .tf-btn.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.35);}
+.mobile-tf { display: none !important; }
 
 /* Indicator buttons — ghost pill */
 .ind-group{display:flex;gap:3px;flex-wrap:nowrap;}
@@ -460,9 +461,10 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
 /* ── MARKET STATUS BAR ── */
 #marketStatusBar{
-  display:flex;align-items:center;
-  background:var(--bg2);border-bottom:1px solid var(--border);
-  padding:4px 14px;font-size:11px;flex-shrink:0;min-height:26px;
+  display:flex;align-items:center;flex-wrap:wrap;
+  background:transparent;border:none;
+  padding:0;font-size:11px;flex-shrink:0;min-height:auto;
+  margin-left:12px;
 }
 
 /* ── LIVE ANIMATIONS ── */
@@ -624,7 +626,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
   .btn-icon { display: block; }
   .btn-text { display: none; }
 
-  #signalBtn, #scannerBtn, #deepForecastBtn {
+  #signalBtn, #deepForecastBtn {
     flex: none;
     width: 36px;
     height: 36px;
@@ -632,6 +634,11 @@ button{border:none;cursor:pointer;transition:all .15s;}
     border-radius: var(--r-full);
     margin: 0;
   }
+  #scannerBtn { display: none !important; }
+  
+  .mobile-tf { display: flex !important; }
+  .desktop-tf { display: none !important; }
+  .topbar-row { gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   
   #themeBtn {
     flex: none;
@@ -649,7 +656,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
   #curPrice { font-size: 24px !important; }
   #curChange { font-size: 13px !important; }
   #curLogo { width: 24px !important; height: 24px !important; display: block !important; }
-  #extHoursCard { display: none !important; }
+  #extHoursCard { flex-direction: row; margin-left: 0 !important; margin-top: 4px; width: 100%; justify-content: space-between; }
 
   /* ── ROW 2: Timeframes + Indicators ── */
   .tf-group {
@@ -805,9 +812,75 @@ button{border:none;cursor:pointer;transition:all .15s;}
 <body>
 
 <div id="topbar">
-  <!-- ROW 1: Search + Buttons + Theme -->
-  <div class="topbar-row">
+  <div class="topbar-row" style="flex-wrap: nowrap;">
     <div id="logo">Trade<em>Pro</em> <sup>AI</sup></div>
+
+    <div id="marketStatusBar" style="display:flex;align-items:center;background:transparent;border:none;padding:0;font-size:11px;flex-shrink:0;margin-left:12px;margin-right:auto;">
+      Se calculează statusul pieței…
+      <span id="liveClock" style="margin-left:8px;"></span>
+      <span style="margin-left:12px;display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);">
+        <span id="liveUpdateDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.3;transition:opacity .2s;"></span>
+        <span style="font-weight:700;color:var(--accent);">LIVE 10s</span>
+      </span>
+    </div>
+
+    <div class="search-wrap" style="min-width:140px;max-width:200px;margin-left:16px;margin-right:12px;">
+      <span class="search-icon">⌕</span>
+      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
+    </div>
+
+    <!-- Desktop TFs -->
+    <div class="tf-group desktop-tf">
+      <button class="tf-btn" data-tf="5m">5m</button>
+      <button class="tf-btn" data-tf="15m">15m</button>
+      <button class="tf-btn" data-tf="30m">30m</button>
+      <button class="tf-btn" data-tf="1h">1h</button>
+      <button class="tf-btn" data-tf="4h">4h</button>
+      <button class="tf-btn active" data-tf="1d">1 Zi</button>
+      <button class="tf-btn" data-tf="1wk">1 Sapt</button>
+      <button class="tf-btn" data-tf="1mo">1 Luna</button>
+    </div>
+    
+    <!-- Mobile TF Select -->
+    <select id="mobileTfSelect" class="mobile-tf" onchange="changeTimeframe(this.value)" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;font-weight:700;padding:4px 6px;font-size:12px;outline:none;">
+      <option value="5m">5m</option>
+      <option value="15m">15m</option>
+      <option value="30m">30m</option>
+      <option value="1h">1h</option>
+      <option value="4h">4h</option>
+      <option value="1d" selected>1 Zi</option>
+      <option value="1wk">1 Sapt</option>
+      <option value="1mo">1 Luna</option>
+    </select>
+
+    <div class="sep desktop-tf"></div>
+
+    <!-- Indicators -->
+    <div class="ind-wrap" style="position:relative;" onmouseenter="document.getElementById('indMenu').style.display='flex'" onmouseleave="document.getElementById('indMenu').style.display='none'">
+      <!-- Desktop Button -->
+      <button class="desktop-tf" style="background:transparent; border:none; color:var(--text); font-weight:700; cursor:pointer; padding:6px 12px; display:flex; align-items:center; gap:6px; border-radius:6px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l5-5 4 4 5-5"/></svg>
+        Indicators
+      </button>
+      <!-- Mobile Icon Button -->
+      <button class="mobile-tf" onclick="document.getElementById('indMenu').style.display=document.getElementById('indMenu').style.display==='flex'?'none':'flex'" style="background:var(--bg3); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:var(--r-full); display:flex; align-items:center; justify-content:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l5-5 4 4 5-5"/></svg>
+      </button>
+
+      <div id="indMenu" class="ind-group" style="display:none; position:absolute; top:100%; left:0; background:var(--bg2); border:1px solid var(--border); border-radius:6px; flex-direction:column; width:160px; padding:8px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,0.3); gap:4px;">
+        <button class="ind-btn active" data-ind="ma" style="text-align:left; justify-content:flex-start; padding:6px 8px;">MA (Moving Avg)</button>
+        <button class="ind-btn active" data-ind="bb" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Bollinger Bands</button>
+        <button class="ind-btn active" data-ind="vol" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Volume</button>
+        <button class="ind-btn active" data-ind="rsi" style="text-align:left; justify-content:flex-start; padding:6px 8px;">RSI (Relative Str)</button>
+        <button class="ind-btn active" data-ind="macd" style="text-align:left; justify-content:flex-start; padding:6px 8px;">MACD</button>
+        <button class="ind-btn" data-ind="ema" style="text-align:left; justify-content:flex-start; padding:6px 8px;">EMA 21</button>
+        <button class="ind-btn" data-ind="vwap" style="text-align:left; justify-content:flex-start; padding:6px 8px;">VWAP</button>
+        <button class="ind-btn active" data-ind="smc" style="text-align:left; justify-content:flex-start; padding:6px 8px;">SMC (Smart Money)</button>
+        <button class="ind-btn active" data-ind="vpvr" style="text-align:left; justify-content:flex-start; padding:6px 8px;">VPVR (Vol Profile)</button>
+        <button class="ind-btn active" data-ind="forecast" style="text-align:left; justify-content:flex-start; padding:6px 8px;">AI Forecast</button>
+        <button class="ind-btn" data-ind="wolfe" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Wolfe Waves</button>
+      </div>
+    </div>
 
     <button id="signalBtn" style="margin-left:auto;" onclick="forceShowSignal()" title="Analiză Simbol Curent">
       <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -824,61 +897,15 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
     <button id="themeBtn" title="Schimbă tema"></button>
   </div>
-
-  <!-- ROW 2: Timeframes + Indicators -->
-  <div class="topbar-row">
-    <div class="tf-group">
-      <button class="tf-btn" data-tf="5m">5m</button>
-      <button class="tf-btn" data-tf="15m">15m</button>
-      <button class="tf-btn" data-tf="30m">30m</button>
-      <button class="tf-btn" data-tf="1h">1h</button>
-      <button class="tf-btn" data-tf="4h">4h</button>
-      <button class="tf-btn active" data-tf="1d">1 Zi</button>
-      <button class="tf-btn" data-tf="1wk">1 Sapt</button>
-      <button class="tf-btn" data-tf="1mo">1 Luna</button>
-    </div>
-    <div class="sep"></div>
-    <div style="position:relative;" onmouseenter="document.getElementById('indMenu').style.display='flex'" onmouseleave="document.getElementById('indMenu').style.display='none'">
-      <button style="background:transparent; border:none; color:var(--text); font-weight:700; cursor:pointer; padding:6px 12px; display:flex; align-items:center; gap:6px; border-radius:6px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l5-5 4 4 5-5"/></svg>
-        Indicators
-      </button>
-      <div id="indMenu" class="ind-group" style="display:none; position:absolute; top:100%; left:0; background:var(--bg2); border:1px solid var(--border); border-radius:6px; flex-direction:column; width:160px; padding:8px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,0.3); gap:4px;">
-        <button class="ind-btn active" data-ind="ma" style="text-align:left; justify-content:flex-start; padding:6px 8px;">MA (Moving Avg)</button>
-        <button class="ind-btn active" data-ind="bb" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Bollinger Bands</button>
-        <button class="ind-btn active" data-ind="vol" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Volume</button>
-        <button class="ind-btn active" data-ind="rsi" style="text-align:left; justify-content:flex-start; padding:6px 8px;">RSI (Relative Str)</button>
-        <button class="ind-btn active" data-ind="macd" style="text-align:left; justify-content:flex-start; padding:6px 8px;">MACD</button>
-        <button class="ind-btn" data-ind="ema" style="text-align:left; justify-content:flex-start; padding:6px 8px;">EMA 21</button>
-        <button class="ind-btn" data-ind="vwap" style="text-align:left; justify-content:flex-start; padding:6px 8px;">VWAP</button>
-        <button class="ind-btn active" data-ind="smc" style="text-align:left; justify-content:flex-start; padding:6px 8px;">SMC (Smart Money)</button>
-        <button class="ind-btn active" data-ind="vpvr" style="text-align:left; justify-content:flex-start; padding:6px 8px;">VPVR (Vol Profile)</button>
-        <button class="ind-btn active" data-ind="forecast" style="text-align:left; justify-content:flex-start; padding:6px 8px;">AI Forecast</button>
-        <button class="ind-btn" data-ind="wolfe" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Wolfe Waves</button>
-      </div>
-    </div>
-  </div>
 </div>
 
-<!-- STATUS BAR -->
-<div id="marketStatusBar">
-  Se calculează statusul pieței…
-  <span id="liveClock"></span>
-  <span style="margin-left:12px;display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);">
-    <span id="liveUpdateDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.3;transition:opacity .2s;"></span>
-    <span style="font-weight:700;color:var(--accent);">LIVE 10s</span>
-  </span>
-</div>
+<!-- STATUS BAR MOVED -->
 
 <!-- ══════════ MAIN ══════════ -->
 <div id="main">
 
   <!-- SIDEBAR -->
   <div id="sidebar" style="display:flex; align-items:center;">
-    <div class="search-wrap" style="min-width:140px;max-width:200px;margin-right:12px;">
-      <span class="search-icon">⌕</span>
-      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
-    </div>
     <div class="sidebar-sep"></div>
     <button class="tool-btn active" id="toolCursor"  title="Cursor" onclick="setTool('cursor')">↖</button>
     <button class="tool-btn"        id="toolTrend"   title="Linie Trend" onclick="setTool('trend')">╱</button>
@@ -912,10 +939,14 @@ button{border:none;cursor:pointer;transition:all .15s;}
     </div>
     <!-- Chart Price Header (Moved outside chartMain) -->
     <div id="chartPriceOverlay">
-      <div class="cpo-top">
-        <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;display:none;object-fit:contain;background:#fff;padding:2px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
-        <span id="curSymbol">---</span>
-        <span id="curCompanyName">---</span>
+      <div class="cpo-top" style="flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;display:none;object-fit:contain;background:#fff;padding:2px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
+          <span id="curSymbol">---</span>
+          <span id="curCompanyName">---</span>
+        </div>
+        
+        <!-- STATUS BAR REMOVED FROM HERE -->
       </div>
       <div class="cpo-bottom">
         <span id="curPrice">—</span>
@@ -1230,14 +1261,17 @@ button{border:none;cursor:pointer;transition:all .15s;}
     <!-- SIGNALS PANEL -->
     <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px; position:relative;">
       <button onclick="toggleSignalsPanel()" style="position:absolute; top:16px; right:16px; background:var(--bg3); border:1px solid var(--border); color:var(--text); width:32px; height:32px; border-radius:50%; cursor:pointer; font-weight:bold; font-size:16px;">✕</button>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px; padding-right:40px;">
         <h2 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:8px;">
           <span style="font-size:24px;">🚀</span> Semnale AI
         </h2>
-        <button onclick="scanMarket()" style="background:var(--accent); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 5 18 3-9h5"/></svg>
-          Scanează
-        </button>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="customScanSymbol" placeholder="Scanează simbol custom (ex: GC=F, AAPL)" style="flex:1; padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg2); color:var(--text); outline:none;" onkeydown="if(event.key==='Enter') scanMarket()">
+          <button onclick="scanMarket()" style="background:var(--accent); color:#fff; border:none; border-radius:6px; padding:8px 16px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 5 18 3-9h5"/></svg>
+            Scanează
+          </button>
+        </div>
       </div>
       
       <div id="signalsStatus" style="font-size:12px; color:var(--text2); margin-bottom:16px; text-align:center; display:none;"></div>
@@ -1246,6 +1280,15 @@ button{border:none;cursor:pointer;transition:all .15s;}
         <div style="text-align:center; color:var(--text2); padding:40px; font-size:14px;">
           Apasă "Scanează" pentru a analiza piața în timp real folosind algoritmul fractal.
         </div>
+      </div>
+    </div>
+
+    <!-- LOCAL SIGNAL MODAL -->
+    <div id="localSignalModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; justify-content:center; align-items:center;">
+      <div style="background:var(--bg2); width:90%; max-width:400px; border-radius:12px; border:1px solid var(--border); box-shadow:0 12px 48px rgba(0,0,0,0.5); padding:24px; position:relative;">
+        <button onclick="document.getElementById('localSignalModal').style.display='none'" style="position:absolute; top:16px; right:16px; background:transparent; border:none; color:var(--text); font-size:20px; cursor:pointer;">✕</button>
+        <h2 style="margin:0 0 16px 0; font-size:20px; color:var(--text); text-align:center;">Analiză Detaliată</h2>
+        <div id="lsmContent"></div>
       </div>
     </div>
   </div><!-- /main -->
@@ -1369,7 +1412,7 @@ function cleanCompanyName(name, sym) {
   if (sym === 'SI=F') return 'Silver';
   if (sym === 'EURUSD=X') return 'EUR/USD';
   if (sym.includes('-USD')) return name.replace(' USD', '');
-  return name.replace(/,?\s+(Inc\.|Inc|Corporation|Corp\.|Corp|Company|Co\.|Ltd\.|Ltd|plc|LLC)\b/ig, '').trim();
+  return name;
 }
 
 const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -2919,16 +2962,24 @@ async function fetchDynamicSymbols() {
 async function scanMarket() {
   const statusEl = document.getElementById('signalsStatus');
   const listEl = document.getElementById('signalsList');
+  const customInput = document.getElementById('customScanSymbol');
+  const customSym = customInput ? customInput.value.trim().toUpperCase() : '';
+  
   statusEl.style.display = 'block';
-  statusEl.textContent = 'Preluare listă simboluri dinamice...';
-  listEl.innerHTML = '<div style="text-align:center; padding:40px;"><div class="spinner" style="margin:0 auto 16px;"></div>Se scanează piața... Așteaptă 10-20 secunde.</div>';
+  statusEl.textContent = 'Preluare listă simboluri...';
+  listEl.innerHTML = '<div style="text-align:center; padding:40px;"><div class="spinner" style="margin:0 auto 16px;"></div>Se scanează piața... Așteaptă.</div>';
 
   const FRACTAL_LEN = 14;
   const FORECAST_LEN = 10;
   let allSignals = [];
   
-  const dynamicSymbols = await fetchDynamicSymbols();
-  const ALL_SYMBOLS = Array.from(new Set([...FAVORITES, ...dynamicSymbols])).filter(s => !!s);
+  let ALL_SYMBOLS = [];
+  if (customSym) {
+    ALL_SYMBOLS = [customSym];
+  } else {
+    const dynamicSymbols = await fetchDynamicSymbols();
+    ALL_SYMBOLS = Array.from(new Set([...FAVORITES, ...dynamicSymbols])).filter(s => !!s);
+  }
 
   for (let idx = 0; idx < ALL_SYMBOLS.length; idx++) {
     const sym = ALL_SYMBOLS[idx];
@@ -3043,7 +3094,13 @@ function renderSignals(signals, dateObj, fullHistory = []) {
         const tvLogo = getBestLogoUrl(sig.sym);
         const fbLogo = getFallbackIconHTML(sig.sym, 40);
         const safeFbLogo = fbLogo.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const logoHtml = tvLogo ? `<img src="${tvLogo}" style="width:40px;height:40px;border-radius:50%;object-fit:contain;background:#fff;padding:2px;border:1px solid var(--border);flex-shrink:0;" onerror="this.outerHTML='${safeFbLogo}'"/>` : fbLogo;
+        const symClean = safe(sig.sym).replace('-USD','');
+        let logoHtml;
+        if (tvLogo) {
+          logoHtml = `<img src="${tvLogo}" style="width:40px;height:40px;border-radius:50%;object-fit:contain;background:#fff;padding:2px;border:1px solid var(--border);flex-shrink:0;" onerror="this.outerHTML='${safeFbLogo}'"/>`;
+        } else {
+          logoHtml = `<img src="https://eodhd.com/img/logos/US/${symClean}.png" style="width:40px;height:40px;border-radius:50%;object-fit:contain;background:#fff;padding:2px;border:1px solid var(--border);flex-shrink:0;" onerror="this.src='https://financialmodelingprep.com/image-stock/${symClean}.png'; this.onerror=function(){this.outerHTML='${safeFbLogo}';};" />`;
+        }
         
         html += `
           <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; position:relative; overflow:hidden; margin-bottom:12px;" onclick="toggleSignalsPanel(); loadSymbol('${sig.sym}')">
@@ -3163,7 +3220,30 @@ function forceShowSignal() {
     return;
   }
   const { score, lbl, price, reasons, bulls, totalSigs } = latestSignalData;
-  triggerSignalNotification(score, lbl, price, reasons, bulls, totalSigs, true);
+  
+  const isBuy  = score > 0;
+  const action = isBuy ? 'CUMPĂRARE' : 'VÂNZARE';
+  const color  = isBuy ? 'var(--green)' : 'var(--red)';
+  const border = isBuy ? 'var(--green)' : 'var(--red)';
+  
+  const reasonsHtml = reasons.map(r => `<div style="padding:8px 0; border-bottom:1px solid var(--border); font-size:14px; color:var(--text);">${r}</div>`).join('');
+  
+  const modal = document.getElementById('localSignalModal');
+  const content = document.getElementById('lsmContent');
+  
+  content.innerHTML = `
+    <div style="text-align:center; margin-bottom:20px;">
+      <div style="font-size:28px; font-weight:800; color:${color}; margin-bottom:8px;">${lbl}</div>
+      <div style="font-size:14px; color:var(--text2);">Scor: ${score.toFixed(2)} (${bulls}/${totalSigs} Bullish)</div>
+      <div style="font-size:16px; font-weight:700; color:var(--text); margin-top:8px;">Preț: ${fmt(price)}</div>
+    </div>
+    <div style="max-height:300px; overflow-y:auto; margin-bottom:16px; padding-right:8px;">
+      ${reasonsHtml}
+    </div>
+    <button onclick="document.getElementById('localSignalModal').style.display='none'" style="width:100%; padding:12px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-weight:bold; font-size:16px; cursor:pointer;">Am Înțeles</button>
+  `;
+  
+  modal.style.display = 'flex';
 }
 
 function triggerSignalNotification(score, labelText, price, reasons = [], bulls = 0, totalSigs = 5, force = false) {
@@ -3657,7 +3737,7 @@ function applyQuoteToDOM(sym, q) {
       const ehChgPct= showPre  ? q.preMarketChangePercent : q.postMarketChangePercent;
       const ehLabel = showPre  ? ' PRE-MARKET' : ' AFTER-HOURS';
 
-      extCard.style.display   = 'block';
+      extCard.style.display   = 'flex';
       extLabel.textContent    = ehLabel;
       extPrice.textContent    = fmt(ehPrice);
       extPrice.style.color    = ehChg >= 0 ? 'var(--green)' : 'var(--red)';

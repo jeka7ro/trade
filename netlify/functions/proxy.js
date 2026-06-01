@@ -1,3 +1,4 @@
+const http = require('http');
 const https = require('https');
 const url = require('url');
 
@@ -48,53 +49,106 @@ async function ensureAuth() {
     }
 }
 
-exports.handler = async function(event, context) {
-    const defaultHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type'
-    };
+const server = http.createServer(async (req, res) => {
+    // Enable CORS for frontend
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers: defaultHeaders, body: '' };
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
     }
 
-    const targetUrlRaw = event.queryStringParameters.url;
+    const parsedUrl = url.parse(req.url, true);
+    
+    if (parsedUrl.pathname === '/api/meta') {
+        const sym = parsedUrl.query.symbol;
+        if (!sym) {
+            res.writeHead(400);
+            return res.end(JSON.stringify({ error: "Missing symbol parameter" }));
+        }
+        try {
+            const YahooFinance = require('yahoo-finance2').default;
+            const quoteData = await YahooFinance.quoteSummary(sym, { modules: ['summaryProfile', 'price'] });
+            const searchData = await YahooFinance.search(sym, { newsCount: 3, quotesCount: 0 });
+            
+            let logoUrl = null;
+            if (quoteData?.summaryProfile?.website) {
+                try {
+                    let host = new URL(quoteData.summaryProfile.website).hostname;
+                    logoUrl = `https://logo.clearbit.com/${host}`;
+                } catch(e){}
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                name: quoteData?.price?.shortName || sym,
+                logoUrl,
+                news: searchData?.news || []
+            }));
+        } catch (e) {
+            console.error('[API META ERROR]', e.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+    }
+
+    if (parsedUrl.pathname !== '/proxy') {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+    }
+
+    const targetUrlRaw = parsedUrl.query.url;
     if (!targetUrlRaw) {
-        return { statusCode: 400, headers: defaultHeaders, body: 'Missing url parameter' };
+        res.writeHead(400);
+        res.end('Missing url parameter');
+        return;
     }
 
     try {
         await ensureAuth();
+
         const targetUrl = new URL(targetUrlRaw);
         targetUrl.searchParams.set('crumb', yahooCrumb);
 
-        return new Promise((resolve, reject) => {
-            https.get(targetUrl.toString(), {
-                headers: {
-                    'Cookie': yahooCookie,
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                    'Accept': 'application/json'
-                }
-            }, (proxyRes) => {
-                let data = [];
-                proxyRes.on('data', chunk => data.push(chunk));
-                proxyRes.on('end', () => {
-                    const bodyString = Buffer.concat(data).toString();
-                    resolve({
-                        statusCode: proxyRes.statusCode,
-                        headers: {
-                            ...defaultHeaders,
-                            'Content-Type': proxyRes.headers['content-type'] || 'application/json'
-                        },
-                        body: bodyString
-                    });
-                });
-            }).on('error', (err) => {
-                resolve({ statusCode: 500, headers: defaultHeaders, body: err.message });
+        console.log(`[PROXY] Fetching: ${targetUrl.toString()}`);
+
+        const proxyReq = https.get(targetUrl.toString(), {
+            headers: {
+                'Cookie': yahooCookie,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                'Accept': 'application/json'
+            }
+        }, (proxyRes) => {
+            console.log(`[PROXY] Response from Yahoo: ${proxyRes.statusCode}`);
+            console.log(`[PROXY] Yahoo Headers:`, proxyRes.headers);
+            res.writeHead(proxyRes.statusCode, {
+                'Content-Type': proxyRes.headers['content-type'] || 'application/json',
+                'Access-Control-Allow-Origin': '*'
             });
+            proxyRes.pipe(res);
         });
+
+        proxyReq.on('error', (err) => {
+            console.error('[ERROR]', err.message);
+            res.writeHead(500);
+            res.end(err.message);
+        });
+
     } catch (e) {
-        return { statusCode: 500, headers: defaultHeaders, body: e.message };
+        console.error('[AUTH ERROR]', e.message);
+        res.writeHead(500);
+        res.end('Yahoo Authentication failed: ' + e.message);
     }
-};
+});
+
+const PORT = 3457;
+server.listen(PORT, () => {
+    console.log(`\n=============================================`);
+    console.log(`🚀 Yahoo Finance Proxy running on port ${PORT}`);
+    console.log(`=============================================\n`);
+});
