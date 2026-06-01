@@ -600,6 +600,8 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
   /* Hide logo — save space */
   #logo { display: none; }
+  /* Hide market status on mobile - saves space */
+  #marketStatusBar { display: none !important; }
 
   /* ── ROW 1: Search | Semnal AI | Forecast | Theme ── */
   .search-wrap {
@@ -893,6 +895,13 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
     <button id="themeBtn" title="Schimbă tema"></button>
   </div>
+  <!-- Mobile search row: only visible on mobile -->
+  <div class="topbar-row mobile-tf" style="padding:0 8px 6px;">
+    <div class="search-wrap" style="flex:1;">
+      <span class="search-icon">⌕</span>
+      <input id="symbolInput" type="text" placeholder="Scrie simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
+    </div>
+  </div>
 </div>
 
 <!-- STATUS BAR MOVED -->
@@ -902,10 +911,6 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
   <!-- SIDEBAR -->
   <div id="sidebar" style="display:flex; align-items:center;">
-    <div class="search-wrap" style="min-width:140px;max-width:200px;margin-right:8px;">
-      <span class="search-icon">⌕</span>
-      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
-    </div>
     <div class="sidebar-sep"></div>
     <button class="tool-btn active" id="toolCursor"  title="Cursor" onclick="setTool('cursor')">↖</button>
     <button class="tool-btn"        id="toolTrend"   title="Linie Trend" onclick="setTool('trend')">╱</button>
@@ -3781,31 +3786,28 @@ function applyQuoteToDOM(sym, q) {
       statPost.className   = `stat-val ${postChgPct>=0?'yellow':'red'}`;
     }
 
-    // Cardul vizibil din topbar — arată prețul sesiunii active extended
-    // Show Extended Hours Card if there is any pre/post market data
-    // Daca suntem in PRE, aratam pre-market. Altfel, daca exista post-market, il aratam pe ala.
-    const showPre = q.preMarketPrice != null && (state === 'PRE' || state === 'PREPRE');
+    // Cardul vizibil PRE/POST market — afiseaza INTOTDEAUNA cand exista pret
+    const showPre  = q.preMarketPrice  != null;
     const showPost = q.postMarketPrice != null && !showPre;
 
     if ((showPre || showPost) && extCard) {
-      const ehPrice = showPre  ? q.preMarketPrice  : q.postMarketPrice;
-      const ehChg   = showPre  ? q.preMarketChange : q.postMarketChange;
-      const ehChgPct= showPre  ? q.preMarketChangePercent : q.postMarketChangePercent;
-      const ehLabel = showPre  ? ' PRE-MARKET' : ' AFTER-HOURS';
+      const ehPrice  = showPre ? q.preMarketPrice  : q.postMarketPrice;
+      const ehChg    = showPre ? (q.preMarketChange || 0) : (q.postMarketChange || 0);
+      const ehChgPct = showPre ? (q.preMarketChangePercent || 0) : (q.postMarketChangePercent || 0);
+      const ehLabel  = showPre ? 'PRE-MARKET' : 'AFTER-HOURS';
 
-      extCard.style.display   = 'flex';
-      extLabel.textContent    = ehLabel;
-      extPrice.textContent    = fmt(ehPrice);
-      extPrice.style.color    = ehChg >= 0 ? 'var(--green)' : 'var(--red)';
-      extChange.textContent   = `${ehChg>=0?'+':''}${fmt(ehChg)} (${ehChg>=0?'+':''}${ehChgPct.toFixed(2)}%)`;
-      extChange.style.color   = ehChg >= 0 ? 'var(--green)' : 'var(--red)';
+      extCard.style.display = 'flex';
+      extLabel.textContent  = ehLabel;
+      extPrice.textContent  = fmt(ehPrice);
+      extPrice.style.color  = ehChg >= 0 ? 'var(--green)' : 'var(--red)';
+      extChange.textContent = `${ehChg>=0?'+':''}${fmt(ehChg)} (${ehChgPct>=0?'+':''}${ehChgPct.toFixed(2)}%)`;
+      extChange.style.color = ehChg >= 0 ? 'var(--green)' : 'var(--red)';
 
-      // Și în extChgRow din stats panel
       if (extChgRow && statExtChg) {
-        extChgRow.style.display    = 'flex';
-        statExtChgLabel.textContent= showPre ? ' Var. pre-mkt' : ' Var. after-hrs';
-        statExtChg.textContent     = `${ehChgPct>=0?'+':''}${ehChgPct.toFixed(2)}%`;
-        statExtChg.className       = `stat-val ${ehChgPct>=0?'yellow':'red'}`;
+        extChgRow.style.display     = 'flex';
+        statExtChgLabel.textContent = showPre ? ' Var. pre-mkt' : ' Var. after-hrs';
+        statExtChg.textContent      = `${ehChgPct>=0?'+':''}${ehChgPct.toFixed(2)}%`;
+        statExtChg.className        = `stat-val ${ehChgPct>=0?'yellow':'red'}`;
       }
     } else {
       if (extCard) extCard.style.display = 'none';
