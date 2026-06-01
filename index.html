@@ -107,12 +107,12 @@ body{
 /* Butoane principale — rounded-full h-10 */
 button{border:none;cursor:pointer;transition:all .15s;}
 
-#signalBtn{
-  background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+#signalBtn, #scannerBtn {
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
   height:40px;padding:0 16px;border-radius:var(--r-full);
   font-weight:700;font-size:12px;white-space:nowrap;
 }
-#signalBtn:hover{background:var(--bg4);color:var(--text);}
+#signalBtn:hover, #scannerBtn:hover {background:var(--bg4);color:var(--text);}
 
 #deepForecastBtn{
   background:linear-gradient(135deg,#7c3aed,#4c1d95);
@@ -899,27 +899,27 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <div class="ctx-item" onclick="clearDrawings()"><span class="ctx-icon">&#128465;</span>Sterge desenele de pe grafic</div>
       <div class="ctx-item" onclick="closeCtxMenu()"><span class="ctx-icon">&#9881;</span>Inchide meniu</div>
     </div>
-    <div id="chartMain" style="position:relative;">
-      <!-- Chart Price Overlay (TradingView style) -->
-      <div id="chartPriceOverlay">
-        <div class="cpo-top">
-          <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;display:none;object-fit:contain;background:#fff;padding:2px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
-          <span id="curSymbol">---</span>
-          <span id="curCompanyName">---</span>
-        </div>
-        <div class="cpo-bottom">
-          <span id="curPrice">—</span>
-          <span id="curChange" class="up">—</span>
-          <!-- Extended hours card -->
-          <div id="extHoursCard" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--r-md);padding:2px 6px;margin-left:8px;">
-            <div style="font-size:9px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;" id="extHoursLabel">PRE-MARKET</div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:13px;font-weight:800;" id="extHoursPrice">—</span>
-              <span style="font-size:10px;font-weight:700;" id="extHoursChange">—</span>
-            </div>
+    <!-- Chart Price Header (Moved outside chartMain) -->
+    <div id="chartPriceOverlay">
+      <div class="cpo-top">
+        <img id="curLogo" src="" alt="" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;display:none;object-fit:contain;background:#fff;padding:2px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"/>
+        <span id="curSymbol">---</span>
+        <span id="curCompanyName">---</span>
+      </div>
+      <div class="cpo-bottom">
+        <span id="curPrice">—</span>
+        <span id="curChange" class="up">—</span>
+        <!-- Extended hours card -->
+        <div id="extHoursCard" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--r-md);padding:2px 6px;margin-left:8px;">
+          <div style="font-size:9px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;" id="extHoursLabel">PRE-MARKET</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:13px;font-weight:800;" id="extHoursPrice">—</span>
+            <span style="font-size:10px;font-weight:700;" id="extHoursChange">—</span>
           </div>
         </div>
       </div>
+    </div>
+    <div id="chartMain" style="position:relative; flex:1;">
 
       <!-- Floating Order Panel (TradingView Style) - HIDDEN -->
       <div id="floatingOrderPanel" style="display:none !important;">
@@ -2990,7 +2990,7 @@ function renderSignals(signals, dateObj, fullHistory = []) {
       items.forEach(sig => {
         const isUp = sig.avgPct > 0;
         const color = isUp ? 'var(--green)' : 'var(--red)';
-        const dirTxt = isUp ? '📈 CREȘTERE' : '📉 SCĂDERE';
+        const dirTxt = isUp ? '📈 PREDICȚIE CREȘTERE' : '📉 PREDICȚIE SCĂDERE';
         const logoHtml = getFallbackIconHTML(sig.sym, 40);
         
         html += `
