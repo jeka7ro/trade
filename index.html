@@ -848,6 +848,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
         <button class="ind-btn active" data-ind="smc" style="text-align:left; justify-content:flex-start; padding:6px 8px;">SMC (Smart Money)</button>
         <button class="ind-btn active" data-ind="vpvr" style="text-align:left; justify-content:flex-start; padding:6px 8px;">VPVR (Vol Profile)</button>
         <button class="ind-btn active" data-ind="forecast" style="text-align:left; justify-content:flex-start; padding:6px 8px;">AI Forecast</button>
+        <button class="ind-btn" data-ind="wolfe" style="text-align:left; justify-content:flex-start; padding:6px 8px;">Wolfe Waves</button>
       </div>
     </div>
   </div>
@@ -1374,6 +1375,7 @@ let lastForecast = null;
 // Charts
 let mainChart, candleSeries, volumeSeries;
 let ma20S, ma50S, ma200S, bbU, bbM, bbL, emaS, vwapS;
+let wolfe135S, wolfe24S, wolfeEPAS;
 let vwapU1, vwapL1, vwapU2, vwapL2, vwapU3, vwapL3;
 let pocLine = null;
 let sigMarkers = [];
@@ -1574,6 +1576,10 @@ function initCharts() {
   vwapL2 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.2)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, priceLineVisible:false, lastValueVisible:false });
   vwapU3 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.1)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, priceLineVisible:false, lastValueVisible:false });
   vwapL3 = mainChart.addLineSeries({ color:'rgba(255,87,34,0.1)', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, priceLineVisible:false, lastValueVisible:false });
+
+  wolfe135S = mainChart.addLineSeries({ color:'#00bcd4', lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+  wolfe24S = mainChart.addLineSeries({ color:'#00bcd4', lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+  wolfeEPAS = mainChart.addLineSeries({ color:'#ff5722', lineWidth:2, priceLineVisible:false, lastValueVisible:false, lineStyle:LightweightCharts.LineStyle.Dashed });
 
   // Forecast series
   fcLineS = mainChart.addLineSeries({ color:'rgba(124,58,237,0.9)', lineWidth:2, priceLineVisible:false, lastValueVisible:true, lineStyle:LightweightCharts.LineStyle.Dashed });
@@ -2008,6 +2014,79 @@ function calcVWAPBands(data) {
   });
 }
 
+function findPivots(data, depth=5) {
+  let pivots = [];
+  for (let i = depth; i < data.length - depth; i++) {
+    let isHigh = true;
+    let isLow = true;
+    for (let j = i - depth; j <= i + depth; j++) {
+      if (i === j) continue;
+      if (data[j].high > data[i].high) isHigh = false;
+      if (data[j].low < data[i].low) isLow = false;
+    }
+    if (isHigh) pivots.push({ idx: i, time: data[i].time, val: data[i].high, type: 'H' });
+    if (isLow)  pivots.push({ idx: i, time: data[i].time, val: data[i].low, type: 'L' });
+  }
+  let clean = [];
+  for (let p of pivots) {
+    if (clean.length === 0) { clean.push(p); continue; }
+    let last = clean[clean.length - 1];
+    if (last.type === p.type) {
+      if (p.type === 'H' && p.val > last.val) clean[clean.length - 1] = p;
+      if (p.type === 'L' && p.val < last.val) clean[clean.length - 1] = p;
+    } else {
+      clean.push(p);
+    }
+  }
+  return clean;
+}
+
+function calcWolfeWaves(data) {
+  let res = { line135: [], line24: [], lineEPA: [] };
+  const pivots = findPivots(data, 5);
+  if (pivots.length < 5) return res;
+
+  for (let i = pivots.length - 5; i >= Math.max(0, pivots.length - 15); i--) {
+    const p1 = pivots[i], p2 = pivots[i+1], p3 = pivots[i+2], p4 = pivots[i+3], p5 = pivots[i+4];
+    
+    // Bullish
+    if (p1.type === 'L' && p2.type === 'H' && p3.type === 'L' && p4.type === 'H' && p5.type === 'L') {
+      if (p3.val < p1.val && p4.val < p2.val && p4.val > p1.val && p5.val <= p3.val) {
+        let slope13 = (p3.val - p1.val) / (p3.idx - p1.idx);
+        let proj5 = p1.val + slope13 * (p5.idx - p1.idx);
+        if (Math.abs(p5.val - proj5) / proj5 < 0.05) {
+          res.line135 = [ {time: p1.time, value: p1.val}, {time: p3.time, value: p3.val}, {time: p5.time, value: p5.val} ];
+          res.line24 = [ {time: p2.time, value: p2.val}, {time: p4.time, value: p4.val} ];
+          let slope14 = (p4.val - p1.val) / (p4.idx - p1.idx);
+          let targetIdx = Math.floor(p5.idx + (p4.idx - p2.idx) * 2.5);
+          if (targetIdx >= data.length) targetIdx = data.length - 1;
+          let targetVal = p1.val + slope14 * (targetIdx - p1.idx);
+          res.lineEPA = [ {time: p1.time, value: p1.val}, {time: p4.time, value: p4.val}, {time: data[targetIdx].time, value: targetVal} ];
+          return res;
+        }
+      }
+    }
+    // Bearish
+    if (p1.type === 'H' && p2.type === 'L' && p3.type === 'H' && p4.type === 'L' && p5.type === 'H') {
+      if (p3.val > p1.val && p4.val > p2.val && p4.val < p1.val && p5.val >= p3.val) {
+        let slope13 = (p3.val - p1.val) / (p3.idx - p1.idx);
+        let proj5 = p1.val + slope13 * (p5.idx - p1.idx);
+        if (Math.abs(p5.val - proj5) / proj5 < 0.05) {
+          res.line135 = [ {time: p1.time, value: p1.val}, {time: p3.time, value: p3.val}, {time: p5.time, value: p5.val} ];
+          res.line24 = [ {time: p2.time, value: p2.val}, {time: p4.time, value: p4.val} ];
+          let slope14 = (p4.val - p1.val) / (p4.idx - p1.idx);
+          let targetIdx = Math.floor(p5.idx + (p4.idx - p2.idx) * 2.5);
+          if (targetIdx >= data.length) targetIdx = data.length - 1;
+          let targetVal = p1.val + slope14 * (targetIdx - p1.idx);
+          res.lineEPA = [ {time: p1.time, value: p1.val}, {time: p4.time, value: p4.val}, {time: data[targetIdx].time, value: targetVal} ];
+          return res;
+        }
+      }
+    }
+  }
+  return res;
+}
+
 function calcFVG(data) {
   let unmitigatedBulls = [];
   let unmitigatedBears = [];
@@ -2154,6 +2233,18 @@ function renderAll(data) {
   // Forecast on chart
   if (indicators.forecast) buildForecastChart(data);
   else { fcLineS.setData([]); fcBandU.setData([]); fcBandL.setData([]); }
+
+  // Wolfe Waves
+  if (indicators.wolfe) {
+    let wolfe = calcWolfeWaves(data);
+    wolfe135S.setData(wolfe.line135);
+    wolfe24S.setData(wolfe.line24);
+    wolfeEPAS.setData(wolfe.lineEPA);
+  } else {
+    wolfe135S.setData([]);
+    wolfe24S.setData([]);
+    wolfeEPAS.setData([]);
+  }
 
   // Fibonacci auto
   renderFibonacci(data);
@@ -3649,13 +3740,13 @@ function updateChartLegend() {
     'ma': 'var(--yellow)', 'bb': 'var(--purple)', 'vol': 'var(--text2)', 
     'rsi': 'var(--purple)', 'macd': 'var(--accent)', 'ema': 'var(--cyan)',
     'vwap': 'var(--green)', 'smc': 'var(--accent)', 'vpvr': 'var(--text)',
-    'forecast': 'var(--orange)'
+    'forecast': 'var(--orange)', 'wolfe': 'var(--cyan)'
   };
   const labels = {
     'ma': 'MA 50', 'bb': 'Bollinger Bands 20,2', 'vol': 'Volume', 
     'rsi': 'RSI 14', 'macd': 'MACD 12,26,9', 'ema': 'EMA 21',
     'vwap': 'VWAP', 'smc': 'SMC (FVG & BOS)', 'vpvr': 'VPVR Profile',
-    'forecast': 'AI Deep Forecast'
+    'forecast': 'AI Deep Forecast', 'wolfe': 'Wolfe Waves'
   };
 
   document.querySelectorAll('.ind-btn.active').forEach(btn => {
