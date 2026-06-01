@@ -824,10 +824,6 @@ button{border:none;cursor:pointer;transition:all .15s;}
       </span>
     </div>
 
-    <div class="search-wrap" style="min-width:140px;max-width:200px;margin-left:16px;margin-right:12px;">
-      <span class="search-icon">⌕</span>
-      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
-    </div>
 
     <!-- Desktop TFs -->
     <div class="tf-group desktop-tf">
@@ -906,6 +902,10 @@ button{border:none;cursor:pointer;transition:all .15s;}
 
   <!-- SIDEBAR -->
   <div id="sidebar" style="display:flex; align-items:center;">
+    <div class="search-wrap" style="min-width:140px;max-width:200px;margin-right:8px;">
+      <span class="search-icon">⌕</span>
+      <input id="symbolInput" type="text" placeholder="Simbol... (Enter)" autocomplete="off" title="Scrie simbolul si apasă Enter sau alege din lista"/>
+    </div>
     <div class="sidebar-sep"></div>
     <button class="tool-btn active" id="toolCursor"  title="Cursor" onclick="setTool('cursor')">↖</button>
     <button class="tool-btn"        id="toolTrend"   title="Linie Trend" onclick="setTool('trend')">╱</button>
