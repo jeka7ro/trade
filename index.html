@@ -1227,28 +1227,27 @@ button{border:none;cursor:pointer;transition:all .15s;}
       </div>
     </div>
   </div><!-- /rightPanel -->
-</div><!-- /main -->
-
-  <!-- SIGNALS PANEL -->
-  <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <h2 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:8px;">
-        <span style="font-size:24px;">🚀</span> Semnale AI
-      </h2>
-      <button onclick="scanMarket()" style="background:var(--accent); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 5 18 3-9h5"/></svg>
-        Scanează
-      </button>
-    </div>
-    
-    <div id="signalsStatus" style="font-size:12px; color:var(--text2); margin-bottom:16px; text-align:center; display:none;"></div>
-    
-    <div id="signalsList" style="display:flex; flex-direction:column; gap:12px;">
-      <div style="text-align:center; color:var(--text2); padding:40px; font-size:14px;">
-        Apasă "Scanează" pentru a analiza piața în timp real folosind algoritmul fractal.
+    <!-- SIGNALS PANEL -->
+    <div id="signalsPanel" style="display:none; flex-direction:column; flex:1; overflow-y:auto; background:var(--bg); padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:8px;">
+          <span style="font-size:24px;">🚀</span> Semnale AI
+        </h2>
+        <button onclick="scanMarket()" style="background:var(--accent); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 5 18 3-9h5"/></svg>
+          Scanează
+        </button>
+      </div>
+      
+      <div id="signalsStatus" style="font-size:12px; color:var(--text2); margin-bottom:16px; text-align:center; display:none;"></div>
+      
+      <div id="signalsList" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="text-align:center; color:var(--text2); padding:40px; font-size:14px;">
+          Apasă "Scanează" pentru a analiza piața în timp real folosind algoritmul fractal.
+        </div>
       </div>
     </div>
-  </div>
+  </div><!-- /main -->
 
 
   <!-- DEEP FORECAST MODAL -->
@@ -2755,18 +2754,40 @@ function loadCachedSignals() {
   }
 }
 
+async function fetchDynamicSymbols() {
+  try {
+    const urls = [
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=most_actives&count=25',
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=25',
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=25'
+    ];
+    let dynamic = [];
+    for (const u of urls) {
+      try {
+        const res = await fetchJSON(u);
+        const quotes = res.finance.result[0].quotes;
+        quotes.forEach(q => dynamic.push(q.symbol));
+      } catch(e){}
+    }
+    return dynamic;
+  } catch(e) {
+    return [];
+  }
+}
+
 async function scanMarket() {
   const statusEl = document.getElementById('signalsStatus');
   const listEl = document.getElementById('signalsList');
   statusEl.style.display = 'block';
-  statusEl.textContent = 'Inițializare scanare globală...';
+  statusEl.textContent = 'Preluare listă simboluri dinamice...';
   listEl.innerHTML = '<div style="text-align:center; padding:40px;"><div class="spinner" style="margin:0 auto 16px;"></div>Se scanează piața... Așteaptă 10-20 secunde.</div>';
 
   const FRACTAL_LEN = 14;
   const FORECAST_LEN = 10;
   let allSignals = [];
   
-  const ALL_SYMBOLS = FAVORITES; 
+  const dynamicSymbols = await fetchDynamicSymbols();
+  const ALL_SYMBOLS = Array.from(new Set([...FAVORITES, ...dynamicSymbols])).filter(s => !!s);
 
   for (let idx = 0; idx < ALL_SYMBOLS.length; idx++) {
     const sym = ALL_SYMBOLS[idx];
@@ -2808,7 +2829,7 @@ async function scanMarket() {
         const topMatches = matches.slice(0, 3);
         const avgPct = topMatches.reduce((sum, m) => sum + m.resultPct, 0) / topMatches.length;
         
-        if (Math.abs(avgPct) >= 5) {
+        if (Math.abs(avgPct) >= 10) { // Threshold 10% minim cerut de user
           const rsi = calcRSI14_local(raw);
           allSignals.push({
             sym,
@@ -2836,42 +2857,56 @@ async function scanMarket() {
 function renderSignals(signals, dateObj) {
   const listEl = document.getElementById('signalsList');
   if (signals.length === 0) {
-    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text2);">Nu s-au găsit semnale majore (>5%) în acest moment.</div>';
+    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text2);">Nu s-au găsit semnale majore (>10%) în acest moment.</div>';
     return;
   }
   
+  // Imparte pe categorii >20%, >15%, >10%
+  const cat20 = signals.filter(s => Math.abs(s.avgPct) >= 20).sort((a,b) => Math.abs(b.avgPct) - Math.abs(a.avgPct));
+  const cat15 = signals.filter(s => Math.abs(s.avgPct) >= 15 && Math.abs(s.avgPct) < 20).sort((a,b) => Math.abs(b.avgPct) - Math.abs(a.avgPct));
+  const cat10 = signals.filter(s => Math.abs(s.avgPct) >= 10 && Math.abs(s.avgPct) < 15).sort((a,b) => Math.abs(b.avgPct) - Math.abs(a.avgPct));
+
   listEl.innerHTML = `<div style="font-size:11px; color:var(--text2); text-align:right; margin-bottom:8px;">Ultima scanare: ${dateObj.toLocaleString()}</div>`;
   
-  signals.sort((a,b) => Math.abs(b.avgPct) - Math.abs(a.avgPct)).forEach(sig => {
-    const isUp = sig.avgPct > 0;
-    const color = isUp ? 'var(--green)' : 'var(--red)';
-    const bg = isUp ? 'rgba(38, 166, 154, 0.1)' : 'rgba(239, 83, 80, 0.1)';
-    const dirTxt = isUp ? '📈 CREȘTERE' : '📉 SCĂDERE';
-    
-    listEl.innerHTML += `
-      <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; position:relative; overflow:hidden;" onclick="toggleSignalsPanel(); loadSymbol('${sig.sym}')">
-        <div style="position:absolute; top:0; left:0; width:4px; height:100%; background:${color};"></div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:40px; height:40px; border-radius:50%; background:${bg}; display:flex; align-items:center; justify-content:center; font-size:20px;">
-              ${isUp ? '🚀' : '🩸'}
+  const renderCat = (title, items, emoji) => {
+    if(items.length === 0) return '';
+    let html = `<div style="margin-top:16px; margin-bottom:8px; font-weight:800; font-size:15px; color:var(--text); display:flex; align-items:center; gap:6px;">${emoji} ${title}</div>`;
+    items.forEach(sig => {
+      const isUp = sig.avgPct > 0;
+      const color = isUp ? 'var(--green)' : 'var(--red)';
+      const bg = isUp ? 'rgba(38, 166, 154, 0.1)' : 'rgba(239, 83, 80, 0.1)';
+      const dirTxt = isUp ? '📈 CREȘTERE' : '📉 SCĂDERE';
+      
+      html += `
+        <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; position:relative; overflow:hidden; margin-bottom:12px;" onclick="toggleSignalsPanel(); loadSymbol('${sig.sym}')">
+          <div style="position:absolute; top:0; left:0; width:4px; height:100%; background:${color};"></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:40px; height:40px; border-radius:50%; background:${bg}; display:flex; align-items:center; justify-content:center; font-size:20px;">
+                ${isUp ? '🚀' : '🩸'}
+              </div>
+              <div>
+                <div style="font-weight:900; font-size:16px;">${sig.sym}</div>
+                <div style="font-size:12px; color:var(--text2);">Preț: $${sig.price.toFixed(2)}</div>
+              </div>
             </div>
-            <div>
-              <div style="font-weight:900; font-size:16px;">${sig.sym}</div>
-              <div style="font-size:12px; color:var(--text2);">Preț: $${sig.price.toFixed(2)}</div>
+            <div style="text-align:right;">
+              <div style="font-size:12px; font-weight:800; color:${color}; margin-bottom:2px;">${dirTxt}</div>
+              <div style="font-size:18px; font-weight:900; color:${color};">${sig.avgPct > 0 ? '+' : ''}${sig.avgPct.toFixed(2)}%</div>
             </div>
           </div>
-          <div style="text-align:right;">
-            <div style="font-size:12px; font-weight:800; color:${color}; margin-bottom:2px;">${dirTxt}</div>
-            <div style="font-size:18px; font-weight:900; color:${color};">${sig.avgPct > 0 ? '+' : ''}${sig.avgPct.toFixed(2)}%</div>
+          <div style="font-size:13px; color:var(--text); line-height:1.5; background:var(--bg3); padding:12px; border-radius:8px;">
+            ${sig.reason}
           </div>
         </div>
-        <div style="font-size:13px; color:var(--text); line-height:1.5; background:var(--bg3); padding:12px; border-radius:8px;">
-          ${sig.reason}
-        </div>
-      </div>
-    `;
-  });
+      `;
+    });
+    return html;
+  };
+
+  listEl.innerHTML += renderCat('Dinamica Extremă (>20%)', cat20, '🔥');
+  listEl.innerHTML += renderCat('Dinamica Puternică (>15%)', cat15, '🚀');
+  listEl.innerHTML += renderCat('Dinamica Moderată (>10%)', cat10, '📈');
 }
 
 
