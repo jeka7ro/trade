@@ -5048,6 +5048,16 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAutocomplete('addWlInput', () => addToWatchlistCustom());
   
   let lastSym = localStorage.getItem('tradepro_last_symbol');
+  
+  // Dacă venim de pe un link din Telegram (ex: ?sym=LITE)
+  const urlParams = new URLSearchParams(window.location.search);
+  const symParam = urlParams.get('sym');
+  if (symParam) {
+    lastSym = symParam.toUpperCase();
+    // Curățăm URL-ul ca să nu rămână blocat la Refresh
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  
   if (!lastSym) {
       const wl = loadWatchlist();
       // Ia primul simbol din watchlist-ul UTILIZATORULUI, nu default
