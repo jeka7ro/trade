@@ -4669,7 +4669,7 @@ async function runDeepForecast() {
   }
 
   let html = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:12px;margin-bottom:24px;">
       <div style="background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);">
         <div style="font-size:10px;color:var(--text2);text-transform:uppercase;">Regim Piață (ATR)</div>
         <div style="font-size:18px;font-weight:800;color:${regimeColor};margin-top:4px;">${regime}</div>
@@ -4692,43 +4692,43 @@ async function runDeepForecast() {
       </div>
     </div>
     
-    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.1);padding:16px;border-radius:8px;margin-bottom:24px;">
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.1);padding:16px;border-radius:8px;margin-bottom:24px;overflow:hidden;">
       <h3 style="margin:0 0 12px 0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text);">[ISTORIC] Dovezi Istorice (Fractal Pattern Match)</h3>
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Algoritmul a scanat mii de bare și a găsit dățile trecute când graficul arăta exact ca acum:</div>
       ${matchesHtml}
       
-      <div style="margin-top:16px;">
+      <div style="margin-top:16px;max-width:100%;overflow-x:hidden;">
          <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">PROIECTIE VIZUALA - Scenarii din Trecut suprapuse pe Pretul Actual</div>
-         <canvas id="dfCanvas" style="display:block;border-radius:6px;"></canvas>
+         <canvas id="dfCanvas" style="display:block;border-radius:6px;max-width:100%;"></canvas>
       </div>
       
-      <div style="margin-top:16px;">
+      <div style="margin-top:16px;max-width:100%;overflow-x:hidden;">
          <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">DISTRIBUTIA REZULTATELOR ISTORICE (%)</div>
-         <canvas id="dfBarCanvas" style="display:block;border-radius:6px;"></canvas>
+         <canvas id="dfBarCanvas" style="display:block;border-radius:6px;max-width:100%;"></canvas>
       </div>
     </div>
     
-    <div style="background:linear-gradient(to right, ${isBull ? 'rgba(8,153,129,0.1)' : 'rgba(242,54,69,0.1)'}, rgba(0,0,0,0));border-left:4px solid ${isBull ? 'var(--green)' : 'var(--red)'};padding:16px;border-radius:4px;margin-bottom:20px;">
+    <div style="background:linear-gradient(to right, ${isBull ? 'rgba(8,153,129,0.1)' : 'rgba(242,54,69,0.1)'}, rgba(0,0,0,0));border-left:4px solid ${isBull ? 'var(--green)' : 'var(--red)'};padding:16px;border-radius:4px;margin-bottom:20px;overflow:hidden;">
       <h3 style="margin:0 0 12px 0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text);">[PLAN] Foaie de Parcurs (${isBull ? 'CUMPĂRĂ' : 'VINDE'})</h3>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-         <div style="text-align:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+         <div style="text-align:center;flex:1;min-width:100px;">
            <div style="color:var(--text2);font-size:11px;">Intrare / Preț Curent</div>
            <div style="font-size:20px;font-weight:800;">${fmt(last.close)}</div>
          </div>
-         <div style="text-align:center;">
+         <div style="text-align:center;flex:1;min-width:100px;">
            <div style="color:var(--red);font-size:11px;">Stop-Loss (Protecție)</div>
            <div style="font-size:20px;font-weight:800;color:var(--red);">${fmt(stopLoss)}</div>
          </div>
-         <div style="text-align:center;">
+         <div style="text-align:center;flex:1;min-width:100px;">
            <div style="color:var(--green);font-size:11px;">Take-Profit 1 (Zid)</div>
            <div style="font-size:20px;font-weight:800;color:var(--green);">${fmt(isBull ? sh : sl)}</div>
          </div>
-         <div style="text-align:center;">
+         <div style="text-align:center;flex:1;min-width:100px;">
            <div style="color:var(--green);font-size:11px;">Take-Profit 2 (Extensie)</div>
            <div style="font-size:20px;font-weight:800;color:var(--green);">${fmt(target2)}</div>
          </div>
       </div>
-      <div style="margin-top:16px;border-top:1px dashed rgba(255,255,255,0.1);padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="margin-top:16px;border-top:1px dashed rgba(255,255,255,0.1);padding-top:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <span style="font-size:12px;color:var(--text2);">Șanse matematice de succes (Piață${isEarningsDanger?' - Penalizare Earnings!':''}):</span>
         <span style="font-size:18px;font-weight:900;color:${isEarningsDanger ? 'var(--red)' : winRate > 60 ? 'var(--green)' : winRate < 40 ? 'var(--red)' : 'var(--yellow)'};">${isEarningsDanger ? 'NECALCULABIL (HAOS)' : winRate + '%'}</span>
       </div>
