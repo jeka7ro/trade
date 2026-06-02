@@ -13,7 +13,7 @@ const SYMBOLS_TO_SCAN = [
   'GC=F','CL=F','SI=F'
 ];
 
-const SIGNAL_THRESHOLD = 10; // min % move predicted to alert
+const SIGNAL_THRESHOLD = 5; // min % move predicted to alert
 const FRACTAL_LEN = 14;
 const FORECAST_LEN = 10;
 const MIN_CANDLES = 50;
@@ -57,6 +57,27 @@ async function fetchCandles(symbol) {
     volume: q.volume[i] || 0
   })).filter(d => d.close != null && !isNaN(d.close));
   return raw;
+}
+
+async function fetchDynamicSymbols() {
+  try {
+    const urls = [
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=most_actives&count=25',
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=25',
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=25'
+    ];
+    let dynamic = [];
+    for (const u of urls) {
+      try {
+        const res = await httpsGet(u);
+        const quotes = res?.finance?.result?.[0]?.quotes || [];
+        quotes.forEach(q => { if(q.symbol) dynamic.push(q.symbol); });
+      } catch(e){}
+    }
+    return dynamic;
+  } catch(e) {
+    return [];
+  }
 }
 
 function calcRSI(data, period = 14) {
@@ -178,7 +199,12 @@ exports.handler = async function(event, context) {
   const signals = [];
   const errors  = [];
 
-  for (const sym of SYMBOLS_TO_SCAN) {
+  // Fetch dynamic symbols (gainers, losers, active) to match frontend behavior
+  console.log('[SCANNER] Fetching dynamic market symbols...');
+  const dynamicSyms = await fetchDynamicSymbols();
+  const allSymbols = Array.from(new Set([...SYMBOLS_TO_SCAN, ...dynamicSyms]));
+
+  for (const sym of allSymbols) {
     try {
       console.log(`[SCANNER] Analyzing ${sym}...`);
       const raw = await fetchCandles(sym);
@@ -232,6 +258,6 @@ exports.handler = async function(event, context) {
   console.log(`[SCANNER] Done. ${signals.length} signals sent.`);
   return {
     statusCode: 200,
-    body: JSON.stringify({ signals: signals.length, symbols: SYMBOLS_TO_SCAN.length })
+    body: JSON.stringify({ signals: signals.length, symbols: allSymbols.length })
   };
 };
