@@ -19,6 +19,9 @@ const FRACTAL_LEN = 14;
 const FORECAST_LEN = 10;
 const MIN_CANDLES = 50;
 
+// IN-MEMORY FALLBACK (Supravietuieste intre rularile cron-ului cat timp Lambda e "warm")
+let GLOBAL_LAST_SIGNALS = {};
+
 // ─── HELPERS ──────────────────────────────────────────────────
 function httpsGet(url, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -233,15 +236,17 @@ exports.handler = async function(event, context) {
   }
 
   // Check Netlify Blob Store for deduplication
-  let lastSignals = {};
+  let lastSignals = { ...GLOBAL_LAST_SIGNALS };
   let store = null;
   try {
     store = getStore('tradepro-telegram-state');
     const data = await store.get('lastSignals', { type: 'json' });
-    if (data) lastSignals = data;
-    console.log('[SCANNER] Successfully loaded previous signal state');
+    if (data) {
+      lastSignals = { ...lastSignals, ...data };
+      console.log('[SCANNER] Successfully loaded previous signal state from Blob');
+    }
   } catch (e) {
-    console.warn('[SCANNER] Could not initialize/load Blob store:', e.message);
+    console.warn('[SCANNER] Could not initialize/load Blob store (using in-memory fallback):', e.message);
   }
 
   // Sort: strongest signals first
@@ -272,6 +277,9 @@ exports.handler = async function(event, context) {
     newSignalsToSend.push(sig);
     lastSignals[sig.sym] = { time: now, avgPct: sig.avgPct };
   }
+  
+  // Update the global fallback state
+  GLOBAL_LAST_SIGNALS = lastSignals;
   
   if (newSignalsToSend.length === 0) {
     console.log('[SCANNER] No NEW or DEVIATED signals to send. Ending quietly to prevent spam.');
