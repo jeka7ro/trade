@@ -21,10 +21,15 @@ const MIN_CANDLES = 50;
 // IN-MEMORY FALLBACK (Supravietuieste intre rularile cron-ului cat timp Lambda e "warm")
 let GLOBAL_LAST_SIGNALS = {};
 
-// ─── HELPERS ──────────────────────────────────────────────────
-function httpsGet(url, headers = {}) {
+// httpsGet with redirect following (critical for external DB)
+function httpsGet(url, headers = {}, _redirects = 0) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, {
+    if (_redirects > 5) return reject(new Error('Too many redirects'));
+    const parsedUrl = new URL(url);
+    const lib = parsedUrl.protocol === 'https:' ? require('https') : require('http');
+    const req = lib.get({
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.pathname + parsedUrl.search,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         'Accept': 'application/json',
@@ -32,6 +37,10 @@ function httpsGet(url, headers = {}) {
       },
       timeout: 10000
     }, (res) => {
+      // Follow redirects
+      if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) && res.headers.location) {
+        return resolve(httpsGet(res.headers.location, headers, _redirects + 1));
+      }
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -224,13 +233,7 @@ exports.handler = async function(event, context) {
   }
 
   if (signals.length === 0) {
-    console.log('[SCANNER] No strong signals found.');
-    // Send a brief status update anyway
-    await sendTelegram(
-      `🤖 <b>TradePro AI — Scanare ${new Date().toLocaleTimeString('ro-RO', {timeZone:'Europe/Bucharest'})}</b>\n` +
-      `📭 Niciun semnal puternic detectat (prag: ±${SIGNAL_THRESHOLD}%)\n` +
-      `🔍 Scanate: ${SYMBOLS_TO_SCAN.length} simboluri`
-    );
+    console.log('[SCANNER] No strong signals found. Silent exit.');
     return { statusCode: 200, body: 'No signals' };
   }
 
@@ -251,30 +254,44 @@ exports.handler = async function(event, context) {
   // Sort: strongest signals first
   signals.sort((a, b) => Math.abs(b.avgPct) - Math.abs(a.avgPct));
   
-  // Deduplicate and check for deviation
+  // ─── SMART DEDUPLICATION ───────────────────────────────────────
+  // Rules:
+  //   1. Never resend same symbol within 24h if direction is the same AND deviation < 5%
+  //   2. ALWAYS resend if direction flipped (BUY→SELL or SELL→BUY)
+  //   3. Resend if price prediction changed by >5% (significant dynamics shift)
+  // ───────────────────────────────────────────────────────────────
+  const DEVIATION_THRESHOLD = 5.0; // % change in prediction to count as "new"
   const newSignalsToSend = [];
   const now = Date.now();
   
   for (const sig of signals) {
-    const prev = lastSignals[sig.sym];
+    const key = sig.sym;
+    const prev = lastSignals[key];
+    
     if (prev) {
       const hoursSinceLast = (now - prev.time) / (1000 * 60 * 60);
+      
       if (hoursSinceLast < 24) {
-        // We already sent this symbol within the last 24 hours. Check deviation.
+        const directionChanged = (prev.isBuy !== sig.isBuy);
         const deviation = Math.abs(prev.avgPct - sig.avgPct);
-        if (deviation < 2.0) {
-          // Deviation is too small to resend, skip it to avoid spam.
-          console.log(`[SCANNER] Skipping ${sig.sym}: Already sent ${hoursSinceLast.toFixed(1)}h ago and deviation is only ${deviation.toFixed(2)}%`);
+        
+        if (directionChanged) {
+          // Direction flipped! This is a major signal reversal — always alert
+          console.log(`[SCANNER] DIRECTION FLIP for ${sig.sym}: was ${prev.isBuy?'BUY':'SELL'}, now ${sig.isBuy?'BUY':'SELL'}. Re-alerting.`);
+        } else if (deviation < DEVIATION_THRESHOLD) {
+          // Same direction, small deviation = noise. Skip.
+          console.log(`[SCANNER] SKIP ${sig.sym}: ${hoursSinceLast.toFixed(1)}h ago, dev=${deviation.toFixed(2)}% < ${DEVIATION_THRESHOLD}% threshold`);
           continue;
         } else {
-          console.log(`[SCANNER] Deviation detected for ${sig.sym}: was ${prev.avgPct.toFixed(2)}%, now ${sig.avgPct.toFixed(2)}%. Re-alerting.`);
+          // Same direction but prediction shifted significantly
+          console.log(`[SCANNER] DYNAMIC SHIFT for ${sig.sym}: ${prev.avgPct.toFixed(2)}% → ${sig.avgPct.toFixed(2)}% (Δ${deviation.toFixed(2)}%). Re-alerting.`);
         }
       }
     }
     
-    // Add to send list and update state
+    // This signal is genuinely new or significantly changed — add to send list
     newSignalsToSend.push(sig);
-    lastSignals[sig.sym] = { time: now, avgPct: sig.avgPct };
+    lastSignals[key] = { time: now, avgPct: sig.avgPct, isBuy: sig.isBuy, price: sig.price };
   }
   
   // Update the global fallback state

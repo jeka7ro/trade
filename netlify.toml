@@ -7,6 +7,6 @@
   to = "/.netlify/functions/proxy"
   status = 200
 
-# ─── SCHEDULED FUNCTIONS ─── OPRIT MANUAL ─ reporneste cu comanda ───────────
-# [functions."scanner"]
-#   schedule = "*/10 * * * *"
+# ─── SCHEDULED FUNCTIONS ───────────────────────────────────────
+[functions."scanner"]
+  schedule = "*/10 * * * *"
