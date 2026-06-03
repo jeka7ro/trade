@@ -1,4 +1,5 @@
 const https = require('https');
+const { getStore } = require('@netlify/blobs');
 
 // ─── CONFIG ───────────────────────────────────────────────────
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -13,7 +14,7 @@ const SYMBOLS_TO_SCAN = [
   'GC=F','CL=F','SI=F'
 ];
 
-const SIGNAL_THRESHOLD = 5; // min % move predicted to alert
+const SIGNAL_THRESHOLD = 10; // min % move predicted to alert (crescut de la 5% la 10% pentru siguranta)
 const FRACTAL_LEN = 14;
 const FORECAST_LEN = 10;
 const MIN_CANDLES = 50;
@@ -231,12 +232,55 @@ exports.handler = async function(event, context) {
     return { statusCode: 200, body: 'No signals' };
   }
 
+  // Check Netlify Blob Store for deduplication
+  let lastSignals = {};
+  let store = null;
+  try {
+    store = getStore('tradepro-telegram-state');
+    const data = await store.get('lastSignals', { type: 'json' });
+    if (data) lastSignals = data;
+    console.log('[SCANNER] Successfully loaded previous signal state');
+  } catch (e) {
+    console.warn('[SCANNER] Could not initialize/load Blob store:', e.message);
+  }
+
   // Sort: strongest signals first
   signals.sort((a, b) => Math.abs(b.avgPct) - Math.abs(a.avgPct));
+  
+  // Deduplicate and check for deviation
+  const newSignalsToSend = [];
+  const now = Date.now();
+  
+  for (const sig of signals) {
+    const prev = lastSignals[sig.sym];
+    if (prev) {
+      const hoursSinceLast = (now - prev.time) / (1000 * 60 * 60);
+      if (hoursSinceLast < 24) {
+        // We already sent this symbol within the last 24 hours. Check deviation.
+        const deviation = Math.abs(prev.avgPct - sig.avgPct);
+        if (deviation < 2.0) {
+          // Deviation is too small to resend, skip it to avoid spam.
+          console.log(`[SCANNER] Skipping ${sig.sym}: Already sent ${hoursSinceLast.toFixed(1)}h ago and deviation is only ${deviation.toFixed(2)}%`);
+          continue;
+        } else {
+          console.log(`[SCANNER] Deviation detected for ${sig.sym}: was ${prev.avgPct.toFixed(2)}%, now ${sig.avgPct.toFixed(2)}%. Re-alerting.`);
+        }
+      }
+    }
+    
+    // Add to send list and update state
+    newSignalsToSend.push(sig);
+    lastSignals[sig.sym] = { time: now, avgPct: sig.avgPct };
+  }
+  
+  if (newSignalsToSend.length === 0) {
+    console.log('[SCANNER] No NEW or DEVIATED signals to send. Ending quietly to prevent spam.');
+    return { statusCode: 200, body: 'Signals found but all were duplicates.' };
+  }
 
   // Header message
-  const buys  = signals.filter(s => s.isBuy).length;
-  const sells = signals.filter(s => !s.isBuy).length;
+  const buys  = newSignalsToSend.filter(s => s.isBuy).length;
+  const sells = newSignalsToSend.filter(s => !s.isBuy).length;
   await sendTelegram(
     `🚀 <b>TradePro AI — Semnale Noi!</b>\n` +
     `🕐 ${new Date().toLocaleTimeString('ro-RO', {timeZone:'Europe/Bucharest'})}\n\n` +
@@ -246,12 +290,22 @@ exports.handler = async function(event, context) {
   );
 
   // Send each signal as separate message (max 5 strongest)
-  for (const sig of signals.slice(0, 5)) {
+  for (const sig of newSignalsToSend.slice(0, 5)) {
     try {
       await sendTelegram(formatSignalMessage(sig));
       await new Promise(r => setTimeout(r, 500)); // avoid Telegram rate limit
     } catch(e) {
       console.warn('[SCANNER] Telegram send failed:', e.message);
+    }
+  }
+  
+  // Save state back to Blob
+  if (store) {
+    try {
+      await store.setJSON('lastSignals', lastSignals);
+      console.log('[SCANNER] Successfully saved state to Blob store');
+    } catch(e) {
+      console.warn('[SCANNER] Failed to save state to Blob store:', e.message);
     }
   }
 
