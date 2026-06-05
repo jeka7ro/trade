@@ -1,4 +1,5 @@
 const https = require('https');
+const { getStore } = require('@netlify/blobs');
 
 // ─── CONFIG ───────────────────────────────────────────────────
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -239,16 +240,17 @@ exports.handler = async function(event, context) {
 
   // Check external JSON Store for deduplication (100% reliable across cold starts)
   let lastSignals = { ...GLOBAL_LAST_SIGNALS };
-  const STATE_URL = 'https://api.restful-api.dev/objects/ff8081819d82fab6019e8c67a28c3248';
+  let store;
   
   try {
-    const data = await httpsGet(STATE_URL);
-    if (data && data.data && data.data.lastSignals) {
-      lastSignals = { ...lastSignals, ...data.data.lastSignals };
-      console.log('[SCANNER] Successfully loaded previous signal state from external DB');
+    store = getStore('tradepro');
+    const data = await store.get('lastSignals', { type: 'json' });
+    if (data) {
+      lastSignals = { ...lastSignals, ...data };
+      console.log('[SCANNER] Successfully loaded previous signal state from Netlify Blobs');
     }
   } catch (e) {
-    console.warn('[SCANNER] Could not load external DB (using in-memory fallback):', e.message);
+    console.warn('[SCANNER] Could not load Netlify Blobs (using in-memory fallback):', e.message);
   }
 
   // Sort: strongest signals first
@@ -325,26 +327,12 @@ exports.handler = async function(event, context) {
   
   // Save state back to external DB
   try {
-    const body = JSON.stringify({ name: "tradepro-state", data: { lastSignals } });
-    await new Promise((resolve, reject) => {
-      const req = https.request(STATE_URL, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body)
-        }
-      }, (res) => {
-        let d = '';
-        res.on('data', c => d += c);
-        res.on('end', () => resolve(d));
-      });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    });
-    console.log('[SCANNER] Successfully saved state to external DB');
+    if (store) {
+      await store.setJSON('lastSignals', lastSignals);
+      console.log('[SCANNER] Successfully saved state to Netlify Blobs');
+    }
   } catch(e) {
-    console.warn('[SCANNER] Failed to save state to external DB:', e.message);
+    console.warn('[SCANNER] Failed to save state to Netlify Blobs:', e.message);
   }
 
   console.log(`[SCANNER] Done. ${signals.length} signals sent.`);

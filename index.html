@@ -547,6 +547,97 @@ button{border:none;cursor:pointer;transition:all .15s;}
 .fib-rec-target .val{font-size:12px;font-weight:900;font-variant-numeric:tabular-nums;}
 
 .fib-lookback-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);}
+
+/* ── ALERTS MODULE ── */
+.alert-header{
+  background:linear-gradient(135deg,#f59e0b,#ef4444);
+  padding:16px 14px;color:#fff;flex-shrink:0;
+}
+.alert-header h3{font-size:14px;font-weight:900;margin-bottom:2px;}
+.alert-header p{font-size:11px;opacity:.85;}
+.alert-add-row{
+  display:flex;gap:6px;padding:10px 12px;
+  border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;
+}
+.alert-price-input{
+  flex:1;background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);border-radius:var(--r-full);padding:0 14px;
+  font-size:13px;font-weight:700;height:36px;outline:none;
+  transition:border-color .2s,box-shadow .2s;font-variant-numeric:tabular-nums;
+}
+.alert-price-input:focus{
+  border-color:var(--yellow);
+  box-shadow:0 0 0 3px rgba(245,158,11,.15);
+}
+.alert-dir-group{display:flex;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-full);padding:3px;flex-shrink:0;}
+.alert-dir-btn{
+  background:transparent;border:none;border-radius:var(--r-full);
+  height:28px;padding:0 10px;font-size:11px;font-weight:700;
+  color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.alert-dir-btn.active-up{background:var(--green);color:#fff;}
+.alert-dir-btn.active-dn{background:var(--red);color:#fff;}
+.alert-dir-btn:hover{color:var(--text);}
+.alert-add-btn{
+  background:var(--yellow);border:none;color:#000;border-radius:var(--r-full);
+  height:36px;padding:0 14px;font-size:12px;font-weight:800;cursor:pointer;
+  transition:all .15s;white-space:nowrap;flex-shrink:0;
+}
+.alert-add-btn:hover{filter:brightness(1.1);}
+.alerts-list{flex:1;overflow-y:auto;padding:8px 0;}
+.alert-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  transition:background .15s;position:relative;overflow:hidden;
+}
+.alert-item:hover{background:var(--bg3);}
+.alert-item-indicator{
+  width:3px;border-radius:2px;align-self:stretch;flex-shrink:0;
+}
+.alert-item-indicator.up{background:var(--green);}
+.alert-item-indicator.dn{background:var(--red);}
+.alert-item-body{flex:1;min-width:0;}
+.alert-item-sym{font-size:11px;font-weight:800;color:var(--accent);}
+.alert-item-price{font-size:15px;font-weight:900;font-variant-numeric:tabular-nums;}
+.alert-item-dir{font-size:10px;font-weight:700;margin-top:2px;}
+.alert-item-dir.up{color:var(--green);}
+.alert-item-dir.dn{color:var(--red);}
+.alert-item-dist{font-size:10px;color:var(--text2);font-weight:600;margin-top:1px;}
+.alert-del-btn{
+  background:none;border:none;color:var(--text2);cursor:pointer;
+  font-size:14px;padding:4px 6px;border-radius:var(--r-full);
+  transition:all .15s;flex-shrink:0;opacity:.5;
+}
+.alert-del-btn:hover{background:rgba(239,68,68,.12);color:var(--red);opacity:1;}
+.alert-status-badge{
+  font-size:10px;font-weight:700;padding:2px 8px;
+  border-radius:var(--r-full);flex-shrink:0;
+}
+.alert-status-badge.active{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.2);}
+.alert-status-badge.triggered{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.2);}
+.alert-empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 20px;color:var(--text2);text-align:center;gap:10px;
+}
+.alert-empty-icon{font-size:36px;opacity:.4;}
+.alert-empty-text{font-size:12px;line-height:1.5;}
+.alert-flash{
+  animation:alertPulse .6s ease;
+}
+@keyframes alertPulse{
+  0%{background:rgba(245,158,11,.25)}
+  100%{background:transparent}
+}
+.alert-stats-row{
+  display:flex;gap:8px;padding:8px 12px 4px;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.alert-stat{
+  flex:1;background:var(--bg3);border-radius:var(--r-md);
+  padding:8px;text-align:center;border:1px solid var(--border);
+}
+.alert-stat-val{font-size:16px;font-weight:900;}
+.alert-stat-lbl{font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase;margin-top:1px;}
 .fib-lookback-label{font-size:11px;color:var(--text2);}
 .fib-lookback-select{
   background:var(--bg3);border:1px solid var(--border);color:var(--text);
@@ -1041,6 +1132,7 @@ button{border:none;cursor:pointer;transition:all .15s;}
       <div class="ptab" data-page="analysis"></div>
       <div class="ptab" data-page="fibonacci">Φ Fib</div>
       <div class="ptab" data-page="forecast"></div>
+      <div class="ptab" data-page="alerts">🔔 Alerte</div>
       <div class="ptab active" data-page="watchlist"> Watchlist</div>
     </div>
 
@@ -1248,6 +1340,48 @@ button{border:none;cursor:pointer;transition:all .15s;}
       </div>
     </div>
 
+    <!-- ── PAGE: ALERTS ── -->
+    <div class="panel-page" id="page-alerts">
+      <div class="alert-header">
+        <h3>🔔 Alerte de Preț</h3>
+        <p>Notificări automate când prețul atinge nivelul setat</p>
+      </div>
+
+      <!-- Stats row -->
+      <div class="alert-stats-row">
+        <div class="alert-stat">
+          <div class="alert-stat-val" id="alertCountActive" style="color:var(--green)">0</div>
+          <div class="alert-stat-lbl">Active</div>
+        </div>
+        <div class="alert-stat">
+          <div class="alert-stat-val" id="alertCountTriggered" style="color:var(--yellow)">0</div>
+          <div class="alert-stat-lbl">Declanșate</div>
+        </div>
+        <div class="alert-stat">
+          <div class="alert-stat-val" id="alertCountTotal" style="color:var(--text)">0</div>
+          <div class="alert-stat-lbl">Total</div>
+        </div>
+      </div>
+
+      <!-- Add alert row -->
+      <div class="alert-add-row">
+        <input type="number" id="alertPriceInput" class="alert-price-input" placeholder="Preț alertă..." step="any" />
+        <div class="alert-dir-group">
+          <button class="alert-dir-btn active-up" id="alertDirUp" onclick="setAlertDir('up')" title="Alertează când prețul depășește valoarea">▲ Sus</button>
+          <button class="alert-dir-btn" id="alertDirDn" onclick="setAlertDir('dn')" title="Alertează când prețul scade sub valoare">▼ Jos</button>
+        </div>
+        <button class="alert-add-btn" onclick="addPriceAlert()">+ Alertă</button>
+      </div>
+
+      <!-- Alerts list -->
+      <div class="alerts-list" id="alertsList">
+        <div class="alert-empty-state" id="alertsEmptyState">
+          <div class="alert-empty-icon">🔔</div>
+          <div class="alert-empty-text">Nu ai nicio alertă activă.<br>Setează un preț și direcție pentru a fi notificat în timp real.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── PAGE: WATCHLIST ── -->
     <div class="panel-page active" id="page-watchlist">
       <!-- Header -->
@@ -1421,6 +1555,7 @@ function showToast(title, message, isBuy, sym) {
 }
 
 let lastBackgroundScanTime = 0;
+let reportedSignalsCache = JSON.parse(localStorage.getItem('tradeProBGCache') || '{}');
 async function runBackgroundScan() {
   if (Date.now() - lastBackgroundScanTime < 4 * 60 * 1000) return; // max once per 4 mins
   lastBackgroundScanTime = Date.now();
@@ -1482,8 +1617,16 @@ async function runBackgroundScan() {
   }
   
   if (bestSignal) {
-    console.log('[BG-SCAN] Oportunitate uriașă detectată:', bestSignal.sym);
-    showToast(`Oportunitate Explozivă: ${bestSignal.sym}`, `Sistemul a detectat o mișcare iminentă de ${bestSignal.avgPct>0?'+':''}${bestSignal.avgPct.toFixed(2)}%. Preț curent: $${bestSignal.price.toFixed(2)}`, bestSignal.avgPct > 0, bestSignal.sym);
+    const cached = reportedSignalsCache[bestSignal.sym];
+    const now = Date.now();
+    if (cached && (now - cached.time < 24 * 60 * 60 * 1000) && Math.abs(cached.avgPct - bestSignal.avgPct) < 2) {
+      console.log('[BG-SCAN] Oportunitate identică detectată pentru', bestSignal.sym, '- omis pentru a evita spam-ul.');
+    } else {
+      reportedSignalsCache[bestSignal.sym] = { avgPct: bestSignal.avgPct, time: now };
+      localStorage.setItem('tradeProBGCache', JSON.stringify(reportedSignalsCache));
+      console.log('[BG-SCAN] Oportunitate uriașă detectată:', bestSignal.sym);
+      showToast(`Oportunitate Explozivă: ${bestSignal.sym}`, `Sistemul a detectat o mișcare iminentă de ${bestSignal.avgPct>0?'+':''}${bestSignal.avgPct.toFixed(2)}%. Preț curent: $${bestSignal.price.toFixed(2)}`, bestSignal.avgPct > 0, bestSignal.sym);
+    }
   } else {
     console.log('[BG-SCAN] Scanare terminată. Nicio rachetă >10% găsită.');
   }
@@ -1571,7 +1714,7 @@ function cleanCompanyName(name, sym) {
 }
 
 const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const PROXY_BASE = IS_LOCAL ? 'http://localhost:3457/proxy' : '/.netlify/functions/proxy';
+const PROXY_BASE = IS_LOCAL ? 'http://localhost:5678/proxy' : '/.netlify/functions/proxy';
 
 let currentTF = localStorage.getItem('tradeProTF') || '1d';
 let allData = [];
@@ -1958,7 +2101,7 @@ let currentSymbolMeta = null;
 
 async function fetchMetaWithNews(symbol) {
   try {
-    const res = await fetch(`http://localhost:3457/api/meta?symbol=${symbol}`);
+    const res = await fetch(`http://localhost:5678/api/meta?symbol=${symbol}`);
     if (res.ok) {
       return await res.json();
     }
@@ -5030,6 +5173,200 @@ function setupAutocomplete(inputId, onSelectCallback) {
       closeAllLists(e.target);
   });
 }
+
+// ════════════════════════════════════════════════════════════
+//  PRICE ALERTS ENGINE
+// ════════════════════════════════════════════════════════════
+const ALERTS_KEY = 'tradepro_alerts_v1';
+let priceAlerts = [];
+let alertDir = 'up'; // 'up' | 'dn'
+
+function loadAlerts() {
+  try {
+    const s = localStorage.getItem(ALERTS_KEY);
+    if (s) priceAlerts = JSON.parse(s);
+  } catch(e) {}
+}
+
+function saveAlerts() {
+  try { localStorage.setItem(ALERTS_KEY, JSON.stringify(priceAlerts)); } catch(e) {}
+}
+
+function setAlertDir(dir) {
+  alertDir = dir;
+  document.getElementById('alertDirUp').className = 'alert-dir-btn' + (dir === 'up' ? ' active-up' : '');
+  document.getElementById('alertDirDn').className = 'alert-dir-btn' + (dir === 'dn' ? ' active-dn' : '');
+}
+
+function addPriceAlert() {
+  const inp = document.getElementById('alertPriceInput');
+  const val = parseFloat(inp.value);
+  if (!val || isNaN(val) || val <= 0) {
+    inp.style.borderColor = 'var(--red)';
+    setTimeout(() => inp.style.borderColor = '', 1200);
+    return;
+  }
+  const sym = currentSymbol || '?';
+  priceAlerts.push({
+    id: Date.now(),
+    sym,
+    price: val,
+    dir: alertDir,
+    triggered: false,
+    createdAt: Date.now(),
+  });
+  saveAlerts();
+  renderAlerts();
+  inp.value = '';
+  // Draw price line on chart
+  if (candleSeries) {
+    candleSeries.createPriceLine({
+      price: val,
+      color: alertDir === 'up' ? '#10b981' : '#ef4444',
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: `🔔 Alertă ${alertDir === 'up' ? '▲' : '▼'} ${fmt(val)}`,
+    });
+  }
+  // Flash feedback
+  inp.classList.add('alert-flash');
+  setTimeout(() => inp.classList.remove('alert-flash'), 700);
+}
+
+function deleteAlert(id) {
+  priceAlerts = priceAlerts.filter(a => a.id !== id);
+  saveAlerts();
+  renderAlerts();
+}
+
+function clearTriggeredAlerts() {
+  priceAlerts = priceAlerts.filter(a => !a.triggered);
+  saveAlerts();
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const list = document.getElementById('alertsList');
+  const empty = document.getElementById('alertsEmptyState');
+  const activeCount = priceAlerts.filter(a => !a.triggered).length;
+  const trigCount = priceAlerts.filter(a => a.triggered).length;
+
+  // Stats
+  const elA = document.getElementById('alertCountActive');
+  const elT = document.getElementById('alertCountTriggered');
+  const elN = document.getElementById('alertCountTotal');
+  if (elA) elA.textContent = activeCount;
+  if (elT) elT.textContent = trigCount;
+  if (elN) elN.textContent = priceAlerts.length;
+
+  if (priceAlerts.length === 0) {
+    list.innerHTML = '';
+    if (empty) list.appendChild(empty);
+    return;
+  }
+
+  // Sort: active first, then by price desc
+  const sorted = [...priceAlerts].sort((a,b) => {
+    if (a.triggered !== b.triggered) return a.triggered ? 1 : -1;
+    return b.price - a.price;
+  });
+
+  const curPrice = allData.length ? allData[allData.length-1].close : 0;
+
+  list.innerHTML = sorted.map(a => {
+    const dist = curPrice > 0 ? ((a.price / curPrice - 1) * 100) : 0;
+    const distStr = (dist >= 0 ? '+' : '') + dist.toFixed(2) + '%';
+    const statusCls = a.triggered ? 'triggered' : 'active';
+    const statusLbl = a.triggered ? '✓ Declanșat' : '● Activ';
+    const dirLbl = a.dir === 'up' ? '▲ La depășire' : '▼ La coborâre';
+    return `<div class="alert-item" id="alert-${a.id}">
+      <div class="alert-item-indicator ${a.dir}"></div>
+      <div class="alert-item-body">
+        <div class="alert-item-sym">${a.sym}</div>
+        <div class="alert-item-price">${fmt(a.price)}</div>
+        <div class="alert-item-dir ${a.dir}">${dirLbl}</div>
+        <div class="alert-item-dist">${distStr} față de preț curent</div>
+      </div>
+      <span class="alert-status-badge ${statusCls}">${statusLbl}</span>
+      <button class="alert-del-btn" onclick="deleteAlert(${a.id})" title="Șterge alerta">✕</button>
+    </div>`;
+  }).join('');
+
+  // Show clear triggered button if needed
+  if (trigCount > 0 && !document.getElementById('alertClearBtn')) {
+    const btn = document.createElement('button');
+    btn.id = 'alertClearBtn';
+    btn.textContent = `Șterge cele ${trigCount} declanșate`;
+    btn.style.cssText = 'display:block;width:calc(100% - 24px);margin:8px 12px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:var(--r-full);padding:8px;font-size:11px;font-weight:700;cursor:pointer;';
+    btn.onclick = clearTriggeredAlerts;
+    list.appendChild(btn);
+  }
+}
+
+// Check alerts on every live tick
+function checkPriceAlerts(currentPrice) {
+  if (!currentPrice || priceAlerts.length === 0) return;
+  let anyTriggered = false;
+  priceAlerts.forEach(a => {
+    if (a.triggered) return;
+    const hit = a.dir === 'up' ? currentPrice >= a.price : currentPrice <= a.price;
+    if (hit) {
+      a.triggered = true;
+      anyTriggered = true;
+      // Flash the alert item
+      const el = document.getElementById('alert-' + a.id);
+      if (el) { el.classList.add('alert-flash'); setTimeout(() => el.classList.remove('alert-flash'), 700); }
+      // Show toast
+      const dir = a.dir === 'up' ? '▲ DEPĂȘIT' : '▼ ATINS';
+      showToast(
+        `🔔 Alertă ${dir}: ${a.sym}`,
+        `Prețul a ${a.dir === 'up' ? 'depășit' : 'coborât sub'} nivelul ${fmt(a.price)}. Preț curent: ${fmt(currentPrice)}`,
+        a.dir === 'up',
+        a.sym
+      );
+      // Browser notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(`🔔 Alertă ${a.sym} — ${dir}`, {
+          body: `Prețul a atins ${fmt(a.price)}. Curent: ${fmt(currentPrice)}`,
+        });
+      }
+    }
+  });
+  if (anyTriggered) { saveAlerts(); renderAlerts(); }
+}
+
+// Patch liveTick to also check alerts
+const _origLiveTick = liveTick;
+async function liveTick() {
+  await _origLiveTick();
+  if (allData.length) checkPriceAlerts(allData[allData.length-1].close);
+}
+
+// Patch updateWatchlistPrices to check alerts for current symbol
+const _origApplyQuote = applyQuoteToDOM;
+function applyQuoteToDOM(sym, q) {
+  _origApplyQuote(sym, q);
+  if (sym === currentSymbol && q.regularMarketPrice) {
+    checkPriceAlerts(q.regularMarketPrice);
+  }
+}
+
+// Fill current price on alert input click
+document.addEventListener('DOMContentLoaded', () => {
+  loadAlerts();
+  renderAlerts();
+  const inp = document.getElementById('alertPriceInput');
+  if (inp) {
+    inp.addEventListener('focus', () => {
+      if (!inp.value && allData.length) {
+        inp.value = allData[allData.length-1].close.toFixed(allData[allData.length-1].close < 1 ? 6 : 2);
+        inp.select();
+      }
+    });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') addPriceAlert(); });
+  }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   initCharts();

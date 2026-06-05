@@ -146,7 +146,7 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-const PORT = 3457;
+const PORT = 5678;
 server.listen(PORT, () => {
     console.log(`\n=============================================`);
     console.log(`🚀 Yahoo Finance Proxy running on port ${PORT}`);
