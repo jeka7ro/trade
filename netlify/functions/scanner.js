@@ -156,6 +156,7 @@ function analyzeSymbol(sym, raw) {
   const rsi  = calcRSI(raw);
   const macd = calcMACD(raw);
   const price = raw[raw.length-1].close;
+  if (price < 2) return null; // Stop chaotic penny stock signals
   const isBuy = avgPct > 0;
 
   return { sym, avgPct, price, rsi, macd, isBuy };
@@ -302,25 +303,23 @@ exports.handler = async function(event, context) {
     return { statusCode: 200, body: 'Signals found but all were duplicates.' };
   }
 
-  // Header message
+  // Combine all signals into ONE message
   const buys  = newSignalsToSend.filter(s => s.isBuy).length;
   const sells = newSignalsToSend.filter(s => !s.isBuy).length;
-  await sendTelegram(
-    `🚀 <b>TradePro AI — Semnale Noi!</b>\n` +
-    `🕐 ${new Date().toLocaleTimeString('ro-RO', {timeZone:'Europe/Bucharest'})}\n\n` +
-    `🟢 Cumpărare: ${buys}   🔴 Vânzare: ${sells}\n` +
-    `📊 Total scanate: ${SYMBOLS_TO_SCAN.length} simboluri\n` +
-    `─────────────────────`
-  );
+  
+  let combinedMessage = `🚀 <b>TradePro AI — Semnale Noi!</b>\n` +
+    `🕐 ${new Date().toLocaleTimeString('ro-RO', {timeZone:'Europe/Bucharest'})}\n` +
+    `📊 Scanate: ${SYMBOLS_TO_SCAN.length} | 🟢 Cumpărare: ${buys} | 🔴 Vânzare: ${sells}\n` +
+    `─────────────────────\n\n`;
 
-  // Send each signal as separate message (max 5 strongest)
   for (const sig of newSignalsToSend.slice(0, 5)) {
-    try {
-      await sendTelegram(formatSignalMessage(sig));
-      await new Promise(r => setTimeout(r, 500)); // avoid Telegram rate limit
-    } catch(e) {
-      console.warn('[SCANNER] Telegram send failed:', e.message);
-    }
+    combinedMessage += formatSignalMessage(sig) + `\n\n`;
+  }
+  
+  try {
+    await sendTelegram(combinedMessage.trim());
+  } catch(e) {
+    console.warn('[SCANNER] Telegram send failed:', e.message);
   }
   
   // Clean up old signals (older than 3 days) to prevent JSON bloat which crashes restful-api.dev
