@@ -1894,22 +1894,26 @@ function triggerSignalNotification(score, labelText, price, reasons = [], bulls 
   `;
   document.body.appendChild(popup);
 
-  // Browser notification (dacă e permisă)
+  // Browser notification (dacă e permisă) - DEZACTIVAT
+  /*
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification(`TradePro AI — ${action} ${currentSymbol}`, {
       body: `${currentSymbol} @ ${fmt(price)} | Încredere: ${conf}%`,
       icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28"></text></svg>'
     });
   }
+  */
 
   // Auto-close after 12 seconds
   setTimeout(() => document.getElementById('signalPopup')?.remove(), 12000);
 }
 
-// Request browser notification permission (silently)
+// Request browser notification permission (silently) - DEZACTIVAT
+/*
 if ('Notification' in window && Notification.permission === 'default') {
   Notification.requestPermission();
 }
+*/
 
 // ════════════════════════════════════════════════════════════
 //  GAUGE

@@ -165,23 +165,24 @@ function analyzeSymbol(sym, raw) {
 // ─── TELEGRAM ─────────────────────────────────────────────────
 function sendTelegram(text) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' });
-    const req = https.request({
+    const data = JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: 'HTML', disable_web_page_preview: true });
+    const options = {
       hostname: 'api.telegram.org',
+      port: 443,
       path: `/bot${TELEGRAM_TOKEN}/sendMessage`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
-      },
-      timeout: 10000
-    }, (res) => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => resolve(d));
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+    const req = require('https').request(options, res => {
+      let resData = '';
+      res.on('data', chunk => resData += chunk);
+      res.on('end', () => resolve(resData));
     });
     req.on('error', reject);
-    req.write(body);
+    req.write(data);
     req.end();
   });
 }
@@ -203,6 +204,16 @@ function formatSignalMessage(sig) {
 // ─── MAIN HANDLER ─────────────────────────────────────────────
 exports.handler = async function(event, context) {
   console.log('[SCANNER] Starting market scan at', new Date().toISOString());
+
+  const today = new Date();
+  // Transform to US Eastern Time approximation to correctly detect weekend
+  const etTime = today.getTime() - (4 * 60 * 60 * 1000);
+  const etDate = new Date(etTime);
+  const day = etDate.getUTCDay(); // 0 = Sunday, 6 = Saturday
+  if (day === 0 || day === 6) {
+    console.log('[SCANNER] Weekend detected (ET Time). Market is closed. Skipping scan.');
+    return { statusCode: 200, body: 'Weekend skip - Market closed' };
+  }
 
   if (!TELEGRAM_TOKEN || !CHAT_ID) {
     console.error('[SCANNER] Missing TELEGRAM_TOKEN or CHAT_ID');
@@ -257,11 +268,9 @@ exports.handler = async function(event, context) {
   
   // ─── SMART DEDUPLICATION ───────────────────────────────────────
   // Rules:
-  //   1. Never resend same symbol within 24h if direction is the same AND deviation < 5%
+  //   1. Never resend same symbol within 24h if direction is the same.
   //   2. ALWAYS resend if direction flipped (BUY→SELL or SELL→BUY)
-  //   3. Resend if price prediction changed by >5% (significant dynamics shift)
   // ───────────────────────────────────────────────────────────────
-  const DEVIATION_THRESHOLD = 5.0; // % change in prediction to count as "new"
   const newSignalsToSend = [];
   const now = Date.now();
   
@@ -269,28 +278,20 @@ exports.handler = async function(event, context) {
     const key = sig.sym;
     const prev = lastSignals[key];
     
-    if (prev && typeof prev === 'object' && prev.time) {
-      const hoursSinceLast = (now - prev.time) / (1000 * 60 * 60);
+    if (prev && typeof prev === 'object') {
+      const directionChanged = (prev.isBuy !== sig.isBuy);
       
-      if (hoursSinceLast < 24) {
-        const directionChanged = (prev.isBuy !== sig.isBuy);
-        const deviation = Math.abs(prev.avgPct - sig.avgPct);
-        
-        if (directionChanged) {
-          // Direction flipped! This is a major signal reversal — always alert
-          console.log(`[SCANNER] DIRECTION FLIP for ${sig.sym}: was ${prev.isBuy?'BUY':'SELL'}, now ${sig.isBuy?'BUY':'SELL'}. Re-alerting.`);
-        } else if (deviation < DEVIATION_THRESHOLD) {
-          // Same direction, small deviation = noise. Skip.
-          console.log(`[SCANNER] SKIP ${sig.sym}: ${hoursSinceLast.toFixed(1)}h ago, dev=${deviation.toFixed(2)}% < ${DEVIATION_THRESHOLD}% threshold`);
-          continue;
-        } else {
-          // Same direction but prediction shifted significantly
-          console.log(`[SCANNER] DYNAMIC SHIFT for ${sig.sym}: ${prev.avgPct.toFixed(2)}% → ${sig.avgPct.toFixed(2)}% (Δ${deviation.toFixed(2)}%). Re-alerting.`);
-        }
+      if (!directionChanged) {
+        // ACEEAȘI DIRECȚIE -> BLOCARE COMPLETĂ pentru a nu repeta alerta (nici măcar după 24h)
+        console.log(`[SCANNER] SKIP ${sig.sym}: Deja am trimis ${sig.isBuy ? 'CUMPĂRARE' : 'VÂNZARE'}. Nu repetăm.`);
+        continue;
+      } else {
+        // Direcția s-a schimbat (FLIP) -> Trimitem!
+        console.log(`[SCANNER] DIRECTION FLIP for ${sig.sym}: was ${prev.isBuy?'BUY':'SELL'}, now ${sig.isBuy?'BUY':'SELL'}. Re-alerting.`);
       }
     }
     
-    // This signal is genuinely new or significantly changed — add to send list
+    // This signal is genuinely new or flipped — add to send list
     newSignalsToSend.push(sig);
     lastSignals[key] = { time: now, avgPct: sig.avgPct, isBuy: sig.isBuy, price: sig.price };
   }
@@ -322,9 +323,9 @@ exports.handler = async function(event, context) {
     console.warn('[SCANNER] Telegram send failed:', e.message);
   }
   
-  // Clean up old signals (older than 3 days) to prevent JSON bloat which crashes restful-api.dev
+  // Clean up old signals (older than 30 days) to prevent JSON bloat
   for (const k in lastSignals) {
-    if (now - (lastSignals[k].time || 0) > 3 * 24 * 60 * 60 * 1000) {
+    if (now - (lastSignals[k].time || 0) > 30 * 24 * 60 * 60 * 1000) {
       delete lastSignals[k];
     }
   }

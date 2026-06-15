@@ -1,6 +1,7 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const YahooFinance = require('yahoo-finance2').default;
+const fs = require('fs');
 const yahooFinance = new YahooFinance();
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -22,19 +23,12 @@ async function sendAlert(message, logoUrl = null) {
     console.log(message);
     if (logoUrl) console.log('🖼️  Logo:', logoUrl);
     console.log('=========================================\n');
+    
     if (bot && CHAT_ID) {
         try {
-            if (logoUrl) {
-                try {
-                    await bot.sendPhoto(CHAT_ID, logoUrl, { caption: message, parse_mode: 'HTML' });
-                    return;
-                } catch (err) {
-                    console.log('⚠️ Eroare la trimiterea pozei, trimit doar text...', err.message);
-                }
-            }
-            await bot.sendMessage(CHAT_ID, message, { parse_mode: 'HTML' });
-        } catch (e) {
-            console.error("Failed to send Telegram message:", e.message);
+            await bot.sendMessage(CHAT_ID, message, { parse_mode: 'HTML', disable_web_page_preview: true });
+        } catch(e) {
+            console.error('Eroare Telegram:', e.message);
         }
     }
 }
@@ -89,6 +83,23 @@ function getReason(rsi, isUp) {
 
 async function runScreener() {
     console.log(`\n[${new Date().toLocaleString()}] 🚀 Start AI Screener (Global Market & Favorites)...`);
+    
+    const today = new Date();
+    // Transform to ET Time to correctly detect weekend
+    const etTime = today.getTime() - (4 * 60 * 60 * 1000);
+    const etDate = new Date(etTime);
+    const day = etDate.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    if (day === 0 || day === 6) {
+        console.log('[SCREENER] Weekend detected (ET Time). Market is closed. Exiting.');
+        return;
+    }
+    
+    const STATE_FILE = './screener_state.json';
+    let lastSignals = {};
+    if (fs.existsSync(STATE_FILE)) {
+        try { lastSignals = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch(e){}
+    }
+
     const FRACTAL_LEN = 14;
     const FORECAST_LEN = 10;
     
@@ -180,6 +191,17 @@ async function runScreener() {
                     
                     const rsi = calcRSI14(allData);
                     const isUp = avgPct > 0;
+                    
+                    // DEDUPLICARE STRICTĂ
+                    const prev = lastSignals[sym];
+                    if (prev && prev.isUp === isUp) {
+                        console.log(`[${sym}] Deja trimis alerta de ${isUp ? 'CRESTERE' : 'SCADERE'}. Blocked to prevent spam.`);
+                        continue;
+                    }
+                    
+                    // Update state
+                    lastSignals[sym] = { isUp, time: Date.now() };
+                    fs.writeFileSync(STATE_FILE, JSON.stringify(lastSignals));
                     let reasonTxt = getReason(rsi, isUp);
                     if (meta.news && meta.news.length > 0) {
                         reasonTxt += `\n\n📰 <b>Context Fundamental (Știri):</b>\n${meta.news[0].title}`;
