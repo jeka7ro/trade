@@ -228,20 +228,26 @@ exports.handler = async function(event, context) {
   const dynamicSyms = await fetchDynamicSymbols();
   const allSymbols = Array.from(new Set([...SYMBOLS_TO_SCAN, ...dynamicSyms]));
 
-  for (const sym of allSymbols) {
-    try {
-      console.log(`[SCANNER] Analyzing ${sym}...`);
-      const raw = await fetchCandles(sym);
-      if (!raw) { errors.push(sym); continue; }
-      const sig = analyzeSymbol(sym, raw);
-      if (sig) {
-        signals.push(sig);
-        console.log(`[SCANNER] Signal found: ${sym} ${sig.avgPct.toFixed(1)}%`);
+  // Process in batches of 15 to prevent Netlify 10s timeout
+  const batchSize = 15;
+  for (let i = 0; i < allSymbols.length; i += batchSize) {
+    const batch = allSymbols.slice(i, i + batchSize);
+    console.log(`[SCANNER] Analyzing batch ${Math.floor(i/batchSize) + 1} (${batch.length} symbols)...`);
+    
+    await Promise.all(batch.map(async (sym) => {
+      try {
+        const raw = await fetchCandles(sym);
+        if (!raw) { errors.push(sym); return; }
+        const sig = analyzeSymbol(sym, raw);
+        if (sig) {
+          signals.push(sig);
+          console.log(`[SCANNER] Signal found: ${sym} ${sig.avgPct.toFixed(1)}%`);
+        }
+      } catch(e) {
+        console.warn(`[SCANNER] Error on ${sym}:`, e.message);
+        errors.push(sym);
       }
-    } catch(e) {
-      console.warn(`[SCANNER] Error on ${sym}:`, e.message);
-      errors.push(sym);
-    }
+    }));
   }
 
   if (signals.length === 0) {
@@ -304,25 +310,6 @@ exports.handler = async function(event, context) {
     return { statusCode: 200, body: 'Signals found but all were duplicates.' };
   }
 
-  // Combine all signals into ONE message
-  const buys  = newSignalsToSend.filter(s => s.isBuy).length;
-  const sells = newSignalsToSend.filter(s => !s.isBuy).length;
-  
-  let combinedMessage = `🚀 <b>TradePro AI — Semnale Noi!</b>\n` +
-    `🕐 ${new Date().toLocaleTimeString('ro-RO', {timeZone:'Europe/Bucharest'})}\n` +
-    `📊 Scanate: ${SYMBOLS_TO_SCAN.length} | 🟢 Cumpărare: ${buys} | 🔴 Vânzare: ${sells}\n` +
-    `─────────────────────\n\n`;
-
-  for (const sig of newSignalsToSend.slice(0, 5)) {
-    combinedMessage += formatSignalMessage(sig) + `\n\n`;
-  }
-  
-  try {
-    await sendTelegram(combinedMessage.trim());
-  } catch(e) {
-    console.warn('[SCANNER] Telegram send failed:', e.message);
-  }
-  
   // Clean up old signals (older than 30 days) to prevent JSON bloat
   for (const k in lastSignals) {
     if (now - (lastSignals[k].time || 0) > 30 * 24 * 60 * 60 * 1000) {
@@ -330,7 +317,7 @@ exports.handler = async function(event, context) {
     }
   }
 
-  // Save state back to external DB
+  // Save state back to external DB FIRST (before sending telegram, so if it times out sending, we don't spam later)
   try {
     const body = JSON.stringify({ name: "tradepro-state", data: { lastSignals } });
     await new Promise((resolve, reject) => {
@@ -343,7 +330,10 @@ exports.handler = async function(event, context) {
       }, (res) => {
         let d = '';
         res.on('data', c => d += c);
-        res.on('end', () => resolve(d));
+        res.on('end', () => {
+          if (res.statusCode >= 400) console.warn('[SCANNER] API DB error HTTP', res.statusCode, d);
+          resolve(d);
+        });
       });
       req.on('error', reject);
       req.write(body);
@@ -352,6 +342,22 @@ exports.handler = async function(event, context) {
     console.log('[SCANNER] Successfully saved state to external DB');
   } catch(e) {
     console.warn('[SCANNER] Failed to save state to external DB:', e.message);
+  }
+
+  // Acum trimitem telegram
+  let combinedMessage = `🚀 <b>TradePro AI — Semnale Noi!</b>\n` +
+    `🕐 ${new Date().toLocaleTimeString('ro-RO', {timeZone:'Europe/Bucharest'})}\n` +
+    `📊 Scanate: ${allSymbols.length} | 🟢 Cumpărare: ${buys} | 🔴 Vânzare: ${sells}\n` +
+    `─────────────────────\n\n`;
+
+  for (const sig of newSignalsToSend.slice(0, 5)) {
+    combinedMessage += formatSignalMessage(sig) + `\n\n`;
+  }
+  
+  try {
+    await sendTelegram(combinedMessage.trim());
+  } catch(e) {
+    console.warn('[SCANNER] Telegram send failed:', e.message);
   }
 
   console.log(`[SCANNER] Done. ${signals.length} signals sent.`);
