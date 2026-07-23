@@ -2189,6 +2189,7 @@ async function fetchData(symbol, tf, silent = false) {
 let liveTickTimer = null;
 
 async function liveTick() {
+  if (document.hidden) return; // Oprește request-urile dacă tab-ul nu este activ
   if (!currentSymbol || typeof allData === 'undefined' || !allData || allData.length === 0) return;
   try {
     const quoteUrl = PROXIES[0](`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${currentSymbol}`);
@@ -2237,8 +2238,7 @@ async function liveTick() {
   } catch(e) {}
 }
 
-setInterval(liveTick, 1800);
-
+setInterval(liveTick, 600000); // Modificat la 10 minute (600000ms) pentru economie extremă de resurse Netlify
 function setLoadText(txt) {
   const el = document.getElementById('loadText');
   if (el) el.textContent = txt;
@@ -5347,6 +5347,7 @@ function checkPriceAlerts(currentPrice) {
 // Patch liveTick to also check alerts
 const _origLiveTick = liveTick;
 async function liveTick() {
+  if (document.hidden) return; // Oprește request-urile dacă tab-ul nu este activ
   await _origLiveTick();
   if (allData.length) checkPriceAlerts(allData[allData.length-1].close);
 }
@@ -5430,8 +5431,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Prima actualizare la 2s după load
   setTimeout(updateWatchlistPrices, 2000);
 
-  // ── LIVE: batch update la fiecare 10 secunde ──────────
-  setInterval(updateWatchlistPrices, 10000);
+  // ── LIVE: batch update la fiecare 10 minute ──────────
+  setInterval(updateWatchlistPrices, 600000); // Modificat la 10 minute
 
   // ── PUSH NOTIFICATIONS: Silent Scan la fiecare 5 minute ──
   setTimeout(runBackgroundScan, 15000); // prima la 15s dupa incarcare
