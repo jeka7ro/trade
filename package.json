@@ -4,6 +4,7 @@
   "description": "",
   "main": "proxy.js",
   "scripts": {
+    "start": "PORT=9030 node proxy.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

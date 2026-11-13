@@ -94,27 +94,50 @@ async function fetchDynamicSymbols() {
 
 function calcRSI(data, period = 14) {
   if (data.length < period + 1) return 50;
-  let gains = 0, losses = 0;
-  for (let i = data.length - period; i < data.length; i++) {
-    const diff = data[i].close - data[i-1].close;
-    if (diff > 0) gains += diff; else losses -= diff;
+  let avgG = 0, avgL = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    if (diff > 0) avgG += diff; else avgL -= diff;
   }
-  const avgG = gains / period;
-  const avgL = losses / period;
+  avgG /= period;
+  avgL /= period;
+  for (let i = period + 1; i < data.length; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    const g = diff > 0 ? diff : 0;
+    const l = diff < 0 ? -diff : 0;
+    avgG = (avgG * (period - 1) + g) / period;
+    avgL = (avgL * (period - 1) + l) / period;
+  }
   if (avgL === 0) return 100;
   return 100 - (100 / (1 + avgG / avgL));
 }
 
+function calcEMA(prices, period) {
+  if (!prices.length) return 0;
+  const k = 2 / (period + 1);
+  let e = prices[0];
+  for (let i = 1; i < prices.length; i++) e = prices[i] * k + e * (1 - k);
+  return e;
+}
+
 function calcMACD(data) {
-  if (data.length < 26) return 0;
+  if (data.length < 35) return 0;
   const prices = data.map(d => d.close);
-  const ema = (arr, period) => {
-    const k = 2 / (period + 1);
-    let e = arr[0];
-    for (let i = 1; i < arr.length; i++) e = arr[i] * k + e * (1 - k);
-    return e;
-  };
-  return ema(prices.slice(-12), 12) - ema(prices.slice(-26), 26);
+  return calcEMA(prices, 12) - calcEMA(prices, 26);
+}
+
+function calcATR(data, period = 14) {
+  if (data.length < 2) return data[data.length - 1].close * 0.02;
+  let atr = data[0].high - data[0].low;
+  for (let i = 1; i < data.length; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close)
+    );
+    atr = i < period ? ((atr * i + tr) / (i + 1)) : ((atr * (period - 1) + tr) / period);
+  }
+  return atr;
 }
 
 function analyzeSymbol(sym, raw) {
@@ -153,13 +176,23 @@ function analyzeSymbol(sym, raw) {
 
   if (Math.abs(avgPct) < SIGNAL_THRESHOLD) return null;
 
+  const closes = raw.map(d => d.close);
   const rsi  = calcRSI(raw);
   const macd = calcMACD(raw);
+  const ema50 = calcEMA(closes, 50);
+  const atr  = calcATR(raw, 14);
   const price = raw[raw.length-1].close;
   if (price < 2) return null; // Stop chaotic penny stock signals
   const isBuy = avgPct > 0;
 
-  return { sym, avgPct, price, rsi, macd, isBuy };
+  // Institutional Anti-FOMO & Trend Regime Filter
+  if (isBuy && (rsi > 74 || price < ema50 * 0.96)) return null;
+  if (!isBuy && (rsi < 26 || price > ema50 * 1.04)) return null;
+
+  const sl = isBuy ? price - 1.5 * atr : price + 1.5 * atr;
+  const tp = isBuy ? price + 3.0 * atr : price - 3.0 * atr;
+
+  return { sym, avgPct, price, rsi, macd, isBuy, sl, tp };
 }
 
 // ─── TELEGRAM ─────────────────────────────────────────────────
@@ -191,10 +224,14 @@ function formatSignalMessage(sig) {
   const dir = sig.isBuy ? '🟢 CUMPĂRARE' : '🔴 VÂNZARE';
   const arrow = sig.isBuy ? '📈' : '📉';
   const pctStr = sig.avgPct > 0 ? `+${sig.avgPct.toFixed(2)}%` : `${sig.avgPct.toFixed(2)}%`;
-  const rsiLabel = sig.rsi > 70 ? '⚠️ Supracumpărat' : sig.rsi < 30 ? '⚡ Supravândut' : '🔵 Neutru';
+  const rsiLabel = sig.rsi > 70 ? '⚠️ Supracumpărat' : sig.rsi < 30 ? '⚡ Supravândut' : '🔵 Optim';
+  const rrLine = sig.sl && sig.tp
+    ? `🛡️ SL: <b>$${sig.sl.toFixed(2)}</b> | 🎯 TP (2R): <b>$${sig.tp.toFixed(2)}</b>\n`
+    : '';
 
   return `${arrow} <b>${sig.sym}</b> — ${dir}\n` +
     `💰 Preț curent: <b>$${sig.price.toFixed(2)}</b>\n` +
+    rrLine +
     `🎯 Predicție: <b>${pctStr}</b> în 10 zile\n` +
     `📊 RSI(14): ${sig.rsi.toFixed(1)} ${rsiLabel}\n` +
     `📉 MACD: ${sig.macd > 0 ? '▲ Bullish' : '▼ Bearish'} (${sig.macd.toFixed(4)})\n` +
@@ -345,7 +382,9 @@ exports.handler = async function(event, context) {
   }
 
   // Acum trimitem telegram
-  let combinedMessage = `🚀 <b>TradePro AI — Semnale Noi!</b>\n` +
+  const buys = newSignalsToSend.filter(s => s.isBuy).length;
+  const sells = newSignalsToSend.length - buys;
+  let combinedMessage = `🚀 <b>TradePro Ultra — Semnale Instituționale Noi!</b>\n` +
     `🕐 ${new Date().toLocaleTimeString('ro-RO', {timeZone:'Europe/Bucharest'})}\n` +
     `📊 Scanate: ${allSymbols.length} | 🟢 Cumpărare: ${buys} | 🔴 Vânzare: ${sells}\n` +
     `─────────────────────\n\n`;

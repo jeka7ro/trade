@@ -1,3 +1,5 @@
 node_modules/
 .env
 .DS_Store
+telegram_state.json
+screener_state.json
