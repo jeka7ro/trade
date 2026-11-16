@@ -64,29 +64,29 @@
 
   // ─── 2. APPLICATION STATE & CATALOGS ──────────────────────────────────────
   const DEFAULT_WATCHLIST = [
-    { sym: 'NQ=F', name: 'NASDAQ 100 Live (US100)' },
-    { sym: 'ES=F', name: 'S&P 500 Live (US500)' },
-    { sym: 'BTC-USD', name: 'Bitcoin USD' },
+    { sym: 'NQ=F',     name: 'NASDAQ 100 Live (US100)' },
+    { sym: 'ES=F',     name: 'S&P 500 Live (US500)' },
+    { sym: 'BTC-USD',  name: 'Bitcoin USD' },
     { sym: 'EGLD-USD', name: 'MultiversX (EGLD)' },
-    { sym: 'ETH-USD', name: 'Ethereum USD' },
-    { sym: 'TSLA', name: 'Tesla, Inc.' },
-    { sym: 'APPS', name: 'Digital Turbine, Inc.' },
-    { sym: 'ONDS', name: 'Ondas Inc.' },
-    { sym: 'NVDA', name: 'NVIDIA Corporation' },
-    { sym: 'LULU', name: 'Lululemon Athletica' },
-    { sym: 'GME', name: 'GameStop Corp.' },
-    { sym: 'MSFT', name: 'Microsoft Corp.' },
-    { sym: 'ORCL', name: 'Oracle Corporation' },
-    { sym: 'AAPL', name: 'Apple Inc.' },
+    { sym: 'ETH-USD',  name: 'Ethereum USD' },
+    { sym: 'TSLA',     name: 'Tesla, Inc.' },
+    { sym: 'APPS',     name: 'Digital Turbine, Inc.' },
+    { sym: 'ONDS',     name: 'Ondas Inc.' },
+    { sym: 'NVDA',     name: 'NVIDIA Corporation' },
+    { sym: 'LULU',     name: 'Lululemon Athletica' },
+    { sym: 'GME',      name: 'GameStop Corp.' },
+    { sym: 'MSFT',     name: 'Microsoft Corp.' },
+    { sym: 'ORCL',     name: 'Oracle Corporation' },
+    { sym: 'AAPL',     name: 'Apple Inc.' },
     { sym: 'EURUSD=X', name: 'EUR / USD' },
-    { sym: 'CL=F', name: 'Crude Oil WTI' },
-    { sym: 'GC=F', name: 'Gold Futures' },
-    { sym: 'NIO', name: 'NIO Inc.' },
-    { sym: 'PYPL', name: 'PayPal Holdings, Inc.' },
-    { sym: 'TRX-USD', name: 'TRON USD' },
-    { sym: 'SPY', name: 'SPDR S&P 500 ETF' },
-    { sym: 'QQQ', name: 'Invesco QQQ ETF' },
-    { sym: 'TLT', name: 'iShares 20+ Yr Treasury Bond ETF' }
+    { sym: 'CL=F',     name: 'Crude Oil WTI' },
+    { sym: 'GC=F',     name: 'Gold Futures' },
+    { sym: 'NIO',      name: 'NIO Inc.' },
+    { sym: 'PYPL',     name: 'PayPal Holdings, Inc.' },
+    { sym: 'TRX-USD',  name: 'TRON USD' },
+    { sym: 'SPY',      name: 'SPDR S&P 500 ETF' },
+    { sym: 'QQQ',      name: 'Invesco QQQ ETF' },
+    { sym: 'TLT',      name: 'iShares 20+ Yr Treasury Bond ETF' }
   ];
 
   const SCREENER_UNIVERSE = [
@@ -281,7 +281,7 @@
       try {
         const saved = JSON.parse(localStorage.getItem('tp_ultra_inds_v3') || 'null');
         if (saved && typeof saved === 'object') return { ...defaults, ...saved };
-      } catch (_) { }
+      } catch (_) {}
       return defaults;
     })(),
 
@@ -319,7 +319,7 @@
           }
         }
         return merged;
-      } catch (_) { }
+      } catch (_) {}
       return DEFAULT_WATCHLIST.map(x => ({ ...x }));
     })(),
 
@@ -327,7 +327,7 @@
       try {
         const s = JSON.parse(localStorage.getItem('tp_ultra_alerts') || localStorage.getItem('tradepro_alerts_v1') || 'null');
         if (Array.isArray(s)) return s;
-      } catch (_) { }
+      } catch (_) {}
       return [];
     })(),
     alertDir: 'up',
@@ -342,7 +342,7 @@
         if (saved && typeof saved === 'object') return { ...def, ...saved };
         const legacy = JSON.parse(localStorage.getItem('tp_ultra_paper') || 'null');
         if (legacy && typeof legacy === 'object') def.p1 = { ...def.p1, ...legacy };
-      } catch (_) { }
+      } catch (_) {}
       return def;
     })(),
     paper: { balance: 10000, riskPct: 1.0, positions: [], closedPnl: 0 },
@@ -372,25 +372,25 @@
 
   // Multi-Chart Secondary Panes (Supports 1 up to 20 Simultaneous Live Supercharts!)
   const secPanes = [
-    { id: 1, sym: 'NQ=F', tf: '5m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 2, sym: 'ES=F', tf: '5m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 3, sym: 'BTC-USD', tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 4, sym: 'TSLA', tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 5, sym: 'APPS', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 6, sym: 'ONDS', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 7, sym: 'EGLD-USD', tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 8, sym: 'ETH-USD', tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 9, sym: 'LULU', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 10, sym: 'GME', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 11, sym: 'MSFT', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 12, sym: 'ORCL', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 13, sym: 'AAPL', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 1,  sym: 'NQ=F',     tf: '5m',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 2,  sym: 'ES=F',     tf: '5m',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 3,  sym: 'BTC-USD',  tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 4,  sym: 'TSLA',     tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 5,  sym: 'APPS',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 6,  sym: 'ONDS',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 7,  sym: 'EGLD-USD', tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 8,  sym: 'ETH-USD',  tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 9,  sym: 'LULU',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 10, sym: 'GME',      tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 11, sym: 'MSFT',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 12, sym: 'ORCL',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 13, sym: 'AAPL',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
     { id: 14, sym: 'EURUSD=X', tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 15, sym: 'CL=F', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 16, sym: 'GC=F', tf: '1h', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 17, sym: 'NIO', tf: '1d', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 18, sym: 'PYPL', tf: '1d', chart: null, candle: null, ema: null, stBull: null, stBear: null },
-    { id: 19, sym: 'TRX-USD', tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null }
+    { id: 15, sym: 'CL=F',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 16, sym: 'GC=F',     tf: '1h',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 17, sym: 'NIO',      tf: '1d',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 18, sym: 'PYPL',     tf: '1d',  chart: null, candle: null, ema: null, stBull: null, stBear: null },
+    { id: 19, sym: 'TRX-USD',  tf: '15m', chart: null, candle: null, ema: null, stBull: null, stBear: null }
   ];
 
   // Restore saved symbols & timeframes per secondary pane across refreshes
@@ -405,14 +405,14 @@
         }
       });
     }
-  } catch (_) { }
+  } catch (_) {}
 
   function saveSecondaryPanes() {
     try {
       const serial = secPanes.map(p => ({ id: p.id, sym: p.sym, tf: p.tf }));
       localStorage.setItem('tp_ultra_secpanes_v1', JSON.stringify(serial));
       localStorage.setItem('tp_ultra_focused_pane', String(state.focusedPaneId || 0));
-    } catch (_) { }
+    } catch (_) {}
   }
 
   // ─── 3. FORMATTING, UNIVERSAL OFFICIAL LOGO ENGINE & SOUND HELPERS ────────
@@ -531,7 +531,7 @@
   const pendingIdentityLookups = new Set();
 
   function saveIdentityCache() {
-    try { localStorage.setItem('tp_official_logos_v4', JSON.stringify(officialIdentityCache)); } catch (_) { }
+    try { localStorage.setItem('tp_official_logos_v4', JSON.stringify(officialIdentityCache)); } catch (_) {}
   }
 
   function getServerLogoEndpoints(upperSym) {
@@ -730,7 +730,7 @@
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.29);
-    } catch (_) { }
+    } catch (_) {}
   }
 
   function showToast(title, body, type = 'info', symToLoad = null) {
@@ -795,6 +795,17 @@
     return window.innerWidth <= 820;
   }
 
+  function closeCopilotOverlay() {
+    const copDrawer = document.getElementById('aiCopilotDrawer');
+    if (copDrawer && copDrawer.classList.contains('open')) {
+      copDrawer.classList.remove('open');
+      copDrawer.setAttribute('aria-hidden', 'true');
+      document.getElementById('aiCopilotTopBtn')?.classList.remove('active');
+      document.getElementById('railCopilotBtn')?.classList.remove('active');
+      document.getElementById('mobCopilotChipBtn')?.classList.remove('active');
+    }
+  }
+
   function closeMobileSheetsToChart() {
     if (!isMobileViewport()) return;
     const rp = document.getElementById('rightPanel');
@@ -807,6 +818,7 @@
     }
     document.getElementById('leftToolbar')?.classList.remove('mob-draw-open');
     document.getElementById('mobDrawToggleBtn')?.classList.remove('active');
+    closeCopilotOverlay();
     document.querySelectorAll('.tv-menu.open').forEach(m => m.classList.remove('open'));
     document.querySelectorAll('[data-mnav]').forEach(b => {
       b.classList.toggle('active', b.dataset.mnav === 'chart');
@@ -869,7 +881,7 @@
       const to = (totalBars - 1) + effOff;
       chartInst.timeScale().setVisibleLogicalRange({ from, to });
     } catch (_) {
-      try { chartInst.timeScale().fitContent(); } catch (__) { }
+      try { chartInst.timeScale().fitContent(); } catch (__) {}
     }
   }
 
@@ -895,7 +907,7 @@
   // ─── 5. INITIALIZE CHARTS & OVERLAY ENGINE ────────────────────────────────
   function createMainPriceSeries(type) {
     if (mainSeries) {
-      try { mainChart.removeSeries(mainSeries); } catch (_) { }
+      try { mainChart.removeSeries(mainSeries); } catch (_) {}
       mainSeries = null;
     }
     mainSeriesType = type;
@@ -992,29 +1004,29 @@
     overlaySeries.stBull = addLine('#00e676', 2, LightweightCharts.LineStyle.Solid, true);
     overlaySeries.stBear = addLine('#ff1744', 2, LightweightCharts.LineStyle.Solid, true);
 
-    overlaySeries.ema9 = addLine('#38bdf8', 1);
-    overlaySeries.ema21 = addLine('#2962ff', 1.75);
-    overlaySeries.ema50 = addLine('#f59e0b', 1.75);
+    overlaySeries.ema9   = addLine('#38bdf8', 1);
+    overlaySeries.ema21  = addLine('#2962ff', 1.75);
+    overlaySeries.ema50  = addLine('#f59e0b', 1.75);
     overlaySeries.ema200 = addLine('#ec4899', 2);
 
-    overlaySeries.sma20 = addLine('#60a5fa', 1, LightweightCharts.LineStyle.Dashed);
-    overlaySeries.sma50 = addLine('#fbbf24', 1, LightweightCharts.LineStyle.Dashed);
+    overlaySeries.sma20  = addLine('#60a5fa', 1, LightweightCharts.LineStyle.Dashed);
+    overlaySeries.sma50  = addLine('#fbbf24', 1, LightweightCharts.LineStyle.Dashed);
     overlaySeries.sma200 = addLine('#f43f5e', 1.5, LightweightCharts.LineStyle.Dashed);
 
     overlaySeries.bbU = addLine('rgba(139, 92, 246, 0.65)', 1);
     overlaySeries.bbM = addLine('rgba(139, 92, 246, 0.35)', 1, LightweightCharts.LineStyle.Dashed);
     overlaySeries.bbL = addLine('rgba(139, 92, 246, 0.65)', 1);
 
-    overlaySeries.vwap = addLine('#ff5722', 2, LightweightCharts.LineStyle.Solid, true);
+    overlaySeries.vwap   = addLine('#ff5722', 2, LightweightCharts.LineStyle.Solid, true);
     overlaySeries.vwapU1 = addLine('rgba(255, 87, 34, 0.45)', 1, LightweightCharts.LineStyle.Dashed);
     overlaySeries.vwapL1 = addLine('rgba(255, 87, 34, 0.45)', 1, LightweightCharts.LineStyle.Dashed);
     overlaySeries.vwapU2 = addLine('rgba(255, 87, 34, 0.22)', 1, LightweightCharts.LineStyle.Dotted);
     overlaySeries.vwapL2 = addLine('rgba(255, 87, 34, 0.22)', 1, LightweightCharts.LineStyle.Dotted);
 
     overlaySeries.tenkan = addLine('#06b6d4', 1.25);
-    overlaySeries.kijun = addLine('#f97316', 1.25);
+    overlaySeries.kijun  = addLine('#f97316', 1.25);
 
-    overlaySeries.fcLine = addLine('#a855f7', 2, LightweightCharts.LineStyle.Dashed, true);
+    overlaySeries.fcLine  = addLine('#a855f7', 2, LightweightCharts.LineStyle.Dashed, true);
     overlaySeries.fcUpper = addLine('rgba(168, 85, 247, 0.35)', 1, LightweightCharts.LineStyle.Dotted);
     overlaySeries.fcLower = addLine('rgba(168, 85, 247, 0.35)', 1, LightweightCharts.LineStyle.Dotted);
     overlaySeries.compareLine = addLine('#38bdf8', 2, LightweightCharts.LineStyle.Solid, true);
@@ -1024,18 +1036,18 @@
     rsiChart = LightweightCharts.createChart(re, makeChartConfig(re.clientWidth || 600, 104, true));
     rsiChart.priceScale('right').applyOptions({ scaleMargins: { top: 0.08, bottom: 0.08 } });
     rsiLineS = rsiChart.addLineSeries({ color: '#a855f7', lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-    rsiMaS = rsiChart.addLineSeries({ color: '#facc15', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false });
-    stochKS = rsiChart.addLineSeries({ color: 'rgba(41, 98, 255, 0.55)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    stochDS = rsiChart.addLineSeries({ color: 'rgba(245, 158, 11, 0.55)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    rsiOB = rsiChart.addLineSeries({ color: 'rgba(242, 54, 69, 0.4)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
-    rsiOS = rsiChart.addLineSeries({ color: 'rgba(8, 153, 129, 0.4)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+    rsiMaS   = rsiChart.addLineSeries({ color: '#facc15', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false });
+    stochKS  = rsiChart.addLineSeries({ color: 'rgba(41, 98, 255, 0.55)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    stochDS  = rsiChart.addLineSeries({ color: 'rgba(245, 158, 11, 0.55)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    rsiOB    = rsiChart.addLineSeries({ color: 'rgba(242, 54, 69, 0.4)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+    rsiOS    = rsiChart.addLineSeries({ color: 'rgba(8, 153, 129, 0.4)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
 
     // MACD Sub-Pane
     const me = document.getElementById('macdCanvas');
     macdChart = LightweightCharts.createChart(me, makeChartConfig(me.clientWidth || 600, 104, true));
     macdHistS = macdChart.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false });
     macdLineS = macdChart.addLineSeries({ color: '#2962ff', lineWidth: 1.75, priceLineVisible: false, lastValueVisible: true });
-    macdSigS = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.25, priceLineVisible: false, lastValueVisible: false });
+    macdSigS  = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.25, priceLineVisible: false, lastValueVisible: false });
 
     // Canvas 2D Institutional & Drawing Overlay
     overlayEngine = new window.ChartOverlayEngine({
@@ -1149,7 +1161,7 @@
       if (!sp || !pn) return;
       sp.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
-        try { sp.setPointerCapture(ev.pointerId); } catch (_) { }
+        try { sp.setPointerCapture(ev.pointerId); } catch (_) {}
         const startY = ev.clientY;
         const startH = pn.clientHeight || 104;
         const onMove = (me) => {
@@ -1210,18 +1222,18 @@
   function tfToYahooParams(tf) {
     const clean = String(tf || '1d').toLowerCase();
     const map = {
-      '5s': { i: '1m', r: '1d' },
-      '15s': { i: '1m', r: '1d' },
-      '30s': { i: '1m', r: '1d' },
-      '100t': { i: '1m', r: '5d' },
-      '500t': { i: '1m', r: '5d' },
-      '1m': { i: '1m', r: '2d' },
-      '5m': { i: '5m', r: '10d' },
+      '5s':  { i: '1m',  r: '1d' },
+      '15s': { i: '1m',  r: '1d' },
+      '30s': { i: '1m',  r: '1d' },
+      '100t':{ i: '1m',  r: '5d' },
+      '500t':{ i: '1m',  r: '5d' },
+      '1m':  { i: '1m',  r: '2d' },
+      '5m':  { i: '5m',  r: '10d' },
       '15m': { i: '15m', r: '25d' },
       '30m': { i: '30m', r: '45d' },
-      '1h': { i: '60m', r: '90d' },
-      '4h': { i: '60m', r: '180d' },
-      '1d': { i: '1d', r: '2y' },
+      '1h':  { i: '60m', r: '90d' },
+      '4h':  { i: '60m', r: '180d' },
+      '1d':  { i: '1d',  r: '2y' },
       '1wk': { i: '1wk', r: '5y' },
       '1mo': { i: '1mo', r: '15y' }
     };
@@ -1379,7 +1391,7 @@
         if (bars.length >= 5) {
           return { bars, meta: res.meta || {}, demo: false };
         }
-      } catch (_) { }
+      } catch (_) {}
     }
 
     return { bars: generateFallbackBars(symbol, cleanTf), meta: { symbol, demo: true }, demo: true };
@@ -1423,11 +1435,34 @@
     return [...base];
   }
 
+  function toEpochSec(val) {
+    if (val == null || val === '') return 0;
+    if (typeof val === 'number') {
+      if (!isFinite(val) || val <= 0) return 0;
+      return Math.floor(val > 1e12 ? val / 1000 : val);
+    }
+    const ms = Date.parse(String(val));
+    return isFinite(ms) && ms > 0 ? Math.floor(ms / 1000) : 0;
+  }
+
+  const EXT_SESS_META = {
+    PRE:  { cls: 'pre',  title: 'Pre-Market activ',        label: 'Pre-Market',        short: 'Pre',       lineTitle: 'Pre-Mkt',   color: '#f59e0b', icoKey: 'preSun' },
+    OVN:  { cls: 'ovn',  title: 'Overnight (BOATS) activ', label: 'Overnight (BOATS)', short: 'Overnight', lineTitle: 'Overnight', color: '#a855f7', icoKey: 'postMoon' },
+    POST: { cls: 'post', title: 'Post-Market activ',       label: 'Post-Market',       short: 'Post',      lineTitle: 'Post-Mkt',  color: '#2962ff', icoKey: 'postMoon' }
+  };
+
+  function getExtSessionUiMeta(extType) {
+    const k = String(extType || '').toUpperCase();
+    const base = EXT_SESS_META[k] || EXT_SESS_META.POST;
+    return { ...base, ico: ICO[base.icoKey] || ICO.postMoon };
+  }
+
   function extractQuoteSessionInfo(q) {
     if (!q) return null;
     const sym = String(q.symbol || '').toUpperCase();
     const is24h = sym.endsWith('-USD') || sym.endsWith('=X');
     const mktState = String(q.marketState || '').toUpperCase();
+    const tvCurrentSession = String(q.tvCurrentSession || '').toLowerCase();
     const regPrice = q.regularMarketPrice;
     const prevClose = q.regularMarketPreviousClose ?? (isFinite(regPrice) && isFinite(q.regularMarketChange) ? regPrice - q.regularMarketChange : null);
     const regChg = q.regularMarketChange ?? (isFinite(regPrice) && isFinite(prevClose) ? regPrice - prevClose : 0);
@@ -1440,14 +1475,24 @@
     let extTime = null;
 
     if (!is24h && mktState !== 'REGULAR') {
+      const hasOvn = q.overnightPrice != null && isFinite(q.overnightPrice) && q.overnightPrice > 0;
       const hasPre = q.preMarketPrice != null && isFinite(q.preMarketPrice) && q.preMarketPrice > 0;
       const hasPost = q.postMarketPrice != null && isFinite(q.postMarketPrice) && q.postMarketPrice > 0;
-      if ((mktState === 'PRE' || mktState === 'PREPRE') && hasPre) {
+      const ovnTs = hasOvn ? toEpochSec(q.overnightTime) : 0;
+      const preTs = hasPre ? toEpochSec(q.preMarketTime) : 0;
+      const postTs = hasPost ? toEpochSec(q.postMarketTime) : 0;
+
+      if (mktState === 'PRE' && hasPre && preTs >= ovnTs) {
         extType = 'PRE';
-      } else if ((mktState === 'POST' || mktState === 'POSTPOST') && hasPost) {
+      } else if ((mktState === 'POST' || mktState === 'POSTPOST') && hasPost && postTs >= ovnTs) {
         extType = 'POST';
-      } else if (hasPre || hasPost) {
-        extType = (hasPre && (!hasPost || (q.preMarketTime || 0) >= (q.postMarketTime || 0))) ? 'PRE' : 'POST';
+      } else if (tvCurrentSession === 'night' && hasOvn) {
+        extType = 'OVN';
+      } else if (hasPre || hasOvn || hasPost) {
+        if (hasPre && preTs >= Math.max(ovnTs, postTs)) extType = 'PRE';
+        else if (hasOvn && ovnTs >= postTs) extType = 'OVN';
+        else if (hasPost) extType = 'POST';
+        else extType = hasPre ? 'PRE' : (hasOvn ? 'OVN' : 'POST');
       }
 
       if (extType === 'PRE') {
@@ -1455,6 +1500,11 @@
         extChg = q.preMarketChange ?? (isFinite(regPrice) ? extPrice - regPrice : 0);
         extChgPct = q.preMarketChangePercent ?? (isFinite(regPrice) && regPrice ? (extChg / regPrice) * 100 : 0);
         extTime = q.preMarketTime || null;
+      } else if (extType === 'OVN') {
+        extPrice = q.overnightPrice;
+        extChg = q.overnightChange ?? (isFinite(regPrice) ? extPrice - regPrice : 0);
+        extChgPct = q.overnightChangePercent ?? (isFinite(regPrice) && regPrice ? (extChg / regPrice) * 100 : 0);
+        extTime = q.overnightTime || null;
       } else if (extType === 'POST') {
         extPrice = q.postMarketPrice;
         extChg = q.postMarketChange ?? (isFinite(regPrice) ? extPrice - regPrice : 0);
@@ -1465,6 +1515,7 @@
 
     return {
       mktState,
+      tvCurrentSession,
       is24h,
       regPrice,
       prevClose,
@@ -1503,7 +1554,7 @@
         arr.forEach(q => {
           if (q && q.symbol) out[String(q.symbol).toUpperCase()] = q;
         });
-      } catch (_) { }
+      } catch (_) {}
     }
 
     // Automatic v8 chart fallback (with Pre/Post-Market support!) for any ticker missing from v7 quote response
@@ -1532,11 +1583,16 @@
           let postMarketPrice = meta.postMarketPrice;
           let postMarketChange = meta.postMarketChange;
           let postMarketChangePercent = meta.postMarketChangePercent;
+          let overnightPrice = meta.overnightPrice;
+          let overnightChange = overnightPrice != null ? overnightPrice - regP : undefined;
+          let overnightChangePercent = (overnightPrice != null && regP) ? ((overnightPrice - regP) / regP) * 100 : undefined;
+          let overnightTime = meta.overnightTime;
           let marketState = meta.marketState || '';
 
           const lastClose = closes[closes.length - 1];
           const lastTs = ts[ts.length - 1];
-          if (isFinite(lastClose) && lastTs && Math.abs(lastClose - regP) > 1e-5 && (!meta.regularMarketTime || lastTs > meta.regularMarketTime + 60)) {
+          const regSec = toEpochSec(meta.regularMarketTime);
+          if (isFinite(lastClose) && lastTs && Math.abs(lastClose - regP) > 1e-5 && (!regSec || lastTs > regSec + 60)) {
             const dEt = new Date((lastTs - 5 * 3600) * 1000);
             const mins = dEt.getUTCHours() * 60 + dEt.getUTCMinutes();
             if (mins >= 240 && mins < 570) {
@@ -1544,6 +1600,12 @@
               preMarketPrice = lastClose;
               preMarketChange = lastClose - regP;
               preMarketChangePercent = regP ? (preMarketChange / regP) * 100 : 0;
+            } else if (mins >= 1200 || mins < 240) {
+              marketState = marketState || 'PREPRE';
+              overnightPrice = lastClose;
+              overnightChange = lastClose - regP;
+              overnightChangePercent = regP ? (overnightChange / regP) * 100 : 0;
+              overnightTime = lastTs;
             } else {
               marketState = marketState || 'POST';
               postMarketPrice = lastClose;
@@ -1573,9 +1635,13 @@
             preMarketChangePercent,
             postMarketPrice,
             postMarketChange,
-            postMarketChangePercent
+            postMarketChangePercent,
+            overnightPrice,
+            overnightChange,
+            overnightChangePercent,
+            overnightTime
           };
-        } catch (_) { }
+        } catch (_) {}
       }));
     }
     return out;
@@ -1678,10 +1744,10 @@
     // 2. Volume Histogram (subtle institutional bottom profile)
     volSeries.setData(state.indicators.vol
       ? bars.map(b => ({
-        time: b.time,
-        value: b.volume,
-        color: b.close >= b.open ? 'rgba(8, 153, 129, 0.20)' : 'rgba(242, 54, 69, 0.20)'
-      }))
+          time: b.time,
+          value: b.volume,
+          color: b.close >= b.open ? 'rgba(8, 153, 129, 0.20)' : 'rgba(242, 54, 69, 0.20)'
+        }))
       : []);
 
     // 3. Overlay Indicators
@@ -1870,9 +1936,7 @@
     if (typeof updateActiveAiStrategist === 'function') {
       updateActiveAiStrategist();
     }
-    if (!fitView) {
-      maybeNotifyLiveSignalTelegram(sigOut);
-    }
+    maybeNotifyLiveSignalTelegram(sigOut, { seedOnly: fitView });
     renderOrderFlowSummary(bars, vpvrFull, fpFull, sigOut.currentPlan);
     const techOut = Q.computeTVTechnicals(bars);
     state.lastTechOut = techOut;
@@ -1894,7 +1958,7 @@
   function drawAxisPriceLines(bars) {
     // Clear previous price lines cleanly
     [...fibPriceLines, ...alertPriceLines, ...hlPriceLines].forEach(obj => {
-      try { obj.series.removePriceLine(obj.line); } catch (_) { }
+      try { obj.series.removePriceLine(obj.line); } catch (_) {}
     });
     fibPriceLines = [];
     alertPriceLines = [];
@@ -1937,15 +2001,16 @@
             })
           });
         } else {
+          const extMeta = getExtSessionUiMeta(eType);
           hlPriceLines.push({
             series: mainSeries,
             line: mainSeries.createPriceLine({
               price: ePrice,
-              color: eType === 'PRE' ? '#f59e0b' : '#2962ff',
+              color: extMeta.color,
               lineWidth: 1,
               lineStyle: LightweightCharts.LineStyle.Dashed,
               axisLabelVisible: true,
-              title: eType === 'PRE' ? 'Pre-Mkt' : 'Post-Mkt'
+              title: extMeta.lineTitle
             })
           });
         }
@@ -1990,77 +2055,10 @@
     });
   }
 
-  // ─── 8. TOP LEGEND, LIVE EVOLUTION STRIP, FLOATING SMART HUD & CROSSHAIR ──
-  function renderLiveEvolutionStrip(rangeOverride = null) {
+  // ─── 8. TOP LEGEND, FLOATING SMART HUD & CROSSHAIR ────────────────────────
+  function renderLiveEvolutionStrip() {
     const strip = document.getElementById('liveEvolutionStrip');
-    if (!strip || !state.bars.length) return;
-    const bars = state.bars;
-    const lastB = bars[bars.length - 1];
-    const liveP = lastB.close;
-
-    // 1. Session Evolution (from live quote cache or state.quote or previous bar)
-    const lq = liveQuoteCache[state.symbol];
-    const sessChg = (!state.compareSpec.startsWith('SPR:') && lq && isFinite(lq.chg))
-      ? lq.chg
-      : (state.quote && isFinite(state.quote.regularMarketChange) ? state.quote.regularMarketChange : (liveP - (bars[bars.length - 2]?.close || lastB.open)));
-    const sessPct = (!state.compareSpec.startsWith('SPR:') && lq && isFinite(lq.chgPct))
-      ? lq.chgPct
-      : (state.quote && isFinite(state.quote.regularMarketChangePercent) ? state.quote.regularMarketChangePercent : ((liveP - (bars[bars.length - 2]?.close || lastB.open)) / Math.max(1e-9, bars[bars.length - 2]?.close || lastB.open)) * 100);
-
-    // 2. Visible Chart Evolution (from first visible bar on screen to latest bar)
-    let visStartIdx = Math.max(0, bars.length - 95);
-    let visEndIdx = bars.length - 1;
-    try {
-      const r = rangeOverride || (mainChart ? mainChart.timeScale().getVisibleLogicalRange() : null);
-      if (r) {
-        visStartIdx = Math.max(0, Math.min(bars.length - 1, Math.floor(r.from)));
-        visEndIdx = Math.max(visStartIdx, Math.min(bars.length - 1, Math.ceil(r.to)));
-      }
-    } catch (_) { }
-    const visBase = bars[visStartIdx]?.open || bars[visStartIdx]?.close || liveP;
-    const visEnd = bars[visEndIdx]?.close || liveP;
-    const visChg = visEnd - visBase;
-    const visPct = visBase ? (visChg / visBase) * 100 : 0;
-
-    // 3. Recent 20-bar Momentum Evolution
-    const momIdx = Math.max(0, bars.length - 21);
-    const momBase = bars[momIdx]?.close || liveP;
-    const momPct = momBase ? ((liveP - momBase) / momBase) * 100 : 0;
-
-    // 4. Full Loaded Period Evolution
-    const fullBase = bars[0]?.open || bars[0]?.close || liveP;
-    const fullPct = fullBase ? ((liveP - fullBase) / fullBase) * 100 : 0;
-
-    const fmtPct = (p) => `${p >= 0 ? '+' : ''}${p.toFixed(2)}%`;
-    const colOf = (v) => v >= 0 ? 'var(--tv-green)' : 'var(--tv-red)';
-
-    strip.innerHTML = `
-      <span class="evo-chip" title="Evoluția pe zona vizibilă acum pe grafic (${visEndIdx - visStartIdx + 1} lumânări)">
-        <span>Vizibil</span>
-        <b style="color:${colOf(visPct)}">${fmtPct(visPct)}</b>
-      </span>
-      <span class="evo-chip" title="Impuls pe ultimele 20 de lumânări">
-        <span>20 Bare</span>
-        <b style="color:${colOf(momPct)}">${fmtPct(momPct)}</b>
-      </span>
-      <span class="evo-chip" title="Evoluție totală pe istoricul încărcat (${bars.length} lumânări)">
-        <span>Perioadă</span>
-        <b style="color:${colOf(fullPct)}">${fmtPct(fullPct)}</b>
-      </span>
-      <button type="button" id="evoFocusLiveBtn" class="evo-chip evo-btn" title="Centrează graficul pe evoluția live și reactivează auto-scalarea">
-        <b>Auto</b>
-      </button>
-    `;
-
-    const focusBtn = document.getElementById('evoFocusLiveBtn');
-    if (focusBtn) {
-      focusBtn.onclick = (e) => {
-        e.stopPropagation();
-        focusLiveEvolution(mainChart, state.bars.length, 95, 8);
-        updateJumpToLiveBtn();
-        renderLiveEvolutionStrip();
-      };
-    }
+    if (strip) strip.innerHTML = '';
   }
 
   function updateHeaderAndLegend(lastBar, prevBar) {
@@ -2111,9 +2109,9 @@
       const ePrice = lq?.extPrice ?? qExt?.extPrice;
       const ePct = lq?.extChgPct ?? qExt?.extChgPct ?? 0;
       if (!state.compareSpec.startsWith('SPR:') && eType && isFinite(ePrice)) {
-        const isPre = eType === 'PRE';
-        extBadge.className = `ext-sess-pill tabular ${isPre ? 'pre' : 'post'}`;
-        extBadge.innerHTML = `${isPre ? ICO.preSun : ICO.postMoon}<span>${isPre ? 'Pre' : 'Post'} ${fmt(ePrice)} (${ePct >= 0 ? '+' : ''}${ePct.toFixed(2)}%)</span>`;
+        const extMeta = getExtSessionUiMeta(eType);
+        extBadge.className = `ext-sess-pill tabular ${extMeta.cls}`;
+        extBadge.innerHTML = `${extMeta.ico}<span>${extMeta.short} ${fmt(ePrice)} (${ePct >= 0 ? '+' : ''}${ePct.toFixed(2)}%)</span>`;
         extBadge.style.display = 'inline-flex';
       } else {
         extBadge.style.display = 'none';
@@ -2151,10 +2149,14 @@
     setOHLCStrip(lastBar, barChg, barChgPct, false);
     renderLiveEvolutionStrip();
 
-    // Bid / Ask One-Click Pill (Split-Digit Live Update)
-    const spread = lastBar.close > 100 ? lastBar.close * 0.0002 : lastBar.close * 0.0008;
-    const bid = state.quote?.bid || (lastBar.close - spread / 2);
-    const ask = state.quote?.ask || (lastBar.close + spread / 2);
+    // Bid / Ask One-Click Pill (Split-Digit Live Update; guard stale closing wide spreads > 4%)
+    const refPx = (lq?.extType && isFinite(lq?.extPrice)) ? lq.extPrice : lastBar.close;
+    const spread = refPx > 100 ? refPx * 0.0002 : refPx * 0.0008;
+    const rawBid = state.quote?.bid;
+    const rawAsk = state.quote?.ask;
+    const validL1Book = isFinite(rawBid) && isFinite(rawAsk) && rawBid > 0 && rawAsk >= rawBid && ((rawAsk - rawBid) / rawBid) <= 0.04;
+    const bid = validL1Book ? rawBid : (refPx - spread / 2);
+    const ask = validL1Book ? rawAsk : (refPx + spread / 2);
     document.getElementById('baSellPrice').innerHTML = formatSplitTickHTML(prevP != null ? prevP - spread / 2 : null, bid, isUp ? 1 : -1);
     document.getElementById('baBuyPrice').innerHTML = formatSplitTickHTML(prevP != null ? prevP + spread / 2 : null, ask, isUp ? 1 : -1);
     document.getElementById('baSpreadVal').textContent = fmtChg(Math.max(0.01, ask - bid), bid);
@@ -2163,20 +2165,48 @@
     // Browser Tab Title
     document.title = `${state.symbol} ${fmt(lastBar.close)} (${isUp ? '+' : ''}${sessPct.toFixed(2)}%)`;
 
-    // Active Indicator Pills + Badge Count + Quick Toggle Sync
+    // Compact Inline Indicator Legend (Max 3 short tags + "+N" on Row 2)
+    const SHORT_IND_LABELS = {
+      smartSignals: 'Signals',
+      supertrend: 'SuperTrend',
+      emaRibbon: 'EMA Ribbon',
+      smc: 'SMC',
+      vpvr: 'VPVR',
+      tpo: 'TPO',
+      footprint: 'Delta',
+      autoPatterns: 'Patterns',
+      expectedMove: 'Exp Move',
+      vwap: 'VWAP',
+      bb: 'Bollinger',
+      ma: 'SMA',
+      ichimoku: 'Ichimoku',
+      fibAuto: 'Fib Auto',
+      candlePatterns: 'Candles',
+      forecast: 'AI Cone',
+      vol: 'Volum',
+      rsi: 'RSI',
+      macd: 'MACD'
+    };
     const activeDefs = INDICATOR_DEFS.filter(d => state.indicators[d.key]);
     document.getElementById('activeIndCount').textContent = activeDefs.length;
     document.querySelectorAll('[data-qind]').forEach(qb => {
       qb.classList.toggle('active', !!state.indicators[qb.dataset.qind]);
     });
     const legEl = document.getElementById('activeIndLegend');
-    legEl.innerHTML = activeDefs.slice(0, 5).map(d => `
-      <div class="ind-leg-row">
-        <span class="ind-leg-dot" style="background:${d.color}"></span>
-        <span>${d.name.split(' (')[0]}</span>
-        <span class="ind-leg-x" data-remove-ind="${d.key}" title="Ascunde indicator">${ICO.close}</span>
-      </div>
-    `).join('');
+    const visibleDefs = activeDefs.slice(0, 3);
+    const hiddenDefs = activeDefs.slice(3);
+    legEl.innerHTML = visibleDefs.map(d => {
+      const shortLbl = SHORT_IND_LABELS[d.key] || d.name.split(' (')[0];
+      return `
+        <div class="ind-leg-row" title="${d.name}">
+          <span class="ind-leg-dot" style="background:${d.color}"></span>
+          <span>${shortLbl}</span>
+          <span class="ind-leg-x" data-remove-ind="${d.key}" title="Ascunde ${shortLbl}">${ICO.close}</span>
+        </div>
+      `;
+    }).join('') + (hiddenDefs.length
+      ? `<span class="ind-leg-more" title="${hiddenDefs.map(d => d.name.split(' (')[0]).join(' · ')}">+${hiddenDefs.length}</span>`
+      : '');
     legEl.querySelectorAll('[data-remove-ind]').forEach(btn => {
       btn.onclick = () => toggleIndicator(btn.dataset.removeInd);
     });
@@ -2231,12 +2261,12 @@
 
     // 1. Compact Status Chip on Chart
     const shortVerdict = cp.status === 'BUY_NOW' ? `Long ${cp.grade}`
-      : cp.status === 'SETUP_BUY' ? `Long ${cp.grade}`
-        : cp.status === 'HOLD_LONG' ? `Long ${cp.grade}`
-          : cp.status === 'SELL_NOW' ? `Short ${cp.grade}`
-            : cp.status === 'SETUP_SELL' ? `Short ${cp.grade}`
-              : cp.status === 'HOLD_SHORT' ? `Short ${cp.grade}`
-                : `Neutru`;
+                       : cp.status === 'SETUP_BUY' ? `Long ${cp.grade}`
+                       : cp.status === 'HOLD_LONG' ? `Long ${cp.grade}`
+                       : cp.status === 'SELL_NOW' ? `Short ${cp.grade}`
+                       : cp.status === 'SETUP_SELL' ? `Short ${cp.grade}`
+                       : cp.status === 'HOLD_SHORT' ? `Short ${cp.grade}`
+                       : `Neutru`;
     const dotCol = cp.badgeClass === 'buy' ? 'buy' : cp.badgeClass === 'sell' ? 'sell' : 'wait';
     const txtCol = cp.badgeClass === 'buy' ? 'var(--tv-green)' : cp.badgeClass === 'sell' ? 'var(--tv-red)' : 'var(--tv-amber)';
 
@@ -2491,10 +2521,11 @@
 
     const rawList = state.topOpps || [];
     if (!rawList.length) {
-      listEl.innerHTML = `<div class="top-opp-empty">${state.topOppsLoading
+      listEl.innerHTML = `<div class="top-opp-empty">${
+        state.topOppsLoading
           ? 'Scanez piața în timp real (Active Lichide Institutional + TradingView + Yahoo + Crypto)...'
           : 'Apasă refresh pentru a descoperi Top 10 AI Idei BUY & SELL live.'
-        }</div>`;
+      }</div>`;
       return;
     }
 
@@ -2860,8 +2891,8 @@
       const bull = cp.stBull;
       const col = bull ? 'var(--tv-green)' : 'var(--tv-red)';
       const lbl = (cp.status === 'BUY_NOW' || cp.status === 'SETUP_BUY') ? 'BUY'
-        : (cp.status === 'SELL_NOW' || cp.status === 'SETUP_SELL') ? 'SELL'
-          : (bull ? 'BULL' : 'BEAR');
+                : (cp.status === 'SELL_NOW' || cp.status === 'SETUP_SELL') ? 'SELL'
+                : (bull ? 'BULL' : 'BEAR');
       return `<div class="mtf-cell ${bull ? 'bull' : 'bear'}" data-mtf="${tf}" title="Schimbă graficul pe ${tf}">
         <div style="font-size:9.5px;font-weight:600;color:var(--text-muted);">${tf.toUpperCase()}</div>
         <div style="font-size:10.5px;font-weight:700;color:${col};margin-top:2px;">${lbl}</div>
@@ -2951,6 +2982,7 @@
       document.getElementById('rightPanel')?.classList.remove('mobile-open');
       document.getElementById('leftToolbar')?.classList.remove('mob-draw-open');
       document.getElementById('mobDrawToggleBtn')?.classList.remove('active');
+      closeCopilotOverlay();
       const mnavKey = tabName === 'screener' ? 'screener' : 'paper';
       document.querySelectorAll('[data-mnav]').forEach(b => {
         b.classList.toggle('active', b.dataset.mnav === mnavKey);
@@ -3079,9 +3111,9 @@
       const target = parseFloat(m[3]);
       const actual = field === 'rsi' ? r.rsi
         : field === 'rvol' ? r.cp.rvol
-          : field === 'winrate' ? r.winRate
-            : field === 'chg' ? r.chgPct
-              : r.cp.score;
+        : field === 'winrate' ? r.winRate
+        : field === 'chg' ? r.chgPct
+        : r.cp.score;
       if (op === '<' && !(actual < target)) return false;
       if (op === '<=' && !(actual <= target)) return false;
       if (op === '>' && !(actual > target)) return false;
@@ -3281,10 +3313,10 @@
           ? `rgba(16, 185, 129, ${intensity.toFixed(2)})`
           : `rgba(239, 68, 68, ${intensity.toFixed(2)})`;
         const sigLbl = r.cp.status === 'BUY_NOW' ? `BUY ${r.cp.grade}`
-          : r.cp.status === 'SETUP_BUY' ? `SETUP BUY`
-            : r.cp.status === 'SELL_NOW' ? `SELL ${r.cp.grade}`
-              : r.cp.status === 'SETUP_SELL' ? `SETUP SELL`
-                : `Scor ${r.cp.score}`;
+                     : r.cp.status === 'SETUP_BUY' ? `SETUP BUY`
+                     : r.cp.status === 'SELL_NOW' ? `SELL ${r.cp.grade}`
+                     : r.cp.status === 'SETUP_SELL' ? `SETUP SELL`
+                     : `Scor ${r.cp.score}`;
         return `
           <div class="hm-tile" data-scr-sym="${r.sym}" style="background:${bg};">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
@@ -3318,12 +3350,12 @@
       const pillCls = cp.badgeClass === 'buy' ? 'pill-buy' : cp.badgeClass === 'sell' ? 'pill-sell' : 'pill-warn';
       const dotCls = cp.badgeClass === 'buy' ? 'buy' : cp.badgeClass === 'sell' ? 'sell' : 'wait';
       const tag = cp.status === 'BUY_NOW' ? `BUY ACTIV ${cp.grade}`
-        : cp.status === 'SETUP_BUY' ? `SETUP BUY ${cp.grade}`
-          : cp.status === 'HOLD_LONG' ? `LONG ${cp.grade}`
-            : cp.status === 'SELL_NOW' ? `SELL ACTIV ${cp.grade}`
-              : cp.status === 'SETUP_SELL' ? `SETUP SELL ${cp.grade}`
+                : cp.status === 'SETUP_BUY' ? `SETUP BUY ${cp.grade}`
+                : cp.status === 'HOLD_LONG' ? `LONG ${cp.grade}`
+                : cp.status === 'SELL_NOW' ? `SELL ACTIV ${cp.grade}`
+                : cp.status === 'SETUP_SELL' ? `SETUP SELL ${cp.grade}`
                 : cp.status === 'HOLD_SHORT' ? `BEARISH ${cp.grade}`
-                  : `WAIT`;
+                : `WAIT`;
       return `<tr data-scr-sym="${r.sym}">
         <td>
           <div style="display:flex;align-items:center;gap:7px;">
@@ -3396,7 +3428,7 @@
       localStorage.setItem('tp_ultra_portfolios_v1', JSON.stringify(state.portfolios));
       localStorage.setItem('tp_ultra_active_pf', state.activePortfolio);
       localStorage.setItem('tp_ultra_paper', JSON.stringify(state.paper));
-    } catch (_) { }
+    } catch (_) {}
   }
 
   function switchPortfolio(pfKey) {
@@ -3532,7 +3564,7 @@
         closedAt: new Date().toLocaleString('ro-RO', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
       });
       localStorage.setItem('tp_ultra_journal', JSON.stringify(j.slice(0, 80)));
-    } catch (_) { }
+    } catch (_) {}
     savePaper();
     const balInp = document.getElementById('calcBalanceInput');
     if (balInp) balInp.value = state.paper.balance;
@@ -3606,15 +3638,15 @@
 
   // ─── 12. REAL-TIME STREAMING ENGINE, SPLIT-DIGIT WATCHLIST & LIVE INDICES ─
   const LIVE_INDICES = [
-    { sym: 'NQ=F', label: 'NAS 100' },
-    { sym: 'ES=F', label: 'S&P 500' },
-    { sym: 'YM=F', label: 'DOW 30' },
-    { sym: '^VIX', label: 'VIX' },
-    { sym: 'BTC-USD', label: 'BTC' },
+    { sym: 'NQ=F',     label: 'NAS 100' },
+    { sym: 'ES=F',     label: 'S&P 500' },
+    { sym: 'YM=F',     label: 'DOW 30' },
+    { sym: '^VIX',     label: 'VIX' },
+    { sym: 'BTC-USD',  label: 'BTC' },
     { sym: 'EGLD-USD', label: 'EGLD' },
-    { sym: 'ETH-USD', label: 'ETH' },
-    { sym: 'GC=F', label: 'GOLD' },
-    { sym: 'CL=F', label: 'OIL WTI' },
+    { sym: 'ETH-USD',  label: 'ETH' },
+    { sym: 'GC=F',     label: 'GOLD' },
+    { sym: 'CL=F',     label: 'OIL WTI' },
     { sym: 'EURUSD=X', label: 'EUR/USD' }
   ];
   const liveQuoteCache = {};
@@ -3667,20 +3699,19 @@
       const clean = state.watchlist.map(w => ({ sym: w.sym, name: w.name }));
       localStorage.setItem('tp_ultra_watchlist_v4', JSON.stringify(clean));
       localStorage.setItem('tp_ultra_watchlist', JSON.stringify(clean));
-    } catch (_) { }
+    } catch (_) {}
   }
 
   function buildWatchlistExtSubHtml(extType, extPrice, extChg, extChgPct) {
     if (!extType || extPrice == null || !isFinite(extPrice)) return '';
-    const isPre = extType === 'PRE';
-    const ico = isPre ? ICO.preSun : ICO.postMoon;
-    const lbl = isPre ? 'Pre-Market' : 'Post-Market';
+    const extMeta = getExtSessionUiMeta(extType);
+    const lbl = extMeta.short === 'Pre' ? 'Pre-Market' : (extMeta.short === 'Post' ? 'Post-Market' : 'Overnight');
     const c = Number(extChg) || 0;
     const p = Number(extChgPct) || 0;
     const cls = p >= 0 ? 'up' : 'dn';
     const sign = p >= 0 ? '+' : '';
     return `
-      <span class="wl-ext-tag ${isPre ? 'pre' : 'post'}">${ico}<span>${lbl}</span></span>
+      <span class="wl-ext-tag ${extMeta.cls}">${extMeta.ico}<span>${lbl}</span></span>
       <span class="wl-ext-vals tabular">
         <b style="color:var(--text-bright);">${fmt(extPrice)}</b>
         <span class="${cls}">${c >= 0 ? '+' : ''}${fmtChg(c, extPrice)} (${sign}${p.toFixed(2)}%)</span>
@@ -4251,9 +4282,10 @@
       const extChg = w.extChg ?? lq?.extChg;
       const extChgPct = w.extChgPct ?? lq?.extChgPct;
       const hasExt = !!(extType && extPrice != null && isFinite(extPrice));
-      const sessCls = extType === 'PRE' ? 'pre' : extType === 'POST' ? 'post' : '';
-      const sessTitle = extType === 'PRE' ? 'Pre-Market activ' : extType === 'POST' ? 'Post-Market activ' : '';
-      const sessSvg = extType === 'PRE' ? ICO.preSun : extType === 'POST' ? ICO.postMoon : '';
+      const extMeta = extType ? getExtSessionUiMeta(extType) : null;
+      const sessCls = extMeta ? extMeta.cls : '';
+      const sessTitle = extMeta ? extMeta.title : '';
+      const sessSvg = extMeta ? extMeta.ico : '';
 
       return `
         <div class="wl-item-wrap" data-wlwrap="${w.sym}">
@@ -4397,14 +4429,15 @@
     let regChg = meta.regChg != null ? meta.regChg : (prevEntry?.regChg != null && meta.extType === undefined && prevEntry?.extType ? prevEntry.regChg : (meta.chg != null ? meta.chg : (prevClose ? regPrice - prevClose : (prevEntry?.chg ?? 0))));
     let regChgPct = meta.regChgPct != null ? meta.regChgPct : (prevEntry?.regChgPct != null && meta.extType === undefined && prevEntry?.extType ? prevEntry.regChgPct : (meta.chgPct != null ? meta.chgPct : (prevClose ? ((regPrice - prevClose) / prevClose) * 100 : (prevEntry?.chgPct ?? 0))));
 
+    const tvSess = meta.tvCurrentSession !== undefined ? meta.tvCurrentSession : (prevEntry?.tvCurrentSession || '');
     let extType = meta.extType !== undefined ? meta.extType : (prevEntry?.extType || '');
     let extPrice = meta.extPrice !== undefined ? meta.extPrice : (prevEntry?.extPrice ?? null);
     let extChg = meta.extChg !== undefined ? meta.extChg : (prevEntry?.extChg ?? null);
     let extChgPct = meta.extChgPct !== undefined ? meta.extChgPct : (prevEntry?.extChgPct ?? null);
     let extTime = meta.extTime !== undefined ? meta.extTime : (prevEntry?.extTime ?? null);
 
-    // If a sub-second WebSocket tick arrives during Pre-Market or Post-Market, route it to Extended Price!
-    if (meta.extType === undefined && extType && !is24h && mktState !== 'REGULAR') {
+    // If a sub-second WebSocket tick arrives during Pre-Market or Post-Market (skip static Yahoo replays during BOATS night), route it to Extended Price!
+    if (meta.extType === undefined && extType && !is24h && mktState !== 'REGULAR' && tvSess !== 'night') {
       extPrice = liveP;
       extChg = isFinite(regPrice) ? liveP - regPrice : 0;
       extChgPct = (isFinite(regPrice) && regPrice) ? (extChg / regPrice) * 100 : 0;
@@ -4440,6 +4473,7 @@
       regChgPct,
       regHtml,
       mktState,
+      tvCurrentSession: tvSess,
       extType,
       extPrice,
       extChg,
@@ -4509,10 +4543,11 @@
       }
       const hasExt = !!(extType && extPrice != null && isFinite(extPrice));
       if (se) {
-        se.style.display = hasExt ? 'inline-flex' : 'none';
-        se.className = `wl-sess-ico ${extType === 'PRE' ? 'pre' : extType === 'POST' ? 'post' : ''}`;
-        se.title = extType === 'PRE' ? 'Pre-Market activ' : extType === 'POST' ? 'Post-Market activ' : '';
-        se.innerHTML = extType === 'PRE' ? ICO.preSun : extType === 'POST' ? ICO.postMoon : '';
+        const extMeta = hasExt ? getExtSessionUiMeta(extType) : null;
+        se.style.display = extMeta ? 'inline-flex' : 'none';
+        se.className = `wl-sess-ico ${extMeta ? extMeta.cls : ''}`;
+        se.title = extMeta ? extMeta.title : '';
+        se.innerHTML = extMeta ? extMeta.ico : '';
       }
       if (ee) {
         if (hasExt) {
@@ -4529,11 +4564,14 @@
       }
     }
 
-    // Determine whether this tick is actively trading for chart candles
+    // Determine whether this tick is actively trading for chart candles (includes Pre/Post & Overnight BOATS)
+    const isExtActive = !is24h && mktState !== 'REGULAR' && !!extType && isFinite(extPrice) && (
+      mktState === 'PRE' || mktState === 'POST' || tvSess === 'night' || tvSess === 'pre_market' || tvSess === 'post_market'
+    );
     const canStreamCandle = is24h
       || mktState === 'REGULAR'
-      || (state.extHours && (mktState === 'PRE' || mktState === 'POST'));
-    const candleLiveP = (state.extHours && extType && isFinite(extPrice) && (mktState === 'PRE' || mktState === 'POST'))
+      || (state.extHours && isExtActive);
+    const candleLiveP = (state.extHours && isExtActive)
       ? extPrice
       : regPrice;
 
@@ -4551,18 +4589,18 @@
             if (pSubDay && pBucket > lb.time && hasTickDiff) {
               const nb = { time: pBucket, open: lb.close, high: Math.max(lb.close, candleLiveP), low: Math.min(lb.close, candleLiveP), close: candleLiveP };
               p.bars.push(nb);
-              try { p.candle.update(nb); } catch (_) { }
+              try { p.candle.update(nb); } catch (_) {}
               if (nearEdge && p.chart) {
                 try {
                   const r = p.chart.timeScale().getVisibleLogicalRange();
                   if (r) p.chart.timeScale().setVisibleLogicalRange({ from: r.from + 1, to: r.to + 1 });
-                } catch (_) { }
+                } catch (_) {}
               }
             } else if (Math.abs(candleLiveP - lb.close) > 1e-9) {
               lb.close = candleLiveP;
               if (candleLiveP > lb.high) lb.high = candleLiveP;
               if (candleLiveP < lb.low) lb.low = candleLiveP;
-              try { p.candle.update({ time: lb.time, open: lb.open, high: lb.high, low: lb.low, close: lb.close }); } catch (_) { }
+              try { p.candle.update({ time: lb.time, open: lb.open, high: lb.high, low: lb.low, close: lb.close }); } catch (_) {}
             }
           }
           const spEl = document.getElementById(`secLivePrice${p.id}`);
@@ -4579,10 +4617,16 @@
     // 4. Update Right Details Widget if this is the focused symbol
     if (sym === getActiveFocusedSymbol()) {
       if (fullQuoteCache[sym]) {
+        if (tvSess) fullQuoteCache[sym].tvCurrentSession = tvSess;
         if (extType === 'PRE' && isFinite(extPrice)) {
           fullQuoteCache[sym].preMarketPrice = extPrice;
           fullQuoteCache[sym].preMarketChange = extChg;
           fullQuoteCache[sym].preMarketChangePercent = extChgPct;
+        } else if (extType === 'OVN' && isFinite(extPrice)) {
+          fullQuoteCache[sym].overnightPrice = extPrice;
+          fullQuoteCache[sym].overnightChange = extChg;
+          fullQuoteCache[sym].overnightChangePercent = extChgPct;
+          if (extTime) fullQuoteCache[sym].overnightTime = extTime;
         } else if (extType === 'POST' && isFinite(extPrice)) {
           fullQuoteCache[sym].postMarketPrice = extPrice;
           fullQuoteCache[sym].postMarketChange = extChg;
@@ -4627,8 +4671,10 @@
             nextTime = Math.max(nowSec, last.time + 1);
           }
         } else if (stepSec > 0 && stepSec < 86400 && !nonTimeChart && hasTickDiff) {
-          const bucketSec = Math.floor(nowSec / stepSec) * stepSec;
-          if (bucketSec > last.time) {
+          const tickSec = (!is24h && mktState !== 'REGULAR' && extTime) ? toEpochSec(extTime) : nowSec;
+          const freshTick = is24h || mktState === 'REGULAR' || !tickSec || Math.abs(nowSec - tickSec) < 900;
+          const bucketSec = Math.floor((tickSec || nowSec) / stepSec) * stepSec;
+          if (freshTick && bucketSec > last.time) {
             spawnNewBar = true;
             nextTime = bucketSec;
           }
@@ -4661,7 +4707,7 @@
               const curR = mainChart.timeScale().getVisibleLogicalRange();
               if (curR) mainChart.timeScale().setVisibleLogicalRange({ from: curR.from + 1, to: curR.to + 1 });
             }
-          } catch (_) { }
+          } catch (_) {}
           updateHeaderAndLegend(nextBar, last);
         } else if (!nonTimeChart) {
           last.close = candleLiveP;
@@ -4677,7 +4723,7 @@
             if (state.indicators.vol && volSeries) {
               volSeries.update({ time: last.time, value: last.volume || 0, color: last.close >= last.open ? 'rgba(8,153,129,0.38)' : 'rgba(242,54,69,0.38)' });
             }
-          } catch (_) { }
+          } catch (_) {}
           updateHeaderAndLegend(last, state.bars[state.bars.length - 2]);
         }
       } else {
@@ -4765,7 +4811,7 @@
         }
       }
       if (out.id && isFinite(out.price) && out.price > 0) return out;
-    } catch (_) { }
+    } catch (_) {}
     return null;
   }
 
@@ -4783,14 +4829,14 @@
     if (yahooWs && yahooWsReady && yahooWs.readyState === WebSocket.OPEN) {
       try {
         yahooWs.send(JSON.stringify({ subscribe: getSubscribedSymbolsList() }));
-      } catch (_) { }
+      } catch (_) {}
     }
   }
 
   function connectYahooLiveStream() {
     if (typeof WebSocket === 'undefined') return;
     try {
-      if (yahooWs) { try { yahooWs.close(); } catch (_) { } }
+      if (yahooWs) { try { yahooWs.close(); } catch (_) {} }
       yahooWs = new WebSocket('wss://streamer.finance.yahoo.com/?version=2');
       yahooWs.onopen = () => {
         yahooWsReady = true;
@@ -4808,9 +4854,9 @@
         yahooReconnectTimer = setTimeout(connectYahooLiveStream, 4000);
       };
       yahooWs.onerror = () => {
-        try { yahooWs.close(); } catch (_) { }
+        try { yahooWs.close(); } catch (_) {}
       };
-    } catch (_) { }
+    } catch (_) {}
   }
 
   // Real-Time 24/7 Sub-Second Crypto Stream via Binance Public WebSocket
@@ -4823,7 +4869,7 @@
     };
     const streams = Object.keys(cryptoMap).map(k => `${k}@ticker`).join('/');
     try {
-      if (binanceWs) { try { binanceWs.close(); } catch (_) { } }
+      if (binanceWs) { try { binanceWs.close(); } catch (_) {} }
       binanceWs = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
       binanceWs.onmessage = (ev) => {
         try {
@@ -4848,16 +4894,16 @@
               ask: isFinite(ask) ? ask : undefined
             });
           }
-        } catch (_) { }
+        } catch (_) {}
       };
       binanceWs.onclose = () => {
         clearTimeout(binanceReconnectTimer);
         binanceReconnectTimer = setTimeout(connectBinanceLiveStream, 5000);
       };
       binanceWs.onerror = () => {
-        try { binanceWs.close(); } catch (_) { }
+        try { binanceWs.close(); } catch (_) {}
       };
-    } catch (_) { }
+    } catch (_) {}
   }
 
   function formatQuoteClock(tsVal) {
@@ -4881,6 +4927,7 @@
       const map = await fetchBatchQuotes(syms);
       let namesEnriched = false;
       const prevPrimaryExt = liveQuoteCache[state.symbol]?.extPrice;
+      const prevPrimaryExtType = liveQuoteCache[state.symbol]?.extType;
 
       Object.keys(map).forEach(k => {
         const q = map[k];
@@ -4902,6 +4949,7 @@
 
         applyLiveTick(k, activePrice, {
           mktState: sInfo.mktState,
+          tvCurrentSession: sInfo.tvCurrentSession,
           regPrice: sInfo.regPrice,
           regChg: sInfo.regChg,
           regChgPct: sInfo.regChgPct,
@@ -4927,9 +4975,10 @@
         updateDetailsWidget(focusQ, focusSym);
       }
 
-      // Refresh Y-axis Pre/Post reference line when extended price updates
+      // Refresh Y-axis Pre/Overnight/Post reference line when extended price updates
       const newPrimaryExt = liveQuoteCache[state.symbol]?.extPrice;
-      if (newPrimaryExt !== prevPrimaryExt && state.bars.length > 0) {
+      const newPrimaryExtType = liveQuoteCache[state.symbol]?.extType;
+      if ((newPrimaryExt !== prevPrimaryExt || newPrimaryExtType !== prevPrimaryExtType) && state.bars.length > 0) {
         drawAxisPriceLines(state.bars);
       }
 
@@ -4954,10 +5003,10 @@
     const catHit = SYMBOL_CATALOG.find(c => c.sym === dispSym);
     const rawExch = String(q.fullExchangeName || q.exchange || cachedId?.exch || catHit?.exch || 'US').toUpperCase();
     const cleanExch = rawExch.includes('NASDAQ') ? 'NASDAQ'
-      : rawExch.includes('NYSE') ? 'NYSE'
-        : rawExch.includes('AMEX') || rawExch.includes('ARCA') ? 'NYSE ARCA'
-          : rawExch.includes('CCC') || dispSym.endsWith('-USD') ? 'CRYPTO'
-            : rawExch.slice(0, 12);
+                    : rawExch.includes('NYSE') ? 'NYSE'
+                    : rawExch.includes('AMEX') || rawExch.includes('ARCA') ? 'NYSE ARCA'
+                    : rawExch.includes('CCC') || dispSym.endsWith('-USD') ? 'CRYPTO'
+                    : rawExch.slice(0, 12);
     const exchEl = document.getElementById('dwExchBadge');
     if (exchEl) exchEl.textContent = cleanExch;
 
@@ -4997,12 +5046,18 @@
         regTimeEl.textContent = 'Piață deschisă 24/7 · Live';
       } else if (sInfo?.mktState === 'REGULAR') {
         regTimeEl.textContent = regClk ? `Sesiune deschisă · Actualizat ${regClk}` : 'Sesiune bursieră deschisă · Live';
+      } else if (sInfo?.mktState === 'PREPRE') {
+        if (sInfo?.extType === 'OVN') {
+          regTimeEl.textContent = regClk ? `Închis (${regClk}) · Overnight BOATS activ (Pre-Market 11:00 RO)` : 'Overnight BOATS activ · Pre-Market 11:00 RO';
+        } else {
+          regTimeEl.textContent = regClk ? `Închis (${regClk}) · Pre-Market SUA începe la 11:00 RO` : 'Pre-Market SUA începe la 11:00 RO';
+        }
       } else {
         regTimeEl.textContent = regClk ? `Închidere sesiune regulară la ${regClk}` : 'Închidere sesiune regulară';
       }
     }
 
-    // Pre-Market / Post-Market Live Card Block (Authentic TradingView Layout)
+    // Pre-Market / Overnight BOATS / Post-Market Live Card Block (Authentic TradingView Layout)
     const extEl = document.getElementById('dwExtInfo');
     const extType = lq?.extType || sInfo?.extType || '';
     const extPrice = lq?.extPrice ?? sInfo?.extPrice;
@@ -5012,7 +5067,7 @@
 
     if (extEl) {
       if (extType && extPrice != null && isFinite(extPrice)) {
-        const isPre = extType === 'PRE';
+        const extMeta = getExtSessionUiMeta(extType);
         const cCls = extPct >= 0 ? 'up' : 'dn';
         const sign = extPct >= 0 ? '+' : '';
         const extClk = formatQuoteClock(extTime);
@@ -5024,9 +5079,9 @@
             <span class="tabular dw-chg-val ${cCls}">${extChg >= 0 ? '+' : ''}${fmtChg(extChg, extPrice)}</span>
             <span class="tabular dw-chg-val ${cCls}">${sign}${extPct.toFixed(2)}%</span>
           </div>
-          <div class="dw-ext-status ${isPre ? 'pre' : 'post'}">
-            ${isPre ? ICO.preSun : ICO.postMoon}
-            <span>${isPre ? 'Pre-Market' : 'Post-Market'}</span>
+          <div class="dw-ext-status ${extMeta.cls}">
+            ${extMeta.ico}
+            <span>${extMeta.label}</span>
             ${extClk ? `<span style="color:var(--text-muted);font-weight:400;">· Actualizat ${extClk}</span>` : ''}
           </div>
         `;
@@ -5042,7 +5097,8 @@
     const bidVal = lq?.bid ?? q.bid;
     const askVal = lq?.ask ?? q.ask;
     if (baRow && bidPill && askPill) {
-      if (bidVal > 0 && askVal > 0 && isFinite(bidVal) && isFinite(askVal)) {
+      const validBook = bidVal > 0 && askVal > 0 && isFinite(bidVal) && isFinite(askVal) && ((askVal - bidVal) / bidVal) <= 0.06;
+      if (validBook) {
         const bSz = q.bidSize > 0 ? ` × ${q.bidSize < 50 ? q.bidSize * 100 : q.bidSize}` : '';
         const aSz = q.askSize > 0 ? ` × ${q.askSize < 50 ? q.askSize * 100 : q.askSize}` : '';
         bidPill.textContent = `${fmt(bidVal)}${bSz}`;
@@ -5088,25 +5144,25 @@
 
   // ─── 13. ULTIMATE MULTI-CONDITION, WATCHLIST & WEBHOOK ALERTS ENGINE ───────
   const ALERT_COND_META = {
-    price_up: { label: 'Preț ≥ Prag', isBull: true, needsVal: true },
-    price_dn: { label: 'Preț ≤ Prag', isBull: false, needsVal: true },
-    sig_buy: { label: 'Semnal Smart BUY (A/A+)', isBull: true, needsVal: false },
-    sig_sell: { label: 'Semnal Smart SELL', isBull: false, needsVal: false },
-    vwap_up: { label: 'Preț Peste VWAP', isBull: true, needsVal: false },
-    macd_bull: { label: 'MACD Cross Bullish', isBull: true, needsVal: false },
-    rvol_spike: { label: 'Volum RVOL ≥ Prag', isBull: true, needsVal: true, defVal: 1.8 },
-    vol_spike_3x: { label: 'Explozie Volum Bară ≥ 3x', isBull: true, needsVal: false },
-    vol_spike_5x: { label: 'Explozie Volum Extrem ≥ 5x', isBull: true, needsVal: false },
+    price_up:   { label: 'Preț ≥ Prag', isBull: true, needsVal: true },
+    price_dn:   { label: 'Preț ≤ Prag', isBull: false, needsVal: true },
+    sig_buy:    { label: 'Semnal Smart BUY (A/A+)', isBull: true, needsVal: false },
+    sig_sell:   { label: 'Semnal Smart SELL', isBull: false, needsVal: false },
+    vwap_up:       { label: 'Preț Peste VWAP', isBull: true, needsVal: false },
+    macd_bull:     { label: 'MACD Cross Bullish', isBull: true, needsVal: false },
+    rvol_spike:    { label: 'Volum RVOL ≥ Prag', isBull: true, needsVal: true, defVal: 1.8 },
+    vol_spike_3x:  { label: 'Explozie Volum Bară ≥ 3x', isBull: true, needsVal: false },
+    vol_spike_5x:  { label: 'Explozie Volum Extrem ≥ 5x', isBull: true, needsVal: false },
     pm_high_break: { label: 'Breakout Maxim Sesiune / PM', isBull: true, needsVal: false },
-    cvd_bull: { label: 'Presiune Intraday ≥ 65%', isBull: true, needsVal: false },
-    multi_bull: { label: 'Multi: BUY + VWAP + RVOL', isBull: true, needsVal: false },
-    rsi_lt: { label: 'RSI(14) Sub Prag', isBull: true, needsVal: true, defVal: 30 },
-    rsi_gt: { label: 'RSI(14) Peste Prag', isBull: false, needsVal: true, defVal: 70 },
-    st_bull: { label: 'SuperTrend Bullish Flip', isBull: true, needsVal: false }
+    cvd_bull:      { label: 'Presiune Intraday ≥ 65%', isBull: true, needsVal: false },
+    multi_bull:    { label: 'Multi: BUY + VWAP + RVOL', isBull: true, needsVal: false },
+    rsi_lt:     { label: 'RSI(14) Sub Prag', isBull: true, needsVal: true, defVal: 30 },
+    rsi_gt:     { label: 'RSI(14) Peste Prag', isBull: false, needsVal: true, defVal: 70 },
+    st_bull:    { label: 'SuperTrend Bullish Flip', isBull: true, needsVal: false }
   };
 
   function saveAlerts() {
-    try { localStorage.setItem('tp_ultra_alerts', JSON.stringify(state.alerts)); } catch (_) { }
+    try { localStorage.setItem('tp_ultra_alerts', JSON.stringify(state.alerts)); } catch (_) {}
   }
 
   function addAlert(priceVal, dir = state.alertDir, condOverride = null) {
@@ -5276,7 +5332,7 @@
               message: hitMsg,
               timestamp: new Date().toISOString()
             })
-          }).catch(() => { });
+          }).catch(() => {});
         }
       }
     }
@@ -5366,10 +5422,16 @@
       signals: true,
       trades: true,
       scanner: false,
-      minScore: 72
+      radarIntel: true,
+      onlyMarketOpen: true,
+      requirePreBuyPass: true,
+      minScore: 78,
+      maxPerHour: 3,
+      cooldownMin: 180
     },
+    rateStats: null,
     logs: [],
-    baselineSigKey: '',
+    baselineByChart: new Map(),
     sentSigKeys: new Set(),
     syncBusy: false
   };
@@ -5387,6 +5449,7 @@
       if (category === 'alerts' && !tgClient.prefs.alerts) return null;
       if (category === 'signals' && !tgClient.prefs.signals) return null;
       if (category === 'trades' && !tgClient.prefs.trades) return null;
+      if (category === 'radar' && !tgClient.prefs.radarIntel) return null;
     }
     try {
       const res = await fetch('/api/telegram/notify', {
@@ -5397,12 +5460,15 @@
           dedupKey: payload.dedupKey || '',
           sym: payload.sym || state.symbol,
           tf: payload.tf || state.tf,
+          bias: payload.bias || '',
+          allowClosedMarket: !!payload.allowClosedMarket,
           summary: payload.summary || '',
           html: payload.html || '',
           includeActions: !!payload.includeActions
         })
       });
       const json = await res.json();
+      if (json?.rateStats) tgClient.rateStats = json.rateStats;
       if (Array.isArray(json?.logs)) {
         tgClient.logs = json.logs;
         renderTelegramPanelUI();
@@ -5413,23 +5479,33 @@
     }
   }
 
-  function maybeNotifyLiveSignalTelegram(sigOut) {
+  function maybeNotifyLiveSignalTelegram(sigOut, { seedOnly = false } = {}) {
     const cp = sigOut?.currentPlan;
-    if (!cp || state.replay.active) return;
+    if (!cp || state.replay.active || !state.bars?.length) return;
+    const lastBar = state.bars[state.bars.length - 1];
+    const prevBar = state.bars[Math.max(0, state.bars.length - 2)];
     const lastSigTime = sigOut?.signals?.length
       ? sigOut.signals[sigOut.signals.length - 1].time
-      : (state.bars[state.bars.length - 1]?.time || 0);
-    const sigKey = `${state.symbol}:${state.tf}:${cp.status}:${lastSigTime}`;
+      : (lastBar?.time || 0);
+    const chartKey = `${state.symbol}:${state.tf}`;
+    const sigKey = `${chartKey}:${cp.status}:${lastSigTime}`;
 
-    if (!tgClient.baselineSigKey) {
-      tgClient.baselineSigKey = sigKey;
+    if (seedOnly || !tgClient.baselineByChart.has(chartKey)) {
+      tgClient.baselineByChart.set(chartKey, sigKey);
       return;
     }
-    if (sigKey === tgClient.baselineSigKey || tgClient.sentSigKeys.has(sigKey)) return;
+    const prevKey = tgClient.baselineByChart.get(chartKey);
+    if (sigKey === prevKey || tgClient.sentSigKeys.has(sigKey)) return;
 
-    tgClient.baselineSigKey = sigKey;
+    tgClient.baselineByChart.set(chartKey, sigKey);
+    const minFreshTime = prevBar?.time ?? lastBar?.time ?? 0;
+    if (Number(lastSigTime) < Number(minFreshTime)) return;
+
     const isEntrySignal = cp.status === 'BUY_NOW' || cp.status === 'SELL_NOW';
-    if (!isEntrySignal || cp.score < (tgClient.prefs.minScore || 72)) return;
+    const tfLower = String(state.tf || '').toLowerCase();
+    const isConfirmedTf = ['15m', '30m', '1h', '4h', '1d'].includes(tfLower);
+    const hasHealthyRr = cp.rr1 == null || Number(cp.rr1) >= 1.4;
+    if (!isEntrySignal || !isConfirmedTf || !hasHealthyRr || cp.score < (tgClient.prefs.minScore || 78)) return;
 
     tgClient.sentSigKeys.add(sigKey);
     const dirLabel = cp.status === 'BUY_NOW' ? 'LONG' : 'SHORT';
@@ -5438,6 +5514,7 @@
       dedupKey: `sig:${sigKey}`,
       sym: state.symbol,
       tf: state.tf,
+      bias: dirLabel,
       includeActions: true,
       summary: `Semnal ${dirLabel} ${cp.grade} (${cp.score}) pe ${state.symbol} (${state.tf.toUpperCase()})`,
       html:
@@ -5512,7 +5589,7 @@
           assignSymbolToFocusedPane(cleanSym);
         } else {
           state.tf = targetTf;
-          try { localStorage.setItem('tp_ultra_tf', targetTf); } catch (_) { }
+          try { localStorage.setItem('tp_ultra_tf', targetTf); } catch (_) {}
           document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === targetTf));
           loadSymbol(cleanSym, targetTf);
         }
@@ -5569,26 +5646,33 @@
     }
   }
 
+  function syncSelectVal(id, val) {
+    const sel = document.getElementById(id);
+    if (!sel || val === undefined || val === null) return;
+    const valStr = String(val);
+    if ([...sel.options].some(o => o.value === valStr)) sel.value = valStr;
+  }
+
   function renderTelegramPanelUI() {
     const badge = document.getElementById('tgConnBadge');
     const railDot = document.getElementById('tgRailDot');
     const handleEl = document.getElementById('tgBotHandleLbl');
     const chatInp = document.getElementById('tgChatIdInput');
     const pollEl = document.getElementById('tgPollStatusLbl');
-    const minSel = document.getElementById('tgMinScoreSelect');
     const logBox = document.getElementById('tgActivityLog');
+    const isEnabled = !!tgClient.prefs.enabled;
 
     if (badge) {
       if (tgClient.botOk && tgClient.chatId) {
-        badge.textContent = tgClient.prefs.enabled ? 'Activ · Live' : 'Pauză (Mute)';
-        badge.className = `pill ${tgClient.prefs.enabled ? 'pill-buy' : 'pill-warn'}`;
+        badge.textContent = isEnabled ? 'Activ · Live' : 'Pauză (Mute)';
+        badge.className = `pill ${isEnabled ? 'pill-buy' : 'pill-warn'}`;
       } else {
-        badge.textContent = 'Deconectat';
-        badge.className = 'pill pill-neut';
+        badge.textContent = isEnabled ? 'Deconectat' : 'Oprit (Mute)';
+        badge.className = `pill ${isEnabled ? 'pill-neut' : 'pill-warn'}`;
       }
     }
     if (railDot) {
-      railDot.classList.toggle('online', !!(tgClient.botOk && tgClient.chatId && tgClient.prefs.enabled));
+      railDot.classList.toggle('online', !!(tgClient.botOk && tgClient.chatId && isEnabled));
     }
     if (handleEl && tgClient.botUsername) {
       handleEl.textContent = `@${tgClient.botUsername}`;
@@ -5601,21 +5685,73 @@
       pollEl.style.color = tgClient.pollingActive ? 'var(--tv-green)' : 'var(--text-muted)';
     }
 
-    ['enabled', 'alerts', 'signals', 'trades', 'scanner'].forEach(k => {
+    const topBtn = document.getElementById('tgQuickToggleBtn');
+    const topLbl = document.getElementById('tgQuickToggleLbl');
+    if (topBtn) {
+      topBtn.classList.toggle('is-on', isEnabled);
+      topBtn.classList.toggle('is-off', !isEnabled);
+      topBtn.setAttribute('aria-pressed', String(isEnabled));
+    }
+    if (topLbl) topLbl.textContent = isEnabled ? 'TG ON' : 'TG OPRIT';
+
+    const mobBtn = document.getElementById('mobTgChipBtn');
+    if (mobBtn) {
+      mobBtn.classList.toggle('is-on', isEnabled);
+      mobBtn.classList.toggle('is-off', !isEnabled);
+      mobBtn.setAttribute('aria-pressed', String(isEnabled));
+      mobBtn.textContent = isEnabled ? 'TG ON' : 'TG OPRIT';
+    }
+
+    const masterBtn = document.getElementById('tgMasterBannerBtn');
+    const masterTxt = document.getElementById('tgMasterBannerTxt');
+    if (masterBtn) {
+      masterBtn.classList.toggle('is-on', isEnabled);
+      masterBtn.classList.toggle('is-off', !isEnabled);
+      masterBtn.setAttribute('aria-pressed', String(isEnabled));
+    }
+    if (masterTxt) {
+      masterTxt.textContent = isEnabled
+        ? 'MESAJE TELEGRAM: ACTIVE (APASĂ PT. OPRIRE)'
+        : 'MESAJE TELEGRAM: OPRITE (APASĂ PT. PORNIRE)';
+    }
+
+    const alertsPill = document.getElementById('alertsTgPill');
+    const alertsTogBtn = document.getElementById('alertsTgToggleBtn');
+    if (alertsPill) {
+      alertsPill.textContent = isEnabled ? 'Telegram: Activ' : 'Telegram: Oprit (Mute)';
+      alertsPill.className = `pill ${isEnabled ? 'pill-buy' : 'pill-warn'}`;
+    }
+    if (alertsTogBtn) {
+      alertsTogBtn.textContent = isEnabled ? 'Oprește TG' : 'Pornește TG';
+      alertsTogBtn.classList.toggle('is-off', !isEnabled);
+    }
+
+    const quotaEl = document.getElementById('tgQuotaStatsLbl');
+    if (quotaEl) {
+      const rs = tgClient.rateStats;
+      const maxHr = tgClient.prefs.maxPerHour || 0;
+      const maxTxt = maxHr > 0 ? String(maxHr) : '∞';
+      const sentTxt = rs ? `${rs.sentLastHour}/${maxTxt}` : `0/${maxTxt}`;
+      const cdTxt = `${tgClient.prefs.cooldownMin || 180}m`;
+      const sessTxt = rs?.sessionLabel || 'Standby';
+      quotaEl.textContent = `${sentTxt} trimise/oră · Cooldown ${cdTxt} · Piață SUA: ${sessTxt}`;
+    }
+
+    ['enabled', 'radarIntel', 'onlyMarketOpen', 'requirePreBuyPass', 'signals', 'alerts', 'trades'].forEach(k => {
+      const active = !!tgClient.prefs[k];
       const sw = document.getElementById(`tgSw_${k}`);
-      if (sw) sw.classList.toggle('on', !!tgClient.prefs[k]);
+      if (sw) sw.classList.toggle('on', active);
+      const row = document.querySelector(`.tg-toggle-row[data-tgpref="${k}"]`);
+      if (row) row.setAttribute('aria-checked', String(active));
     });
 
-    if (minSel && String(tgClient.prefs.minScore)) {
-      const valStr = String(tgClient.prefs.minScore);
-      if ([...minSel.options].some(o => o.value === valStr)) {
-        minSel.value = valStr;
-      }
-    }
+    syncSelectVal('tgMinScoreSelect', tgClient.prefs.minScore ?? 78);
+    syncSelectVal('tgMaxPerHourSelect', tgClient.prefs.maxPerHour ?? 3);
+    syncSelectVal('tgCooldownSelect', tgClient.prefs.cooldownMin ?? 180);
 
     if (logBox) {
       if (!tgClient.logs.length) {
-        logBox.innerHTML = `<div style="padding:16px 10px;text-align:center;color:var(--text-muted);font-size:10.5px;">Nicio comandă sau notificare recentă. Trimite <code>/pret NVDA</code> pe Telegram.</div>`;
+        logBox.innerHTML = `<div style="padding:16px 10px;text-align:center;color:var(--text-muted);font-size:10.5px;">Nicio comandă sau notificare recentă. Trimite <code>/radar</code> sau <code>/mute</code> pe Telegram.</div>`;
       } else {
         logBox.innerHTML = tgClient.logs.slice(0, 20).map(item => {
           const isIn = item.dir === 'in';
@@ -5651,13 +5787,63 @@
         if (json.chatId) tgClient.chatId = json.chatId;
         if (json.botUsername) tgClient.botUsername = json.botUsername;
         if (json.prefs) tgClient.prefs = { ...tgClient.prefs, ...json.prefs };
+        if (json.rateStats) tgClient.rateStats = json.rateStats;
         if (Array.isArray(json.logs)) tgClient.logs = json.logs;
         renderTelegramPanelUI();
         if (customChatId !== null) {
           showToast('Configurare Telegram Salvată', `Chat ID activ: ${tgClient.chatId}`, 'buy');
         }
       }
-    } catch (_) { }
+    } catch (_) {}
+  }
+
+  function toggleTelegramMasterMute() {
+    const next = !tgClient.prefs.enabled;
+    saveTelegramConfig({ enabled: next });
+    showToast(
+      next ? 'Mesaje Telegram Pornite' : 'Mesaje Telegram Oprite',
+      next
+        ? 'Notificările inteligente (Early Radar AI + Pre-BUY Gate) sunt active.'
+        : 'Botul nu va mai trimite mesaje automate până la reactivare.',
+      next ? 'buy' : 'sell'
+    );
+  }
+
+  async function triggerSmartRadarScanFromUI() {
+    const btn = document.getElementById('tgRunRadarNowBtn');
+    const prevHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>Analizez Early Radar + SEC EDGAR...</span>';
+    }
+    try {
+      const res = await fetch('/api/telegram/radar-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true })
+      });
+      const json = await res.json();
+      if (json?.rateStats) tgClient.rateStats = json.rateStats;
+      if (Array.isArray(json?.logs)) tgClient.logs = json.logs;
+      renderTelegramPanelUI();
+
+      if (json?.sentCount > 0) {
+        showToast('Briefing Radar Livrat', 'Cel mai bun setup calificat a fost trimis pe Telegram.', 'buy');
+      } else if (json?.skipped === 'disabled') {
+        showToast('Telegram Oprit / Dezactivat', 'Pornește Telegram ON și Early Radar AI pentru a primi alerte.', 'sell');
+      } else if (json?.skipped === 'rate_limit') {
+        showToast('Limită Orară Atinsă', 'Limita anti-spam pe oră a blocat trimiterea suplimentară.', 'info');
+      } else {
+        showToast('Niciun Moment Calificat', `Scanate ${json?.scanned || 0} simboluri — niciunul nu a trecut complet filtrele Intel & Pre-BUY.`, 'info');
+      }
+    } catch (e) {
+      showToast('Eroare Radar Telegram', e?.message || 'Eroare de conexiune.', 'sell');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = prevHtml;
+      }
+    }
   }
 
   async function syncTelegramBridge() {
@@ -5687,6 +5873,7 @@
       tgClient.pollingActive = !!data.pollingActive;
       if (data.chatId) tgClient.chatId = data.chatId;
       if (data.prefs) tgClient.prefs = { ...tgClient.prefs, ...data.prefs };
+      if (data.rateStats) tgClient.rateStats = data.rateStats;
       if (Array.isArray(data.logs)) tgClient.logs = data.logs;
 
       if (Array.isArray(data.uiActions) && data.uiActions.length > 0) {
@@ -5701,19 +5888,39 @@
 
   function wireTelegramUI() {
     document.querySelectorAll('.tg-toggle-row[data-tgpref]').forEach(row => {
-      row.onclick = () => {
+      const toggleRow = () => {
         const key = row.dataset.tgpref;
         if (!key) return;
         saveTelegramConfig({ [key]: !tgClient.prefs[key] });
       };
+      row.onclick = toggleRow;
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleRow();
+        }
+      });
     });
 
-    const minSel = document.getElementById('tgMinScoreSelect');
-    if (minSel) {
-      minSel.onchange = () => {
-        saveTelegramConfig({ minScore: Number(minSel.value) || 72 });
+    ['tgMasterBannerBtn', 'tgQuickToggleBtn', 'mobTgChipBtn', 'alertsTgToggleBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.onclick = toggleTelegramMasterMute;
+    });
+
+    const openCfgBtn = document.getElementById('alertsTgOpenCfgBtn');
+    if (openCfgBtn) openCfgBtn.onclick = () => applyRightSidebarState('telegram', false);
+
+    const bindSelectPref = (id, key, fallback) => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      sel.onchange = () => {
+        const val = parseInt(sel.value, 10);
+        saveTelegramConfig({ [key]: Number.isFinite(val) ? val : fallback });
       };
-    }
+    };
+    bindSelectPref('tgMinScoreSelect', 'minScore', 78);
+    bindSelectPref('tgMaxPerHourSelect', 'maxPerHour', 3);
+    bindSelectPref('tgCooldownSelect', 'cooldownMin', 180);
 
     const saveBtn = document.getElementById('tgSaveCfgBtn');
     const chatInp = document.getElementById('tgChatIdInput');
@@ -5735,6 +5942,34 @@
 
     const testBtn = document.getElementById('tgTestBtn');
     if (testBtn) testBtn.onclick = () => sendCurrentPlanToTelegram(true);
+
+    const radarBtn = document.getElementById('tgRunRadarNowBtn');
+    if (radarBtn) radarBtn.onclick = triggerSmartRadarScanFromUI;
+
+    const sendHubBtn = document.getElementById('tgSendHubBtn');
+    if (sendHubBtn) {
+      sendHubBtn.onclick = async () => {
+        const prev = sendHubBtn.innerHTML;
+        sendHubBtn.disabled = true;
+        sendHubBtn.innerHTML = '<span>Trimit Taste &amp; Panou pe Telegram...</span>';
+        try {
+          const res = await fetch('/api/telegram/send-controls', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          const json = await res.json();
+          if (json?.ok) {
+            if (Array.isArray(json.logs)) tgClient.logs = json.logs;
+            renderTelegramPanelUI();
+            showToast('Panou & Taste Trimise', 'Tastele rapide jos și Panoul Interactiv au fost livrate în Telegram.', 'buy');
+          } else {
+            showToast('Eroare Telegram', json?.error || 'Nu s-au putut trimite controalele.', 'sell');
+          }
+        } catch (e) {
+          showToast('Eroare Telegram', e?.message || 'Eroare de conexiune.', 'sell');
+        } finally {
+          sendHubBtn.disabled = false;
+          sendHubBtn.innerHTML = prev;
+        }
+      };
+    }
   }
 
   function initTelegramBridge() {
@@ -5748,11 +5983,12 @@
         if (st.chatId) tgClient.chatId = st.chatId;
         tgClient.pollingActive = !!st.pollingActive;
         if (st.prefs) tgClient.prefs = { ...tgClient.prefs, ...st.prefs };
+        if (st.rateStats) tgClient.rateStats = st.rateStats;
         if (Array.isArray(st.logs)) tgClient.logs = st.logs;
         renderTelegramPanelUI();
         syncTelegramBridge();
       })
-      .catch(() => { });
+      .catch(() => {});
 
     setInterval(() => {
       syncTelegramBridge();
@@ -6190,7 +6426,7 @@
         badge.textContent = `${cp.status === 'BUY_NOW' ? 'BUY' : cp.status === 'SELL_NOW' ? 'SELL' : (cp.stBull ? 'BULL' : 'BEAR')} ${cp.score}`;
         badge.className = `pill ${cp.stBull ? 'pill-buy' : 'pill-sell'}`;
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 
   // ─── 16. MAIN SYMBOL, COMPARE/SPREAD & CSV EXPORT ENGINE ──────────────────
@@ -6673,9 +6909,9 @@
 
     const endpoints = IS_LOCAL
       ? [
-        `/api/search?q=${encodeURIComponent(qClean)}&cat=${encodeURIComponent(cat)}`,
-        `http://localhost:9030/api/search?q=${encodeURIComponent(qClean)}&cat=${encodeURIComponent(cat)}`
-      ]
+          `/api/search?q=${encodeURIComponent(qClean)}&cat=${encodeURIComponent(cat)}`,
+          `http://localhost:9030/api/search?q=${encodeURIComponent(qClean)}&cat=${encodeURIComponent(cat)}`
+        ]
       : [`/api/search?q=${encodeURIComponent(qClean)}&cat=${encodeURIComponent(cat)}`];
 
     let remoteResults = null;
@@ -6790,9 +7026,11 @@
     const eType = it.extType || lq?.extType || '';
     const ePrice = it.extPrice ?? lq?.extPrice;
     const ePct = it.extChgPct ?? lq?.extChgPct ?? 0;
-    const extStr = (eType && ePrice != null && isFinite(ePrice))
-      ? `<div class="wl-ext-tag ${eType === 'PRE' ? 'pre' : 'post'}" style="font-size:9px;margin-top:1px;">${eType === 'PRE' ? 'Pre' : 'Post'} ${fmt(ePrice)} (${ePct >= 0 ? '+' : ''}${ePct.toFixed(2)}%)</div>`
-      : '';
+    let extStr = '';
+    if (eType && ePrice != null && isFinite(ePrice)) {
+      const extMeta = getExtSessionUiMeta(eType);
+      extStr = `<div class="wl-ext-tag ${extMeta.cls}" style="font-size:9px;margin-top:1px;">${extMeta.short} ${fmt(ePrice)} (${ePct >= 0 ? '+' : ''}${ePct.toFixed(2)}%)</div>`;
+    }
     return `
       <div class="tabular" style="text-align:right;line-height:1.2;flex-shrink:0;">
         <div style="font-size:11px;font-weight:700;color:var(--text-bright);">${fmt(p)}</div>
@@ -7283,7 +7521,7 @@
     const bearOB = kl.bearOB ? `${fmt(kl.bearOB.bottom)} – ${fmt(kl.bearOB.top)}` : '—';
 
     body.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:10px;margin-bottom:14px;">
+      <div class="ai-fc-kpi-grid">
         <div class="bt-kpi"><div class="bt-kpi-lbl">Simbol &amp; Preț</div><div class="bt-kpi-val">${escTg(state.symbol)} · ${fmt(fc.lastClose)}</div></div>
         <div class="bt-kpi"><div class="bt-kpi-lbl">Probabilitate AI</div><div class="bt-kpi-val ${idea?.isBuy ? 'up' : 'dn'}">${idea ? `${idea.probPct}% · ${idea.grade}` : `${cp.grade} (${cp.score}/100)`}</div></div>
         <div class="bt-kpi"><div class="bt-kpi-lbl">Target k-NN (${fc.horizon} bare)</div><div class="bt-kpi-val ${isBull ? 'up' : 'dn'}">${fmt(fc.baseTarget)} (${fc.basePct >= 0 ? '+' : ''}${fc.basePct.toFixed(2)}%)</div></div>
@@ -7333,7 +7571,7 @@
         <div style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">Suprapunere Grafică: Preț Curent + Scenarii Istorice k-NN + Niveluri TP/SL</div>
         <canvas id="deepFcCanvas" style="width:100%;height:230px;display:block;"></canvas>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div class="ai-fc-analogs-grid">
         ${fc.topMatches.map((m, i) => `
           <div class="bt-kpi" style="border:1px solid var(--border);border-radius:var(--r-ctrl);">
             <div style="display:flex;justify-content:space-between;font-weight:700;">
@@ -7464,16 +7702,17 @@
       if (mins >= 570 && mins < 960) { lbl = 'LIVE'; dot = 'green'; }
       else if (mins >= 240 && mins < 570) { lbl = 'PRE-MARKET'; dot = 'amber'; }
       else if (mins >= 960 && mins < 1200) { lbl = 'AFTER-HOURS'; dot = 'amber'; }
+      else if (mins < 240 || (dow <= 4 && mins >= 1200)) { lbl = 'OVERNIGHT'; dot = 'amber'; }
+    } else if (dow === 0 && mins >= 1200) {
+      lbl = 'OVERNIGHT'; dot = 'amber';
     } else {
       lbl = 'WEEKEND (CRYPTO 24/7)';
     }
 
     const dotEl = document.getElementById('mktSessionDot');
     const txtEl = document.getElementById('mktSessionText');
-    const clkEl = document.getElementById('liveClockText');
     if (dotEl) dotEl.className = `status-dot ${dot}`;
     if (txtEl) txtEl.textContent = lbl;
-    if (clkEl) clkEl.textContent = now.toLocaleTimeString('ro-RO');
   }
 
   // ─── 18. WIRE DOM EVENTS & BOOT ───────────────────────────────────────────
@@ -7487,7 +7726,7 @@
     try {
       localStorage.setItem('tp_ultra_rpage', cleanPage);
       localStorage.setItem('tp_ultra_rp_collapsed', isCol ? '1' : '0');
-    } catch (_) { }
+    } catch (_) {}
 
     const rp = document.getElementById('rightPanel');
     if (rp) rp.classList.toggle('collapsed', isCol);
@@ -7495,7 +7734,7 @@
     document.querySelectorAll('[data-rpage]').forEach(b => {
       b.classList.toggle('active', !isCol && b.dataset.rpage === cleanPage);
       if (b.classList.contains('active') && b.closest('#mobileDrawerTabs')) {
-        try { b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) { }
+        try { b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
       }
     });
     document.querySelectorAll('.rpage').forEach(p => {
@@ -7523,10 +7762,15 @@
     }
 
     // Symbol Search Modal (Updates whichever Multi-Chart Screen is currently selected!)
-    document.getElementById('curSymbolTitle').onclick = () => {
+    const triggerMainSymbolSearch = () => {
       if (state.layout !== '1' && state.focusedPaneId !== 0) focusChartPane(0);
       openSymbolModal('');
     };
+    document.getElementById('curSymbolTitle').onclick = triggerMainSymbolSearch;
+    document.getElementById('mobSymSearchBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerMainSymbolSearch();
+    });
     const symModalInp = document.getElementById('symSearchModalInput');
     const clrModalBtn = document.getElementById('clearModalSearchBtn');
     if (clrModalBtn) {
@@ -7844,7 +8088,7 @@
       if (wlContEl && isFinite(savedWlH) && savedWlH >= 110 && !isMobileViewport()) {
         wlContEl.style.height = `${savedWlH}px`;
       }
-    } catch (_) { }
+    } catch (_) {}
     if (wlSplitEl && wlContEl) {
       let splitDrag = null;
       wlSplitEl.addEventListener('pointerdown', (e) => {
@@ -7866,13 +8110,13 @@
         wlSplitEl.classList.remove('dragging');
         const finalH = Math.round(wlContEl.getBoundingClientRect().height);
         splitDrag = null;
-        try { localStorage.setItem('tp_wl_panel_h', String(finalH)); } catch (_) { }
+        try { localStorage.setItem('tp_wl_panel_h', String(finalH)); } catch (_) {}
       };
       wlSplitEl.addEventListener('pointerup', endSplitDrag);
       wlSplitEl.addEventListener('pointercancel', endSplitDrag);
       wlSplitEl.addEventListener('dblclick', () => {
         wlContEl.style.height = '';
-        try { localStorage.removeItem('tp_wl_panel_h'); } catch (_) { }
+        try { localStorage.removeItem('tp_wl_panel_h'); } catch (_) {}
       });
     }
     document.getElementById('dwGoAiIdeaBtn')?.addEventListener('click', () => {
@@ -8192,8 +8436,13 @@
 
         if (target === 'chart') {
           closeMobileSheetsToChart();
+          if (document.getElementById('centerColumn')?.classList.contains('intel-mode')) {
+            window.dispatchEvent(new CustomEvent('tp:switchWorkspaceView', { detail: { view: 'chart' } }));
+          }
           return;
         }
+
+        closeCopilotOverlay();
 
         if (target === 'screener' || target === 'paper') {
           const activeBdTab = document.querySelector('.bd-tab.active')?.dataset.bdtab || '';

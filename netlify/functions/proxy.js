@@ -8,6 +8,13 @@ const YFClass = YahooFinancePkg.default || YahooFinancePkg;
 const yf = typeof YFClass === 'function'
   ? new YFClass({ suppressNotices: ['yahooSurvey', 'ripHistorical'], validation: { logErrors: false } })
   : YFClass;
+const {
+  TV_INTERVAL_MAP,
+  isUsEquityTicker,
+  enrichQuotesWithTvExtended,
+  fetchBoatsOvernightSeries,
+  mergeBoatsBarsIntoChartPayload
+} = require('./tv-overnight.js');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -16,9 +23,12 @@ const CORS_HEADERS = {
   'Cache-Control': 'no-store'
 };
 
-let serverlessTgPrefs = { enabled: true, alerts: true, signals: true, trades: true, scanner: false, minScore: 72 };
+let serverlessTgPrefs = { enabled: true, alerts: true, signals: true, trades: true, scanner: false, radarIntel: true, onlyMarketOpen: true, minScore: 78, maxPerHour: 3, cooldownMin: 180 };
 let serverlessUiActions = [];
 let serverlessLogs = [];
+const serverlessDedup = new Map();
+const serverlessCooldown = new Map();
+let serverlessSentTimestamps = [];
 
 function rangeToPeriod1(rangeStr, intervalStr) {
   const daysMap = {
@@ -127,16 +137,44 @@ exports.handler = async (event) => {
       if (!tok || !chat) return jsonResp(200, { ok: false, error: 'TELEGRAM_TOKEN sau CHAT_ID lipsă în Netlify Env' });
       const cat = bodyObj.category || 'manual';
       const bypass = cat === 'reply' || cat === 'test' || cat === 'manual';
-      if (!bypass && (!serverlessTgPrefs.enabled || (serverlessTgPrefs[cat] === false))) {
-        return jsonResp(200, { ok: true, skipped: cat });
+      const sym = String(bodyObj.sym || '').trim().toUpperCase();
+      const bias = String(bodyObj.bias || '').trim().toUpperCase();
+      const dedupKey = String(bodyObj.dedupKey || '').trim();
+      const now = Date.now();
+      if (!bypass) {
+        if (!serverlessTgPrefs.enabled || (serverlessTgPrefs[cat] === false)) {
+          return jsonResp(200, { ok: true, skipped: cat });
+        }
+        if (dedupKey && serverlessDedup.has(dedupKey) && now - serverlessDedup.get(dedupKey) < 6 * 3600 * 1000) {
+          return jsonResp(200, { ok: true, skipped: 'dedup' });
+        }
+        if (sym && serverlessCooldown.has(sym)) {
+          const prev = serverlessCooldown.get(sym);
+          const cdMs = (serverlessTgPrefs.cooldownMin || 180) * 60 * 1000;
+          if (now - prev.ts < cdMs && (!bias || prev.bias === bias)) {
+            return jsonResp(200, { ok: true, skipped: 'cooldown' });
+          }
+        }
+        serverlessSentTimestamps = serverlessSentTimestamps.filter(ts => now - ts < 3600 * 1000);
+        if ((serverlessTgPrefs.maxPerHour || 3) > 0 && serverlessSentTimestamps.length >= (serverlessTgPrefs.maxPerHour || 3)) {
+          return jsonResp(200, { ok: true, skipped: 'rate_limit' });
+        }
       }
       const tgRes = await fetch(`https://api.telegram.org/bot${tok}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chat, text: String(bodyObj.html || ''), parse_mode: 'HTML', disable_web_page_preview: true })
+        body: JSON.stringify({ chat_id: chat, text: String(bodyObj.html || '').slice(0, 3850), parse_mode: 'HTML', disable_web_page_preview: true })
       }).then(r => r.json()).catch(e => ({ ok: false, description: e.message }));
       if (!tgRes.ok) return jsonResp(500, { ok: false, error: tgRes.description || 'Telegram error' });
-      serverlessLogs.unshift({ id: Date.now(), time: new Date().toLocaleTimeString('ro-RO'), dir: 'out', category: cat, summary: bodyObj.summary || 'Notificare trimisă' });
+      if (dedupKey) {
+        serverlessDedup.set(dedupKey, now);
+        if (serverlessDedup.size > 400) serverlessDedup.delete(serverlessDedup.keys().next().value);
+      }
+      if (!bypass) {
+        serverlessSentTimestamps.push(now);
+        if (sym) serverlessCooldown.set(sym, { ts: now, bias });
+      }
+      serverlessLogs.unshift({ id: now, time: new Date().toLocaleTimeString('ro-RO'), dir: 'out', category: cat, summary: bodyObj.summary || 'Notificare trimisă' });
       serverlessLogs = serverlessLogs.slice(0, 20);
       return jsonResp(200, { ok: true, logs: serverlessLogs });
     }
@@ -228,7 +266,11 @@ exports.handler = async (event) => {
       const includePrePost = parsed.searchParams.get('includePrePost') === 'true';
       const period1 = rangeToPeriod1(range, yfInterval);
 
-      const ch = await yf.chart(rawSym, { period1, interval: yfInterval, includePrePost }, { validateResult: false });
+      const wantBoats = includePrePost && TV_INTERVAL_MAP[yfInterval] && isUsEquityTicker(rawSym);
+      const [ch, boatsBars] = await Promise.all([
+        yf.chart(rawSym, { period1, interval: yfInterval, includePrePost }, { validateResult: false }),
+        wantBoats ? fetchBoatsOvernightSeries(rawSym, yfInterval).catch(() => []) : Promise.resolve([])
+      ]);
       const quotes = (ch?.quotes || []).filter(q => q && q.date && q.close != null);
       const payload = {
         chart: {
@@ -248,6 +290,7 @@ exports.handler = async (event) => {
           error: null
         }
       };
+      if (boatsBars.length) mergeBoatsBarsIntoChartPayload(payload, boatsBars);
       return {
         statusCode: 200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
@@ -272,6 +315,7 @@ exports.handler = async (event) => {
           }));
         }
       }
+      await enrichQuotesWithTvExtended(results).catch(() => {});
       return {
         statusCode: 200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },

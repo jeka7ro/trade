@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { toEpochSec } = require('./netlify/functions/tv-overnight.js');
 
 const UA_BROWSER = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const UA_SEC = 'TradeProTerminal/2.0 research@tradepro.local';
@@ -96,8 +97,14 @@ function getMarketSessionContext(nowMs = Date.now()) {
   let isRegular = false;
   let isPreMarket = false;
   let isAfterHours = false;
+  let isOvernight = false;
 
-  if (isWeekend) {
+  if (weekday === 'Sun' && ny.minuteOfDay >= 1200) {
+    sessionCode = 'OVERNIGHT';
+    label = 'OVERNIGHT (BOATS)';
+    tone = 'purple';
+    isOvernight = true;
+  } else if (isWeekend) {
     sessionCode = 'WEEKEND';
     label = 'ÎNCHIS (WEEKEND)';
   } else if (ny.minuteOfDay >= 240 && ny.minuteOfDay < 570) {
@@ -115,6 +122,11 @@ function getMarketSessionContext(nowMs = Date.now()) {
     label = 'AFTER-HOURS ET';
     tone = 'cyan';
     isAfterHours = true;
+  } else if (ny.minuteOfDay < 240 || (weekday !== 'Fri' && ny.minuteOfDay >= 1200)) {
+    sessionCode = 'OVERNIGHT';
+    label = 'OVERNIGHT (BOATS)';
+    tone = 'purple';
+    isOvernight = true;
   }
 
   return {
@@ -124,6 +136,7 @@ function getMarketSessionContext(nowMs = Date.now()) {
     isRegular,
     isPreMarket,
     isAfterHours,
+    isOvernight,
     isExtendedHours: isPreMarket || isAfterHours,
     dayEt: ny.day,
     minuteOfDayEt: ny.minuteOfDay,
@@ -210,17 +223,6 @@ function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function toEpochSec(val) {
-  if (val instanceof Date) return Math.floor(val.getTime() / 1000);
-  if (typeof val === 'string' && val.trim()) {
-    const ms = Date.parse(val);
-    if (Number.isFinite(ms)) return Math.floor(ms / 1000);
-  }
-  const n = Number(val);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
-}
-
 function nowTimeRo() {
   return new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -286,8 +288,11 @@ function createIntelEngine(deps) {
     const clean = Array.from(new Set(symbols.map(s => String(s || '').trim().toUpperCase()).filter(Boolean)));
     const map = new Map();
     if (!clean.length) return map;
+    const slices = [];
     for (let i = 0; i < clean.length; i += 40) {
-      const slice = clean.slice(i, i + 40);
+      slices.push(clean.slice(i, i + 40));
+    }
+    await Promise.all(slices.map(async (slice) => {
       try {
         const data = await handleYahooProxyTarget(
           `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(slice.join(','))}`
@@ -296,7 +301,7 @@ function createIntelEngine(deps) {
           if (q?.symbol) map.set(String(q.symbol).toUpperCase(), q);
         }
       } catch (_) {}
-    }
+    }));
     return map;
   }
 
@@ -3382,10 +3387,290 @@ function createIntelEngine(deps) {
     }
   }
 
+  function resolveCockpitExtendedFields(q, r, sessionCtx) {
+    const regPrice = safeNum(q.regularMarketPrice, safeNum(r.close, 0));
+    const regChgPct = safeNum(q.regularMarketChangePercent, safeNum(r.change, 0));
+    const regTs = toEpochSec(q.regularMarketTime);
+    const tvRegOpenTs = toEpochSec(r.time);
+
+    const tvPreTsRaw = toEpochSec(r.premarket_time);
+    const tvPreValid = tvPreTsRaw > tvRegOpenTs && safeNum(r.premarket_close, 0) > 0;
+    const hasYfPre = q.preMarketPrice != null && Number.isFinite(q.preMarketPrice) && q.preMarketPrice > 0;
+    const prePrice = hasYfPre ? q.preMarketPrice : (tvPreValid ? safeNum(r.premarket_close, null) : null);
+    const prePct = hasYfPre
+      ? safeNum(q.preMarketChangePercent, regPrice > 0 ? ((prePrice - regPrice) / regPrice) * 100 : null)
+      : (tvPreValid ? safeNum(r.premarket_change, null) : null);
+    const preTs = hasYfPre ? (toEpochSec(q.preMarketTime) || regTs) : (tvPreValid ? tvPreTsRaw : 0);
+
+    const hasOvn = q.overnightPrice != null && Number.isFinite(q.overnightPrice) && q.overnightPrice > 0;
+    const ovnPrice = hasOvn ? q.overnightPrice : null;
+    const ovnPct = hasOvn
+      ? safeNum(q.overnightChangePercent, regPrice > 0 ? ((ovnPrice - regPrice) / regPrice) * 100 : 0)
+      : null;
+    const ovnTs = hasOvn ? toEpochSec(q.overnightTime) : 0;
+
+    const tvPostTsRaw = toEpochSec(r.postmarket_time);
+    const tvPostValid = tvPostTsRaw >= tvRegOpenTs && safeNum(r.postmarket_close, 0) > 0;
+    const hasYfPost = q.postMarketPrice != null && Number.isFinite(q.postMarketPrice) && q.postMarketPrice > 0;
+    const postPrice = hasYfPost ? q.postMarketPrice : (tvPostValid ? safeNum(r.postmarket_close, null) : null);
+    const postPct = hasYfPost
+      ? safeNum(q.postMarketChangePercent, regPrice > 0 ? ((postPrice - regPrice) / regPrice) * 100 : null)
+      : (tvPostValid ? safeNum(r.postmarket_change, null) : null);
+    const postTs = hasYfPost ? (toEpochSec(q.postMarketTime) || regTs) : (tvPostValid ? tvPostTsRaw : 0);
+
+    const mktState = String(q.marketState || '').toUpperCase();
+    const tvSess = String(q.tvCurrentSession || '').toLowerCase();
+    let extType = '';
+    let extLabel = '';
+    let extPrice = null;
+    let extChgPct = null;
+    let extTime = 0;
+
+    if (!sessionCtx.isRegular && mktState !== 'REGULAR') {
+      if ((mktState === 'PRE' || tvSess === 'pre_market') && prePrice > 0 && preTs >= ovnTs) {
+        extType = 'PRE';
+      } else if (tvSess === 'night' && ovnPrice > 0) {
+        extType = 'OVN';
+      } else if ((mktState === 'POST' || mktState === 'POSTPOST' || tvSess === 'post_market') && postPrice > 0 && postTs >= ovnTs) {
+        extType = 'POST';
+      } else if (prePrice > 0 && preTs >= Math.max(ovnTs, postTs)) {
+        extType = 'PRE';
+      } else if (ovnPrice > 0 && ovnTs >= postTs) {
+        extType = 'OVN';
+      } else if (postPrice > 0) {
+        extType = 'POST';
+      }
+
+      if (extType === 'PRE') {
+        extLabel = 'Pre-Mkt';
+        extPrice = prePrice;
+        extChgPct = prePct;
+        extTime = preTs;
+      } else if (extType === 'OVN') {
+        extLabel = 'Overnight';
+        extPrice = ovnPrice;
+        extChgPct = ovnPct;
+        extTime = ovnTs;
+      } else if (extType === 'POST') {
+        extLabel = 'Post-Mkt';
+        extPrice = postPrice;
+        extChgPct = postPct;
+        extTime = postTs;
+      }
+    }
+
+    const livePrice = (!sessionCtx.isRegular && extPrice > 0) ? extPrice : regPrice;
+    const chgPct = (sessionCtx.isPreMarket && extType === 'PRE' && extChgPct != null)
+      ? extChgPct
+      : regChgPct;
+    const liveMovePct = (!sessionCtx.isRegular && extChgPct != null) ? extChgPct : chgPct;
+    const pmHigh = (hasYfPre || tvPreValid) ? safeNum(q.preMarketDayHigh, safeNum(r.premarket_high, null)) : null;
+
+    return {
+      regPrice,
+      regChgPct,
+      extType,
+      extLabel,
+      extPrice,
+      extChgPct,
+      extTime,
+      preChgPct: prePct,
+      pmHigh,
+      preVolume: tvPreValid ? safeNum(r.premarket_volume, 0) : 0,
+      livePrice,
+      chgPct,
+      liveMovePct
+    };
+  }
+
+  function computeProposalTradeLevels(side, price, vwap) {
+    const p = Number(price) || 0;
+    if (p <= 0) return { entry: 0, sl: 0, tp1: 0, tp2: 0, rr: 2.0 };
+    const dec = p < 2 ? 3 : 2;
+    const rawRisk = Math.min(p * 0.06, Math.max(p * 0.025, Math.abs((vwap || p) - p) * 0.85));
+    if (side === 'BUY') {
+      const sl = Math.max(0.01, p - rawRisk);
+      const risk = Math.max(0.005, p - sl);
+      return {
+        entry: Number(p.toFixed(dec)),
+        sl: Number(sl.toFixed(dec)),
+        tp1: Number((p + risk * 2.0).toFixed(dec)),
+        tp2: Number((p + risk * 3.2).toFixed(dec)),
+        rr: 2.0
+      };
+    }
+    const sl = p + rawRisk;
+    const risk = Math.max(0.005, sl - p);
+    return {
+      entry: Number(p.toFixed(dec)),
+      sl: Number(sl.toFixed(dec)),
+      tp1: Number(Math.max(0.01, p - risk * 2.0).toFixed(dec)),
+      tp2: Number(Math.max(0.01, p - risk * 3.2).toFixed(dec)),
+      rr: 2.0
+    };
+  }
+
+  function buildTop10CockpitProposals(poolRows, sessionCtx) {
+    const unique = new Map();
+    for (const r of poolRows) {
+      if (r && r.sym && !unique.has(r.sym)) unique.set(r.sym, r);
+    }
+
+    const buyCandidates = [];
+    const sellCandidates = [];
+
+    for (const row of unique.values()) {
+      if (row.halt || !(row.price >= 0.85)) continue;
+      if ((row.volume || 0) < 50000 && (row.preVolume || 0) < 15000) continue;
+
+      const extPct = row.extChgPct;
+      const movePct = (!sessionCtx.isRegular && extPct != null) ? extPct : row.chgPct;
+      const postSpikeDump = row.regChgPct >= 10 && extPct != null && extPct <= -2.5;
+      const activeSelloff = movePct <= -1.8 && (row.chg5m <= 0.15 || !sessionCtx.isRegular);
+      const dilutionFail = row.newsMeta?.isDilutionRisk || row.preBuyCheck?.checks?.some(c => c.id === 'dilution' && c.status === 'FAIL');
+      const overboughtFade = (row.rsi >= 75 && row.chg5m <= -0.35) || (dilutionFail && movePct <= 2);
+
+      const moveLabel = (row.extType && extPct != null)
+        ? `${row.extLabel} ${extPct >= 0 ? '+' : ''}${extPct.toFixed(2)}%`
+        : `${sessionCtx.isRegular ? 'RTH' : 'Reg'} ${row.chgPct >= 0 ? '+' : ''}${row.chgPct.toFixed(2)}%`;
+      const regRefLabel = (row.extType && row.regPrice > 0 && Math.abs(row.price - row.regPrice) > 1e-4)
+        ? `Reg $${row.regPrice.toFixed(row.regPrice < 2 ? 3 : 2)} (${row.regChgPct >= 0 ? '+' : ''}${row.regChgPct.toFixed(1)}%)`
+        : '';
+
+      const fmtRvolTag = (rv) => (rv >= 50 ? 'RVOL 50x+' : `RVOL ${rv.toFixed(1)}x`);
+
+      if (postSpikeDump || activeSelloff || overboughtFade) {
+        let score = 48;
+        score += Math.min(24, Math.abs(movePct) * 1.4);
+        score += postSpikeDump ? 14 : 0;
+        score += Math.min(10, Math.max(0, (row.rvolDaily - 1) * 2.5));
+        score += (row.vwap > 0 && row.price < row.vwap) ? 7 : 0;
+        score += dilutionFail ? 9 : 0;
+        score += (row.dollarVolume >= 2e6) ? 6 : 0;
+        score = Math.round(clamp(score, 52, 98));
+
+        const badge = score >= 76 && (movePct <= -4 || postSpikeDump) ? 'STRONG SELL' : 'SELL';
+        const levels = computeProposalTradeLevels('SELL', row.price, row.vwap);
+        const reasons = [];
+        if (postSpikeDump) reasons.push(`Fade ${row.extLabel} ${extPct.toFixed(1)}% după +${row.regChgPct.toFixed(0)}%`);
+        else if (movePct <= -1.8) reasons.push(`${row.extType ? row.extLabel : 'Cădere'} ${movePct.toFixed(2)}%`);
+        if (row.vwap > 0 && row.price < row.vwap) reasons.push('Sub VWAP');
+        if (dilutionFail) reasons.push('Risc diluție SEC/Știri');
+        else if (row.rvolDaily >= 2) reasons.push(fmtRvolTag(row.rvolDaily));
+
+        sellCandidates.push({
+          sym: row.sym,
+          name: row.name,
+          side: 'SELL',
+          badge,
+          score,
+          price: row.price,
+          regPrice: row.regPrice,
+          regChgPct: row.regChgPct,
+          extType: row.extType,
+          extLabel: row.extLabel,
+          extChgPct: row.extChgPct,
+          movePct,
+          moveLabel,
+          regRefLabel,
+          rvolDaily: row.rvolDaily,
+          preBuyAllow: false,
+          levels,
+          reason: reasons.slice(0, 3).join(' · ') || 'Presiune de vânzare activă'
+        });
+        continue;
+      }
+
+      const extHoldOk = extPct == null || extPct >= -0.2;
+      const notOverExtended = !row.preBuyCheck?.isOverExtended && movePct < 24 && row.regChgPct < 35;
+      const liqOk = (row.dollarVolume || 0) >= 250000 || (row.preVolume || 0) >= 20000;
+      const hasBullTraction = movePct >= 0.4 && (movePct >= 1.2 || (row.preChgPct != null && row.preChgPct >= 1.5) || row.chg5m >= 0.7 || (row.rvolDaily >= 2.0 && row.chgPct >= 0.5));
+
+      if (extHoldOk && !dilutionFail && notOverExtended && liqOk && hasBullTraction && row.rsi < 81) {
+        let score = 42;
+        score += (row.preBuyCheck?.passedCount || 0) * 5;
+        const sweetMom = movePct <= 14 ? movePct * 1.45 : Math.max(4, 20 - (movePct - 14) * 0.9);
+        score += clamp(sweetMom, 2, 22);
+        score += Math.min(12, Math.max(0, (row.rvolDaily - 1) * 3));
+        score += (row.floatShares > 0 && row.floatShares < 25e6) ? 7 : 0;
+        score += (row.newsMeta?.bias === 'BULLISH' || row.newsMeta?.isHot) ? 10 : 0;
+        score += (row.nearHod || (row.vwap > 0 && row.price >= row.vwap)) ? 7 : 0;
+        score = Math.round(clamp(score, 50, 98));
+
+        const prePass = Boolean(row.preBuyCheck?.allowBuy);
+        const badge = prePass && score >= 76 ? 'STRONG BUY' : ((prePass || score >= 66) ? 'BUY' : 'BUY SETUP');
+        const levels = computeProposalTradeLevels('BUY', row.price, row.vwap);
+        const reasons = [];
+        if (row.extType && extPct != null && extPct >= 1) {
+          reasons.push(`${row.regChgPct <= -10 ? 'Revenire ' : ''}${row.extLabel} +${extPct.toFixed(1)}%`);
+        } else {
+          reasons.push(`Impuls ${movePct >= 0 ? '+' : ''}${movePct.toFixed(1)}%`);
+        }
+        if (row.rvolDaily >= 1.8) reasons.push(fmtRvolTag(row.rvolDaily));
+        if (row.floatShares > 0 && row.floatShares < 25e6) reasons.push(`Float ${(row.floatShares / 1e6).toFixed(1)}M`);
+        if (row.newsMeta?.isHot) reasons.push('Catalizator recent');
+        else if (row.vwap > 0 && row.price >= row.vwap) reasons.push('Peste VWAP');
+
+        buyCandidates.push({
+          sym: row.sym,
+          name: row.name,
+          side: 'BUY',
+          badge,
+          score,
+          price: row.price,
+          regPrice: row.regPrice,
+          regChgPct: row.regChgPct,
+          extType: row.extType,
+          extLabel: row.extLabel,
+          extChgPct: row.extChgPct,
+          movePct,
+          moveLabel,
+          regRefLabel,
+          rvolDaily: row.rvolDaily,
+          preBuyAllow: prePass,
+          levels,
+          reason: reasons.slice(0, 3).join(' · ') || 'Momentum pozitiv peste VWAP'
+        });
+      }
+    }
+
+    buyCandidates.sort((a, b) => b.score - a.score);
+    sellCandidates.sort((a, b) => b.score - a.score);
+
+    const topBuys = buyCandidates.slice(0, 5);
+    const topSells = sellCandidates.slice(0, 5);
+    const mixed = [];
+    const seenMix = new Set();
+    const maxLen = Math.max(topBuys.length, topSells.length);
+    for (let i = 0; i < maxLen && mixed.length < 10; i++) {
+      if (topBuys[i] && !seenMix.has(topBuys[i].sym)) {
+        seenMix.add(topBuys[i].sym);
+        mixed.push(topBuys[i]);
+      }
+      if (mixed.length < 10 && topSells[i] && !seenMix.has(topSells[i].sym)) {
+        seenMix.add(topSells[i].sym);
+        mixed.push(topSells[i]);
+      }
+    }
+    for (const extra of [...buyCandidates.slice(5), ...sellCandidates.slice(5)]) {
+      if (mixed.length >= 10) break;
+      if (!seenMix.has(extra.sym)) {
+        seenMix.add(extra.sym);
+        mixed.push(extra);
+      }
+    }
+
+    return {
+      topProposals: mixed,
+      buyProposals: buyCandidates.slice(0, 10),
+      sellProposals: sellCandidates.slice(0, 10)
+    };
+  }
+
   async function fetchScannerCockpit(customSyms = [], forceRefresh = false) {
-    const cacheKey = 'intel:cockpit:v2';
+    const cacheKey = 'intel:cockpit:v3';
     if (!forceRefresh) {
-      const hit = getCached(cacheKey, 12000);
+      const hit = getCached(cacheKey, 10000);
       if (hit) return hit;
     }
 
@@ -3394,37 +3679,38 @@ function createIntelEngine(deps) {
       'name', 'description', 'close', 'change', 'volume',
       'float_shares_outstanding', 'relative_volume_10d_calc',
       'relative_volume_intraday|5', 'change|5', 'high', 'VWAP',
-      'premarket_change', 'premarket_high', 'total_shares_outstanding',
-      'market_cap_basic', 'RSI', 'bid', 'ask'
+      'premarket_close', 'premarket_change', 'premarket_high', 'premarket_volume', 'premarket_time',
+      'postmarket_close', 'postmarket_change', 'postmarket_time',
+      'total_shares_outstanding', 'market_cap_basic', 'RSI', 'bid', 'ask', 'time'
     ];
 
-    const [lowFloatRows, topGainerRows, earlyMoverRows, squeeze5mRows, pillars5Rows, halts, mktOverview] = await Promise.all([
+    const [lowFloatRows, topGainerRows, earlyMoverRows, squeeze5mRows, pillars5Rows, preMarketRows, sellLoserRows, extFadeRows, halts, mktOverview] = await Promise.all([
       tvScan(cols, [
         { left: 'type', operation: 'in_range', right: ['stock'] },
         { left: 'close', operation: 'in_range', right: [1, 40] },
         { left: 'float_shares_outstanding', operation: 'less', right: 25000000 },
         { left: 'volume', operation: 'greater', right: 250000 },
         { left: 'change', operation: 'greater', right: 1 }
-      ], 'change', 'desc', 22),
+      ], 'change', 'desc', 20),
       tvScan(cols, [
         { left: 'type', operation: 'in_range', right: ['stock', 'dr'] },
         { left: 'close', operation: 'in_range', right: [1, 300] },
         { left: 'volume', operation: 'greater', right: 350000 },
         { left: 'change', operation: 'greater', right: 2 }
-      ], 'change', 'desc', 22),
+      ], 'change', 'desc', 20),
       tvScan(cols, [
         { left: 'type', operation: 'in_range', right: ['stock'] },
         { left: 'close', operation: 'in_range', right: [1, 80] },
         { left: 'volume', operation: 'greater', right: 200000 },
         { left: 'relative_volume_10d_calc', operation: 'greater', right: 1.2 },
         { left: 'change', operation: 'in_range', right: [-2, 8] }
-      ], 'relative_volume_intraday|5', 'desc', 20),
+      ], 'relative_volume_intraday|5', 'desc', 18),
       tvScan(cols, [
         { left: 'type', operation: 'in_range', right: ['stock'] },
         { left: 'close', operation: 'in_range', right: [1, 100] },
         { left: 'volume', operation: 'greater', right: 200000 },
         { left: 'change|5', operation: 'greater', right: 1.2 }
-      ], 'change|5', 'desc', 22),
+      ], 'change|5', 'desc', 18),
       tvScan(cols, [
         { left: 'type', operation: 'in_range', right: ['stock'] },
         { left: 'close', operation: 'in_range', right: [1.5, 35] },
@@ -3432,45 +3718,69 @@ function createIntelEngine(deps) {
         { left: 'relative_volume_10d_calc', operation: 'greater', right: 2.5 },
         { left: 'volume', operation: 'greater', right: 400000 },
         { left: 'change', operation: 'greater', right: 3 }
-      ], 'relative_volume_10d_calc', 'desc', 18),
+      ], 'relative_volume_10d_calc', 'desc', 16),
+      tvScan(cols, [
+        { left: 'type', operation: 'in_range', right: ['stock'] },
+        { left: 'close', operation: 'in_range', right: [1, 300] },
+        { left: 'volume', operation: 'greater', right: 120000 },
+        { left: 'premarket_change', operation: 'greater', right: 2 }
+      ], 'premarket_change', 'desc', 16),
+      tvScan(cols, [
+        { left: 'type', operation: 'in_range', right: ['stock'] },
+        { left: 'close', operation: 'in_range', right: [1, 250] },
+        { left: 'volume', operation: 'greater', right: 300000 },
+        { left: 'change', operation: 'less', right: -2 }
+      ], 'change', 'asc', 16),
+      tvScan(cols, [
+        { left: 'type', operation: 'in_range', right: ['stock'] },
+        { left: 'close', operation: 'in_range', right: [1, 300] },
+        { left: 'volume', operation: 'greater', right: 250000 },
+        { left: 'postmarket_change', operation: 'less', right: -2.5 }
+      ], 'postmarket_change', 'asc', 14),
       fetchNasdaqHalts(),
       fetchMarketOverview(false)
     ]);
 
     const haltMap = new Map((halts || []).map(h => [h.sym, h]));
 
-    // Collect unique cockpit symbols to enrich live L1 Quote (Bid/Ask/Spread) + Short Interest + SEC + News
-    const allRawRows = [...lowFloatRows, ...topGainerRows, ...earlyMoverRows, ...squeeze5mRows, ...pillars5Rows];
-    const allUniqueSyms = Array.from(new Set(allRawRows.map(r => r.sym))).slice(0, 56);
+    // Ensure user watchlist US equities are also scanned live in Cockpit (including Pre-Market & BOATS Overnight)
+    const customRows = [];
+    const scannedSet = new Set([...lowFloatRows, ...topGainerRows, ...earlyMoverRows, ...squeeze5mRows, ...pillars5Rows, ...preMarketRows, ...sellLoserRows, ...extFadeRows].map(r => r.sym));
+    for (const s of (customSyms || []).slice(0, 8)) {
+      const up = String(s || '').toUpperCase().trim();
+      if (up && isUsEquitySymbol(up) && !scannedSet.has(up)) {
+        scannedSet.add(up);
+        customRows.push({ sym: up, name: up, rawSym: up });
+      }
+    }
+
+    // Enrich live quotes (Yahoo + TradingView Overnight BOATS + Pre/Post real-time)
+    const allRawRows = [...customRows, ...preMarketRows, ...earlyMoverRows, ...pillars5Rows, ...extFadeRows, ...sellLoserRows, ...lowFloatRows, ...squeeze5mRows, ...topGainerRows];
+    const allUniqueSyms = Array.from(new Set(allRawRows.map(r => r.sym))).slice(0, 72);
     const quoteMap = await fetchYahooQuoteBatch(allUniqueSyms);
 
     const priorityStructSyms = Array.from(new Set([
-      ...squeeze5mRows.slice(0, 6).map(r => r.sym),
+      ...squeeze5mRows.slice(0, 4).map(r => r.sym),
       ...pillars5Rows.slice(0, 4).map(r => r.sym),
-      ...lowFloatRows.slice(0, 4).map(r => r.sym)
-    ])).slice(0, 12);
+      ...lowFloatRows.slice(0, 4).map(r => r.sym),
+      ...sellLoserRows.slice(0, 3).map(r => r.sym)
+    ])).slice(0, 14);
 
     const prioritySecSyms = Array.from(new Set([
-      ...lowFloatRows.slice(0, 4).map(r => r.sym),
+      ...lowFloatRows.slice(0, 3).map(r => r.sym),
+      ...extFadeRows.slice(0, 2).map(r => r.sym),
       ...topGainerRows.filter(r => safeNum(r.change, 0) >= 20).slice(0, 3).map(r => r.sym),
-      ...pillars5Rows.slice(0, 3).map(r => r.sym)
-    ])).slice(0, 6);
+      ...pillars5Rows.slice(0, 2).map(r => r.sym)
+    ])).slice(0, 8);
 
     const distinctNewsSyms = [];
     const seenS = new Set();
-    for (const row of [...pillars5Rows, ...earlyMoverRows, ...lowFloatRows, ...squeeze5mRows, ...topGainerRows]) {
+    for (const row of [...pillars5Rows, ...earlyMoverRows, ...extFadeRows, ...lowFloatRows, ...sellLoserRows, ...squeeze5mRows, ...topGainerRows, ...customRows]) {
       if (!seenS.has(row.sym)) {
         seenS.add(row.sym);
         distinctNewsSyms.push(row.sym);
       }
-      if (distinctNewsSyms.length >= 12) break;
-    }
-    for (const s of (customSyms || []).slice(0, 3)) {
-      const up = String(s || '').toUpperCase().trim();
-      if (up && isUsEquitySymbol(up) && !seenS.has(up)) {
-        seenS.add(up);
-        distinctNewsSyms.push(up);
-      }
+      if (distinctNewsSyms.length >= 14) break;
     }
 
     const [structSettled, secSettled, newsSettled] = await Promise.all([
@@ -3515,14 +3825,17 @@ function createIntelEngine(deps) {
       const halt = haltMap.get(r.sym) || null;
       const newsMeta = symNewsAgeMap[r.sym] || null;
 
-      const chg = safeNum(q.regularMarketChangePercent, safeNum(r.change, 0));
+      const extInfo = resolveCockpitExtendedFields(q, r, sessionCtx);
+      const close = extInfo.livePrice;
+      const chg = extInfo.chgPct;
+      const liveMovePct = extInfo.liveMovePct;
+
       const chg5 = safeNum(r['change|5'], 0);
       const rvol = safeNum(r.relative_volume_10d_calc, 1);
       const rvol5m = safeNum(r['relative_volume_intraday|5'], 0);
       const tvFlt = safeNum(r.float_shares_outstanding, null);
       const yfFlt = st?.floatShares ?? null;
       const flt = yfFlt ?? tvFlt;
-      const close = safeNum(q.regularMarketPrice, safeNum(r.close, 0));
       const volume = safeNum(q.regularMarketVolume, safeNum(r.volume, 0));
       const hi = safeNum(q.regularMarketDayHigh, safeNum(r.high, close));
       const vwapPx = safeNum(r.VWAP, close);
@@ -3536,7 +3849,7 @@ function createIntelEngine(deps) {
 
       const dataQuality = auditDataQuality({
         sym: r.sym,
-        chgPct: chg,
+        chgPct: liveMovePct,
         sessionCtx,
         volume,
         price: close,
@@ -3552,7 +3865,7 @@ function createIntelEngine(deps) {
       const preBuyCheck = evaluatePreBuySafetyChecks({
         sym: r.sym,
         price: close,
-        chgPct: chg,
+        chgPct: liveMovePct,
         distVwapPct,
         volume,
         rvol5m,
@@ -3567,7 +3880,6 @@ function createIntelEngine(deps) {
         dataQuality
       });
 
-      // Strict differentiation: Short Squeeze ONLY with confirmed elevated Short Interest / DTC!
       const siPct = st?.shortPctFloat ?? null;
       const siRatio = st?.shortRatio ?? null;
       let strategy = extraTag || 'Low Float - High Rel Vol';
@@ -3599,7 +3911,7 @@ function createIntelEngine(deps) {
 
       const fivePillarsDetail = computeFivePillarsBreakdown({
         rvolDaily: rvol,
-        chgPct: chg,
+        chgPct: liveMovePct,
         floatShares: flt,
         shortPctFloat: siPct,
         shortRatio: siRatio,
@@ -3607,8 +3919,8 @@ function createIntelEngine(deps) {
         newsMeta
       });
 
-      // Verdict strictly respects 6-point Pre-BUY safety gate + extension guard (POAS +234% NEVER shows BUY!)
       const rsiVal = safeNum(r.RSI, 50);
+      const postSpikeDump = extInfo.regChgPct >= 10 && extInfo.extChgPct != null && extInfo.extChgPct <= -2.5;
       let cpAction = 'WAIT';
       let cpBadge = 'AȘTEAPTĂ';
       let cpTone = 'wait';
@@ -3616,26 +3928,28 @@ function createIntelEngine(deps) {
       if (halt) {
         cpBadge = 'HALT LULD';
         cpReason = `Oprit la tranzacționare (${halt.code || 'HALT'}): ${halt.explanation || ''}`;
-      } else if (chg <= -2 && chg5 <= -0.3) {
+      } else if (postSpikeDump || (liveMovePct <= -2 && (chg5 <= 0 || !sessionCtx.isRegular))) {
         cpAction = 'SELL';
         cpBadge = 'SELL';
         cpTone = 'sell';
-        cpReason = `Presiune vânzare (${chg.toFixed(2)}%) · SL ~$${(close * 1.04).toFixed(2)} · Țintă ~$${(close * 0.92).toFixed(2)}`;
-      } else if (chg >= 2 && (chg5 >= 0.4 || nearHod) && rvol5m >= 1.5 && rsiVal < 82) {
+        cpReason = postSpikeDump
+          ? `Fade ${extInfo.extLabel} (${extInfo.extChgPct.toFixed(2)}% vs înch. $${extInfo.regPrice.toFixed(2)}) · SL ~$${(close * 1.04).toFixed(2)} · Țintă ~$${(close * 0.92).toFixed(2)}`
+          : `Presiune vânzare (${liveMovePct.toFixed(2)}%) · SL ~$${(close * 1.04).toFixed(2)} · Țintă ~$${(close * 0.92).toFixed(2)}`;
+      } else if (liveMovePct >= 2 && (chg5 >= 0.4 || nearHod || (!sessionCtx.isRegular && liveMovePct >= 3)) && rvol5m >= 1.2 && rsiVal < 82) {
         if (!preBuyCheck.allowBuy) {
           cpAction = 'WAIT';
           cpBadge = preBuyCheck.isOverExtended ? 'SUPRA-EXTINS' : 'BLOCAT PRE-BUY';
           cpTone = 'wait';
           cpReason = `BUY blocat de Pre-BUY Gate (${preBuyCheck.passedCount}/${preBuyCheck.totalChecks}): ${preBuyCheck.blockers.join(' · ')}`;
         } else {
-          cpAction = chg >= 12 && nearHod && rvol5m >= 3 ? 'STRONG BUY' : 'BUY';
+          cpAction = liveMovePct >= 12 && nearHod && rvol5m >= 3 ? 'STRONG BUY' : 'BUY';
           cpBadge = cpAction;
           cpTone = cpAction === 'STRONG BUY' ? 'strong-buy' : 'buy';
           cpReason = `Validat Pre-BUY (${preBuyCheck.passedCount}/${preBuyCheck.totalChecks}) · SL ~$${(close * 0.96).toFixed(2)} · Țintă ~$${(close * 1.085).toFixed(2)}`;
         }
       } else if (preBuyCheck.isOverExtended) {
         cpBadge = 'SUPRA-EXTINS';
-        cpReason = `Mișcare deja întinsă (+${chg.toFixed(1)}%) — risc FOMO ridicat; așteaptă retragere la VWAP.`;
+        cpReason = `Mișcare deja întinsă (+${liveMovePct.toFixed(1)}%) — risc FOMO ridicat; așteaptă retragere la VWAP.`;
       }
 
       const rvol5mDisplay = !Number.isFinite(rvol5m) || rvol5m <= 0
@@ -3646,7 +3960,16 @@ function createIntelEngine(deps) {
         sym: r.sym,
         name: String(q.shortName || r.description || r.sym),
         price: close,
+        regPrice: extInfo.regPrice,
+        regChgPct: extInfo.regChgPct,
+        extType: extInfo.extType,
+        extLabel: extInfo.extLabel,
+        extPrice: extInfo.extPrice,
+        extChgPct: extInfo.extChgPct,
+        extTime: extInfo.extTime,
+        preVolume: extInfo.preVolume,
         chgPct: chg,
+        liveMovePct,
         chg5m: chg5,
         volume,
         dollarVolume: Math.round(close * volume),
@@ -3658,8 +3981,8 @@ function createIntelEngine(deps) {
         rvolDaily: Number(rvol.toFixed(2)),
         rvol5m: Number(rvol5m.toFixed(1)),
         rvol5mDisplay,
-        preChgPct: safeNum(q.preMarketChangePercent, safeNum(r.premarket_change, null)),
-        pmHigh: safeNum(r.premarket_high, null),
+        preChgPct: extInfo.preChgPct,
+        pmHigh: extInfo.pmHigh,
         high: hi,
         vwap: Number(vwapPx.toFixed(4)),
         distVwapPct: Number(distVwapPct.toFixed(2)),
@@ -3692,6 +4015,31 @@ function createIntelEngine(deps) {
     const earlyMovers = earlyMoverRows.map(r => normRow(r, 'Early Mover'));
     const fivePillars = pillars5Rows.map(r => normRow(r, '5 Pillars Match'));
     const squeezeAlerts = squeeze5mRows.map(r => normRow(r));
+    const sellLosers = sellLoserRows.map(r => normRow(r, 'Breakdown / SELL'));
+    const extFades = extFadeRows.map(r => normRow(r, 'Fade Extended'));
+    const customNorm = customRows.map(r => normRow(r, 'Watchlist'));
+
+    // In Pre-Market, prioritize rows actually moving positively in Pre-Market!
+    const preMoversNorm = preMarketRows
+      .map(r => normRow(r, 'Pre-Market Mover'))
+      .filter(r => r.extType === 'PRE' && (r.extChgPct ?? 0) > 1);
+
+    if (sessionCtx.isPreMarket && preMoversNorm.length) {
+      const mergedTop = [];
+      const seenTop = new Set();
+      for (const item of [...preMoversNorm, ...topGainers].sort((a, b) => (b.liveMovePct || 0) - (a.liveMovePct || 0))) {
+        if (!seenTop.has(item.sym)) {
+          seenTop.add(item.sym);
+          mergedTop.push(item);
+        }
+      }
+      topGainers.splice(0, topGainers.length, ...mergedTop.slice(0, 22));
+    }
+
+    const { topProposals, buyProposals, sellProposals } = buildTop10CockpitProposals(
+      [...preMoversNorm, ...earlyMovers, ...fivePillars, ...lowFloat, ...squeezeAlerts, ...extFades, ...sellLosers, ...topGainers, ...customNorm],
+      sessionCtx
+    );
 
     const out = {
       ok: true,
@@ -3699,8 +4047,12 @@ function createIntelEngine(deps) {
       updatedAt: new Date().toISOString(),
       updatedTimeRo: nowTimeRo(),
       updatedTimeEt: sessionCtx.timeEt,
-      source: 'TradingView US 5m/Daily + Yahoo L1 Quote/Short + SEC EDGAR + NASDAQ LULD Halts + Yahoo Știri',
+      source: 'TradingView US + BOATS Overnight + Yahoo L1 Quote/Short + SEC EDGAR + NASDAQ Halts + Știri',
       marketRegime: mktOverview.regime,
+      topProposals,
+      buyProposals,
+      sellProposals,
+      sellSetups: [...extFades, ...sellLosers, ...customNorm].slice(0, 28),
       earlyMovers,
       lowFloat,
       topGainers,

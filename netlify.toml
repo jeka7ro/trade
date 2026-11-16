@@ -18,5 +18,7 @@
   status = 200
 
 # ─── SCHEDULED FUNCTIONS ───────────────────────────────────────
-[functions."scanner"]
-  schedule = "*/10 * * * *"
+# Disabled: legacy 1D fractal scanner caused duplicate 10m alerts due to frozen external state DB.
+# Use local TradePro Early Signal Radar AI + /api/telegram controls instead.
+# [functions."scanner"]
+#   schedule = "*/10 * * * *"

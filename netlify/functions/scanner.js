@@ -240,6 +240,14 @@ function formatSignalMessage(sig) {
 
 // ─── MAIN HANDLER ─────────────────────────────────────────────
 exports.handler = async function(event, context) {
+  // Legacy 1D fractal cron disabled by default to prevent duplicate 10m Telegram spam.
+  if (process.env.ENABLE_NETLIFY_SCANNER !== 'true') {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ok: true, skipped: 'legacy_scanner_disabled' })
+    };
+  }
   console.log('[SCANNER] Starting market scan at', new Date().toISOString());
 
   const today = new Date();

@@ -436,10 +436,11 @@
         mins = d.getUTCHours() * 60 + d.getUTCMinutes();
       }
 
-      // 04:00 - 09:30 ET = Pre-Market | 09:30 - 16:00 ET = Regular | 16:00 - 20:00 ET = Post-Market
+      // 04:00 - 09:30 ET = Pre-Market | 09:30 - 16:00 ET = Regular | 16:00 - 20:00 ET = Post-Market | 20:00 - 04:00 ET = Overnight (BOATS)
       let sess = 'REG';
       if (mins >= 240 && mins < 570) sess = 'PRE';
-      else if (mins >= 960 || mins < 240) sess = 'POST';
+      else if (mins >= 960 && mins < 1200) sess = 'POST';
+      else if (mins >= 1200 || mins < 240) sess = 'OVN';
 
       if (this._etCache.size > 12000) this._etCache.clear();
       this._etCache.set(minKey, sess);
@@ -483,10 +484,26 @@
       }
 
       const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      const preFill = isLight ? 'rgba(245, 158, 11, 0.085)' : 'rgba(245, 158, 11, 0.068)';
-      const postFill = isLight ? 'rgba(41, 98, 255, 0.075)' : 'rgba(41, 98, 255, 0.082)';
-      const preBorder = isLight ? 'rgba(245, 158, 11, 0.22)' : 'rgba(245, 158, 11, 0.16)';
-      const postBorder = isLight ? 'rgba(41, 98, 255, 0.22)' : 'rgba(41, 98, 255, 0.18)';
+      const sessTheme = {
+        PRE: {
+          fill: isLight ? 'rgba(245, 158, 11, 0.085)' : 'rgba(245, 158, 11, 0.068)',
+          border: isLight ? 'rgba(245, 158, 11, 0.22)' : 'rgba(245, 158, 11, 0.16)',
+          txt: isLight ? 'rgba(217, 119, 6, 0.72)' : 'rgba(245, 158, 11, 0.55)',
+          tag: 'PRE'
+        },
+        POST: {
+          fill: isLight ? 'rgba(41, 98, 255, 0.075)' : 'rgba(41, 98, 255, 0.082)',
+          border: isLight ? 'rgba(41, 98, 255, 0.22)' : 'rgba(41, 98, 255, 0.18)',
+          txt: isLight ? 'rgba(37, 99, 235, 0.72)' : 'rgba(91, 140, 255, 0.58)',
+          tag: 'POST'
+        },
+        OVN: {
+          fill: isLight ? 'rgba(147, 51, 234, 0.075)' : 'rgba(168, 85, 247, 0.072)',
+          border: isLight ? 'rgba(147, 51, 234, 0.22)' : 'rgba(168, 85, 247, 0.18)',
+          txt: isLight ? 'rgba(126, 34, 206, 0.72)' : 'rgba(192, 132, 252, 0.62)',
+          tag: 'OVN'
+        }
+      };
 
       const spans = [];
       let curSess = null;
@@ -536,12 +553,12 @@
         const bw = x2 - x1;
         if (bw <= 0.5) continue;
 
-        const isPre = sp.sess === 'PRE';
-        ctx.fillStyle = isPre ? preFill : postFill;
+        const st = sessTheme[sp.sess] || sessTheme.POST;
+        ctx.fillStyle = st.fill;
         ctx.fillRect(x1, 0, bw, h);
 
         // Crisp vertical hairline on session boundary
-        ctx.strokeStyle = isPre ? preBorder : postBorder;
+        ctx.strokeStyle = st.border;
         ctx.lineWidth = 1;
         ctx.beginPath();
         if (sp.x1 >= 1 && sp.x1 <= w - 1) {
@@ -556,10 +573,8 @@
 
         // Subtle institutional session tag near bottom of chart (keeps top legend 100% clear)
         if (bw >= 44) {
-          ctx.fillStyle = isPre
-            ? (isLight ? 'rgba(217, 119, 6, 0.72)' : 'rgba(245, 158, 11, 0.55)')
-            : (isLight ? 'rgba(37, 99, 235, 0.72)' : 'rgba(91, 140, 255, 0.58)');
-          ctx.fillText(isPre ? 'PRE' : 'POST', x1 + 5, h - 6);
+          ctx.fillStyle = st.txt;
+          ctx.fillText(st.tag, x1 + 5, h - 6);
         }
       }
       ctx.restore();

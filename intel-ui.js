@@ -36,6 +36,7 @@
     cockpitCacheTs: 0,
     cockpitPaused: false,
     cockpitSelectedSym: '',
+    cockpitPropFilter: 'all',
     cockpitTimer: null,
     radarDetailSym: '',
     radarShowValidation: false,
@@ -232,15 +233,29 @@
       center.classList.toggle('intel-mode', next !== 'chart');
     }
 
+    // Dismiss mobile overlay sheets & sync bottom nav when switching workspace modes
+    if (window.innerWidth <= 820) {
+      document.getElementById('rightPanel')?.classList.remove('mobile-open');
+      const dock = document.getElementById('bottomDock');
+      if (dock && dock.classList.contains('expanded')) {
+        dock.classList.remove('expanded');
+        const bdIcon = document.getElementById('bdToggleIcon');
+        if (bdIcon) {
+          bdIcon.innerHTML = '<svg class="tv-ico sm" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>';
+        }
+      }
+      document.getElementById('leftToolbar')?.classList.remove('mob-draw-open');
+      document.getElementById('mobDrawToggleBtn')?.classList.remove('active');
+      document.querySelectorAll('.tv-menu.open').forEach(m => m.classList.remove('open'));
+      toggleCopilotDrawer(false);
+      document.querySelectorAll('[data-mnav]').forEach(b => {
+        b.classList.toggle('active', b.dataset.mnav === 'chart');
+      });
+    }
+
     if (next === 'chart') {
       setTimeout(() => window.dispatchEvent(new Event('resize')), 40);
       return;
-    }
-
-    // Ensure center column is visible on mobile when tapping an intel tab
-    if (window.innerWidth <= 680) {
-      document.getElementById('rightPanel')?.classList.remove('mob-open');
-      document.getElementById('bottomDock')?.classList.remove('mob-open');
     }
 
     renderActiveIntelStage();
@@ -991,6 +1006,16 @@
     return `<span style="font-size:10px;color:var(--text-muted);">${esc(ageLbl)}</span>`;
   }
 
+  function fmtCockpitPriceCell(r) {
+    if (!r) return '—';
+    const base = fmtPx(r.price);
+    if (!r.extType || r.extChgPct == null) return base;
+    const cls = String(r.extType).toLowerCase();
+    const shortLbl = r.extType === 'OVN' ? 'Ovn' : (r.extType === 'PRE' ? 'Pre' : 'Post');
+    const dirCls = Number(r.extChgPct) >= 0 ? 'up' : 'dn';
+    return `${base}<span class="cp-ext-mini ${cls} ${dirCls}" title="${esc(r.extLabel || shortLbl)} vs Reg ${fmtPx(r.regPrice)} (${fmtPct(r.regChgPct)})">${shortLbl} ${fmtPct(r.extChgPct)}</span>`;
+  }
+
   function buildCockpitScannerRows(rows, selectedSym, mode) {
     if (!rows || !rows.length) {
       const cols = (mode === 'pillars' || mode === 'squeeze') ? 7 : 8;
@@ -1005,6 +1030,7 @@
       const fCls = fltHeatCls(r.floatShares);
       const newsHtml = fmtNewsBadge(r.newsMeta);
       const rv5Txt = r.rvol5mDisplay || fmtRvolCell(r.rvol5m);
+      const pxHtml = fmtCockpitPriceCell(r);
 
       if (mode === 'pillars') {
         const pScore = r.fivePillarsDetail?.score;
@@ -1012,7 +1038,7 @@
           <tr class="cp-row${selCls}" data-cpsym="${esc(r.sym)}">
             <td class="cp-sym-cell"><span class="cp-sym-wrap">${renderSymAvatar(r.sym, 'sm')}<span>${esc(r.sym)}</span></span></td>
             <td>${newsHtml}</td>
-            <td>${fmtPx(r.price)}</td>
+            <td>${pxHtml}</td>
             <td class="${vCls}">${fmtCompact(r.volume)}</td>
             <td class="${chgCls}">${fmtPct(r.chgPct)}</td>
             <td class="${fCls}">${fmtCompact(r.floatShares)}</td>
@@ -1027,7 +1053,7 @@
           <tr class="cp-row${selCls}" data-cpsym="${esc(r.sym)}">
             <td class="cp-sym-cell"><span class="cp-sym-wrap">${renderSymAvatar(r.sym, 'sm')}<span>${esc(r.sym)}</span></span></td>
             <td>${newsHtml}</td>
-            <td>${fmtPx(r.price)}</td>
+            <td>${pxHtml}</td>
             <td class="${vCls}">${fmtCompact(r.volume)}</td>
             <td class="${v5Cls}">${esc(rv5Txt)}</td>
             <td class="${chg5Cls}">${fmtPct(r.chg5m)}</td>
@@ -1042,7 +1068,7 @@
           <td class="${chgCls}">${fmtPct(r.chgPct)}</td>
           <td class="cp-sym-cell"><span class="cp-sym-wrap">${renderSymAvatar(r.sym, 'sm')}<span>${esc(r.sym)}</span></span></td>
           <td>${newsHtml}</td>
-          <td>${fmtPx(r.price)}</td>
+          <td>${pxHtml}</td>
           <td class="${vCls}">${fmtCompact(r.volume)}</td>
           <td class="${fCls}">${fmtCompact(r.floatShares)}</td>
           <td class="${chg5Cls}">${fmtPct(r.chg5m)}</td>
@@ -1054,7 +1080,7 @@
 
   function findCockpitRecord(data, sym) {
     const clean = String(sym || '').toUpperCase().trim();
-    const pools = [data.earlyMovers, data.lowFloat, data.topGainers, data.fivePillars, data.squeezeAlerts];
+    const pools = [data.earlyMovers, data.lowFloat, data.topGainers, data.fivePillars, data.squeezeAlerts, data.sellSetups];
     let row = null;
     for (const list of pools) {
       if (!Array.isArray(list)) continue;
@@ -1084,6 +1110,7 @@
 
     const inWl = dispSym && dispSym !== '—' && bridge().isInWatchlist?.(dispSym);
     const fiveDetail = r?.fivePillarsDetail || null;
+    const inspPct = r ? (r.liveMovePct != null ? r.liveMovePct : r.chgPct) : 0;
 
     return `
       <div class="cp-insp-head">
@@ -1094,7 +1121,8 @@
         ${r ? `
           <div class="cp-insp-px">
             <div style="font-size:14px;font-weight:800;color:var(--text-bright);">${fmtPx(r.price)}</div>
-            <div class="tabular ${Number(r.chgPct) >= 0 ? 'up' : 'dn'}" style="font-size:11px;font-weight:700;">${fmtPct(r.chgPct)}</div>
+            <div class="tabular ${Number(inspPct) >= 0 ? 'up' : 'dn'}" style="font-size:11px;font-weight:700;">${r.extType ? `${esc(r.extLabel)} ` : ''}${fmtPct(inspPct)}</div>
+            ${r.extType && r.regPrice > 0 && Math.abs(r.price - r.regPrice) > 1e-4 ? `<div style="font-size:9px;color:var(--text-muted);">Reg ${fmtPx(r.regPrice)} (${fmtPct(r.regChgPct)})</div>` : ''}
           </div>
         ` : (h ? `<span class="cp-pane-badge halt-live">${esc(h.code || 'HALT')}</span>` : '')}
       </div>
@@ -1112,7 +1140,7 @@
       ${r ? `
         <div class="cp-insp-stats">
           <div class="cp-insp-row"><span class="cp-insp-lbl">Setup / Regim</span><span class="cp-insp-val">${esc(r.setupType || r.strategy || '—')}</span></div>
-          <div class="cp-insp-row"><span class="cp-insp-lbl">Pre-Market % / High</span><span class="cp-insp-val ${Number(r.preChgPct) >= 0 ? 'up' : 'dn'}">${r.preChgPct != null ? fmtPct(r.preChgPct) : '—'} · ${r.pmHigh ? fmtPx(r.pmHigh) : '—'}</span></div>
+          <div class="cp-insp-row"><span class="cp-insp-lbl">Extins / Pre-Mkt %</span><span class="cp-insp-val ${Number(r.extChgPct ?? r.preChgPct ?? 0) >= 0 ? 'up' : 'dn'}">${r.extChgPct != null ? `${esc(r.extLabel)} ${fmtPct(r.extChgPct)}` : (r.preChgPct != null ? fmtPct(r.preChgPct) : '—')}${r.pmHigh ? ` · H ${fmtPx(r.pmHigh)}` : ''}</span></div>
           <div class="cp-insp-row"><span class="cp-insp-lbl">VWAP / Dist %</span><span class="cp-insp-val">${r.vwap ? fmtPx(r.vwap) : '—'} (${r.distVwapPct != null ? fmtPct(r.distVwapPct) : '—'})</span></div>
           <div class="cp-insp-row"><span class="cp-insp-lbl">Volum Zi / $Vol</span><span class="cp-insp-val">${fmtCompact(r.volume)} · ${fmtCompact(r.dollarVolume)}</span></div>
           <div class="cp-insp-row"><span class="cp-insp-lbl">Rel Daily / 5m Vol</span><span class="cp-insp-val">${fmtRvolCell(r.rvolDaily)} · ${esc(r.rvol5mDisplay || fmtRvolCell(r.rvol5m))}</span></div>
@@ -1201,6 +1229,80 @@
     });
   }
 
+  function buildCockpitTop10CardsHtml(list, selectedSym) {
+    if (!list || !list.length) {
+      return '<div style="grid-column:1 / -1;padding:10px;text-align:center;color:var(--text-muted);font-size:11px;">Niciun setup clar cu criteriile curente în această sesiune. Încearcă filtrul opus sau Scanează Acum.</div>';
+    }
+    return list.map((p, idx) => {
+      const sideCls = p.side === 'BUY' ? 'buy' : 'sell';
+      const mvCls = Number(p.movePct) >= 0 ? 'up' : 'dn';
+      const selCls = selectedSym === p.sym ? ' selected' : '';
+      return `
+        <article class="cp-prop-card ${sideCls}${selCls}" data-cpsym="${esc(p.sym)}" title="Click pentru detalii în Inspector · Dublu-click sau buton Grafic pentru deschidere grafic">
+          <div class="cp-prop-top">
+            <span class="cp-prop-sym-grp">
+              <span class="cp-prop-rank">#${idx + 1}</span>
+              ${renderSymAvatar(p.sym, 'xs')}
+              <span class="cp-prop-sym">${esc(p.sym)}</span>
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:4px;">
+              <span class="cp-prop-badge ${sideCls}">${esc(p.badge)}</span>
+              <span class="cp-prop-score tabular">${Number(p.score || 0)}p</span>
+            </span>
+          </div>
+          <div class="cp-prop-px-row">
+            <span class="cp-prop-px tabular">${fmtPx(p.price)}</span>
+            <span class="cp-prop-mv ${mvCls} tabular">${esc(p.moveLabel || '')}</span>
+            ${p.regRefLabel ? `<span class="cp-prop-reg tabular">${esc(p.regRefLabel)}</span>` : ''}
+          </div>
+          <div class="cp-prop-levels tabular">
+            <span>In <b>${fmtPx(p.levels?.entry)}</b></span>
+            <span class="dn">SL <b>${fmtPx(p.levels?.sl)}</b></span>
+            <span class="up">TP <b>${fmtPx(p.levels?.tp1)}</b></span>
+          </div>
+          <div class="cp-prop-foot">
+            <span class="cp-prop-reason" title="${esc(p.reason || '')}">${esc(p.reason || '')}</span>
+            <button type="button" class="cp-prop-go" data-propchart="${esc(p.sym)}">${ICO.chart}<span>Grafic</span></button>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  function getActiveCockpitProposals(data) {
+    const mode = stateIntel.cockpitPropFilter || 'all';
+    if (mode === 'buy') return data?.buyProposals || [];
+    if (mode === 'sell') return data?.sellProposals || [];
+    return data?.topProposals || [];
+  }
+
+  function renderCockpitTop10Section(data, selectedSym) {
+    const sCtx = data.sessionCtx || {};
+    const mixCnt = (data.topProposals || []).length;
+    const buyCnt = (data.buyProposals || []).length;
+    const sellCnt = (data.sellProposals || []).length;
+    const mode = stateIntel.cockpitPropFilter || 'all';
+    const list = getActiveCockpitProposals(data);
+    return `
+      <section class="cp-top10-wrap" aria-label="Top 10 Propuneri BUY si SELL Live si Pre-Market">
+        <div class="cp-top10-hdr">
+          <div class="cp-top10-title-grp">
+            <span class="cp-top10-title">Top 10 Propuneri Clari · BUY &amp; SELL</span>
+            <span class="intel-sess-pill ${esc(sCtx.tone || 'muted')}">${sCtx.label ? `${esc(sCtx.label)} · Prețuri Live Extinse` : 'Pre-Market &amp; Overnight Live'}</span>
+          </div>
+          <div class="cp-top10-tabs" role="tablist" aria-label="Filtru direcție Top 10">
+            <button type="button" class="cp-prop-tab${mode === 'all' ? ' active' : ''}" data-propfilter="all">Top 10 Mix (${mixCnt})</button>
+            <button type="button" class="cp-prop-tab buy${mode === 'buy' ? ' active' : ''}" data-propfilter="buy">Doar BUY (${buyCnt})</button>
+            <button type="button" class="cp-prop-tab sell${mode === 'sell' ? ' active' : ''}" data-propfilter="sell">Doar SELL (${sellCnt})</button>
+          </div>
+        </div>
+        <div id="cpTop10Grid" class="cp-top10-grid">
+          ${buildCockpitTop10CardsHtml(list, selectedSym)}
+        </div>
+      </section>
+    `;
+  }
+
   async function renderCockpitView(force = false) {
     const stage = document.getElementById('intelStage');
     if (!stage) return;
@@ -1210,7 +1312,7 @@
     const savedStageScroll = stage.scrollTop;
 
     if (!stateIntel.cockpitCache) {
-      renderLoadingState('Cockpit Multi-Scanner Day-Trading', 'Se încarcă Early Movers, Low Float, Top Gainers, 5 Pillars, NASDAQ Halts LULD și catalizatori SEC/Știri...');
+      renderLoadingState('Cockpit Multi-Scanner Day-Trading', 'Se încarcă Top 10 BUY/SELL Live, Early Movers, Pre-Market / Overnight BOATS, Halts și catalizatori SEC/Știri...');
     }
 
     try {
@@ -1224,7 +1326,7 @@
       // Pick default symbol for Inspector if none selected or not present yet
       if (!stateIntel.cockpitSelectedSym) {
         const ctxSym = bridge().getContext().sym;
-        const fallback = data.earlyMovers?.[0]?.sym || data.lowFloat?.[0]?.sym || data.topGainers?.[0]?.sym || ctxSym || 'ONDS';
+        const fallback = data.topProposals?.[0]?.sym || data.earlyMovers?.[0]?.sym || data.lowFloat?.[0]?.sym || data.topGainers?.[0]?.sym || ctxSym || 'ONDS';
         stateIntel.cockpitSelectedSym = fallback;
       }
 
@@ -1234,7 +1336,7 @@
         <div class="cockpit-head-bar">
           <div class="intel-title-grp">
             <div class="intel-h1" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span>Zona 03 · Cockpit Multi-Scanner Day-Trading</span>
+              <span>Cockpit Multi-Scanner Day-Trading</span>
               ${sCtx.label ? `<span class="intel-sess-pill ${esc(sCtx.tone || 'muted')}">${esc(sCtx.label)} · ${esc(sCtx.timeEt || '')}</span>` : ''}
             </div>
             <div class="intel-sub">Actualizat RO ${esc(data.updatedTimeRo)} (${esc(data.updatedTimeEt || sCtx.timeEt || '')}) · ${esc(data.source || '')}</div>
@@ -1248,9 +1350,11 @@
               ${stateIntel.cockpitPaused ? ICO.pause : ICO.play}<span>${stateIntel.cockpitPaused ? 'Auto 15s: OPRIT' : 'Auto 15s: LIVE'}</span>
             </button>
             <button id="cpRefreshBtn" class="intel-chip-btn" type="button">${ICO.refresh}<span>Scanează Acum</span></button>
-            <button id="cpGoRadarBtn" class="intel-chip-btn" type="button">${ICO.radar}<span>Zona 02: Early Radar</span></button>
+            <button id="cpGoRadarBtn" class="intel-chip-btn" type="button">${ICO.radar}<span>Early Radar</span></button>
           </div>
         </div>
+
+        ${renderCockpitTop10Section(data, selSym)}
 
         <div class="cockpit-shell">
           <!-- LEFT COLUMN: Low Float Top Gainers + Halts LULD + Live Newsfeed -->
@@ -1489,30 +1593,57 @@
       stage.querySelector('#cpRefreshBtn')?.addEventListener('click', () => renderCockpitView(true));
       stage.querySelector('#cpGoRadarBtn')?.addEventListener('click', () => switchWorkspaceView('radar'));
 
-      // Row click -> synchronous Quick-Inspector update; double-click -> load on Chart
-      stage.querySelectorAll('[data-cpsym]').forEach(rowEl => {
-        rowEl.addEventListener('click', (e) => {
-          if (e.target.closest('a')) return;
-          const sym = rowEl.dataset.cpsym;
-          if (!sym) return;
-          stateIntel.cockpitSelectedSym = sym;
-          stage.querySelectorAll('.cp-row.selected').forEach(el => el.classList.remove('selected'));
-          stage.querySelectorAll(`.cp-row[data-cpsym="${CSS.escape(sym)}"]`).forEach(el => el.classList.add('selected'));
-          const insp = stage.querySelector('#cpInspectorCard');
-          if (insp) {
-            insp.innerHTML = renderCockpitInspectorHtml(data, sym);
-            wireCockpitInspectorActions(insp);
-          }
+      const bindCockpitInteractiveNodes = (rootEl) => {
+        rootEl.querySelectorAll('[data-propchart]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const sym = btn.dataset.propchart;
+            if (sym) {
+              bridge().loadSymbol(sym);
+              switchWorkspaceView('chart');
+            }
+          });
         });
-        rowEl.addEventListener('dblclick', (e) => {
-          if (e.target.closest('a')) return;
-          const sym = rowEl.dataset.cpsym;
-          if (sym) {
-            bridge().loadSymbol(sym);
-            switchWorkspaceView('chart');
+
+        rootEl.querySelectorAll('[data-cpsym]').forEach(rowEl => {
+          rowEl.addEventListener('click', (e) => {
+            if (e.target.closest('a, [data-propchart]')) return;
+            const sym = rowEl.dataset.cpsym;
+            if (!sym) return;
+            stateIntel.cockpitSelectedSym = sym;
+            stage.querySelectorAll('.cp-row.selected, .cp-prop-card.selected').forEach(el => el.classList.remove('selected'));
+            stage.querySelectorAll(`[data-cpsym="${CSS.escape(sym)}"].cp-row, [data-cpsym="${CSS.escape(sym)}"].cp-prop-card`).forEach(el => el.classList.add('selected'));
+            const insp = stage.querySelector('#cpInspectorCard');
+            if (insp) {
+              insp.innerHTML = renderCockpitInspectorHtml(data, sym);
+              wireCockpitInspectorActions(insp);
+            }
+          });
+          rowEl.addEventListener('dblclick', (e) => {
+            if (e.target.closest('a')) return;
+            const sym = rowEl.dataset.cpsym;
+            if (sym) {
+              bridge().loadSymbol(sym);
+              switchWorkspaceView('chart');
+            }
+          });
+        });
+      };
+
+      stage.querySelectorAll('[data-propfilter]').forEach(tabBtn => {
+        tabBtn.addEventListener('click', () => {
+          const nextMode = tabBtn.dataset.propfilter || 'all';
+          stateIntel.cockpitPropFilter = nextMode;
+          stage.querySelectorAll('[data-propfilter]').forEach(b => b.classList.toggle('active', b === tabBtn));
+          const grid = stage.querySelector('#cpTop10Grid');
+          if (grid) {
+            grid.innerHTML = buildCockpitTop10CardsHtml(getActiveCockpitProposals(data), stateIntel.cockpitSelectedSym);
+            bindCockpitInteractiveNodes(grid);
           }
         });
       });
+
+      bindCockpitInteractiveNodes(stage);
 
       const inspInit = stage.querySelector('#cpInspectorCard');
       if (inspInit) wireCockpitInspectorActions(inspInit);
@@ -2165,7 +2296,7 @@
             <div class="intel-card-hdr">
               <div class="intel-card-title">Ultimele Execuții Simulate (${bt.trades.length})</div>
             </div>
-            <div style="max-height:175px;overflow-y:auto;">
+            <div class="radar-table-wrap" tabindex="0" role="region" aria-label="Execuții simulate strategie" style="max-height:200px;overflow:auto;">
               <table class="intel-table">
                 <thead><tr><th>Data</th><th>Tip</th><th>Entry</th><th>Exit</th><th>Net P&amp;L</th><th>Motiv</th></tr></thead>
                 <tbody>
@@ -2353,12 +2484,22 @@
     const drawer = document.getElementById('aiCopilotDrawer');
     const topBtn = document.getElementById('aiCopilotTopBtn');
     const railBtn = document.getElementById('railCopilotBtn');
+    const mobChip = document.getElementById('mobCopilotChipBtn');
     if (!drawer) return;
     const next = open != null ? !!open : !drawer.classList.contains('open');
     drawer.classList.toggle('open', next);
     drawer.setAttribute('aria-hidden', next ? 'false' : 'true');
     topBtn?.classList.toggle('active', next);
     railBtn?.classList.toggle('active', next);
+    mobChip?.classList.toggle('active', next);
+
+    if (next && window.innerWidth <= 820) {
+      document.getElementById('rightPanel')?.classList.remove('mobile-open');
+      document.getElementById('bottomDock')?.classList.remove('expanded');
+      document.getElementById('leftToolbar')?.classList.remove('mob-draw-open');
+      document.getElementById('mobDrawToggleBtn')?.classList.remove('active');
+      document.querySelectorAll('.tv-menu.open').forEach(m => m.classList.remove('open'));
+    }
 
     const msgs = document.getElementById('copilotMessages');
     if (next && msgs && !msgs.children.length) {
@@ -2371,7 +2512,9 @@
         </div>
       `;
     }
-    if (next) setTimeout(() => document.getElementById('copilotInput')?.focus(), 140);
+    if (next && window.innerWidth > 820) {
+      setTimeout(() => document.getElementById('copilotInput')?.focus(), 140);
+    }
   }
 
   async function askCopilot(queryText) {
@@ -2435,7 +2578,7 @@
             stateIntel.deepSymInput = sym;
             bridge().loadSymbol(sym);
             switchWorkspaceView(v);
-            if (window.innerWidth <= 680) toggleCopilotDrawer(false);
+            if (window.innerWidth <= 820) toggleCopilotDrawer(false);
           };
         });
       }
@@ -2584,7 +2727,7 @@
 
     document.getElementById('aiCopilotTopBtn')?.addEventListener('click', () => toggleCopilotDrawer());
     document.getElementById('railCopilotBtn')?.addEventListener('click', () => toggleCopilotDrawer());
-    document.getElementById('mobCopilotChipBtn')?.addEventListener('click', () => toggleCopilotDrawer(true));
+    document.getElementById('mobCopilotChipBtn')?.addEventListener('click', () => toggleCopilotDrawer());
     document.getElementById('copilotCloseBtn')?.addEventListener('click', () => toggleCopilotDrawer(false));
 
     document.querySelectorAll('#copilotPresets .copilot-preset-btn').forEach(btn => {
@@ -2599,6 +2742,10 @@
       if (!q) return;
       inp.value = '';
       askCopilot(q);
+    });
+
+    window.addEventListener('tp:switchWorkspaceView', (e) => {
+      if (e.detail?.view) switchWorkspaceView(e.detail.view);
     });
 
     window.addEventListener('tp:bottomTabOpened', (e) => {
