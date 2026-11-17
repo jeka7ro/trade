@@ -17,6 +17,8 @@ const {
 } = require('./tv-overnight.js');
 const { handleAuthApiRequest } = require('./auth-store.js');
 const { createIntelEngine } = require('../../intel-backend.js');
+const { createEtoroSyncService } = require('../../etoro-sync-service.js');
+const serverlessEtoroService = createEtoroSyncService();
 const serverlessIntelCache = new Map();
 const serverlessIntelEngine = createIntelEngine({
   getCached: (k, ttl) => {
@@ -88,6 +90,32 @@ exports.handler = async (event) => {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(out.body)
     };
+  }
+
+  // eToro Read-Only Sync API on Netlify
+  if (evPath.includes('/api/etoro/')) {
+    try {
+      const bodyObj = event.body ? JSON.parse(event.body) : {};
+      if (evPath.endsWith('/status') && event.httpMethod === 'GET') {
+        return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(serverlessEtoroService.getStatus('default')) };
+      }
+      if (evPath.endsWith('/config') && event.httpMethod === 'POST') {
+        return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(serverlessEtoroService.updateConfig('default', bodyObj)) };
+      }
+      if (evPath.endsWith('/test') && event.httpMethod === 'POST') {
+        const customKeys = (bodyObj?.apiKey && bodyObj?.userKey)
+          ? { apiKey: String(bodyObj.apiKey).trim(), userKey: String(bodyObj.userKey).trim() }
+          : null;
+        const resTest = await serverlessEtoroService.testConnection(customKeys, 'default');
+        return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(resTest) };
+      }
+      if (evPath.endsWith('/sync') && event.httpMethod === 'POST') {
+        const resSync = await serverlessEtoroService.syncNow('default');
+        return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(resSync) };
+      }
+    } catch (e) {
+      return { statusCode: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ ok: false, error: e.message }) };
+    }
   }
 
   // Real Portfolio Live Risk & Technical Evaluator on Netlify
@@ -194,6 +222,12 @@ exports.handler = async (event) => {
     }
     if (evPath.endsWith('/notify')) {
       if (!tok || !chat) return jsonResp(200, { ok: false, error: 'TELEGRAM_TOKEN sau CHAT_ID lipsă în Netlify Env' });
+      const summaryStr = String(bodyObj.summary || '');
+      const htmlStr = String(bodyObj.html || '');
+      const isPortfolioSmartAlert = summaryStr.includes('Alerte Smart Portofoliu') || htmlStr.includes('Radar Smart Portofoliu');
+      if (isPortfolioSmartAlert && bodyObj.explicitUserClick !== true) {
+        return jsonResp(200, { ok: true, skipped: 'auto_portfolio_push_disabled', logs: serverlessLogs });
+      }
       const cat = bodyObj.category || 'manual';
       const bypass = cat === 'reply' || cat === 'test' || cat === 'manual';
       const sym = String(bodyObj.sym || '').trim().toUpperCase();
@@ -246,6 +280,7 @@ exports.handler = async (event) => {
     const KNOWN = {
       NVDA: 'nvidia', APPS: 'digital-turbine', ONDS: 'ondas', TSLA: 'tesla',
       AAPL: 'apple', MSFT: 'microsoft', AMZN: 'amazon', META: 'meta-platforms',
+      ETORO: 'etoro', SPCX: 'spacex', 'SPCX.24-7': 'spacex',
       MSTR: 'strategy-cad-hedged-cibc-cdr', 'NQ=F': 'indices/nasdaq-100', '^NDX': 'indices/nasdaq-100',
       '^IXIC': 'indices/nasdaq-composite', 'ES=F': 'indices/s-and-p-500', '^GSPC': 'indices/s-and-p-500',
       'YM=F': 'indices/dow-30', '^DJI': 'indices/dow-30', 'GC=F': 'metal/gold', 'SI=F': 'metal/silver',

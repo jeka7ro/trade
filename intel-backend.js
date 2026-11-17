@@ -4158,10 +4158,14 @@ function createIntelEngine(deps) {
 
   function buildLotInsights(asset, livePrice) {
     const lots = Array.isArray(asset.lots) ? asset.lots : [];
-    const cur = Number.isFinite(livePrice) && livePrice > 0 ? livePrice : (asset.brokerPrice || asset.avgOpen);
+    const cur = (asset.source === 'etoro_api' && Number.isFinite(Number(asset.brokerPrice)) && Number(asset.brokerPrice) > 0)
+      ? Number(asset.brokerPrice)
+      : (Number.isFinite(livePrice) && livePrice > 0 ? livePrice : (asset.brokerPrice || asset.avgOpen));
     return lots.map((l) => {
       const sign = l.side === 'SHORT' ? -1 : 1;
-      const lotLivePnl = cur > 0 ? l.units * (cur - l.open) * sign : (l.brokerPnl ?? 0);
+      const lotLivePnl = (l.source === 'etoro_api' && l.brokerPnl != null && Number.isFinite(Number(l.brokerPnl)))
+        ? Number(l.brokerPnl)
+        : (cur > 0 ? l.units * (cur - l.open) * sign : (l.brokerPnl ?? 0));
       const slDistPct = (l.sl && cur > 0)
         ? (sign > 0 ? ((cur - l.sl) / cur) * 100 : ((l.sl - cur) / cur) * 100)
         : null;
@@ -4369,13 +4373,18 @@ function createIntelEngine(deps) {
         : ((mktState === 'POST' || mktState === 'POSTPOST' || mktState === 'PREPRE' || mktState === 'CLOSED')
           ? finiteNum(q.overnightPrice, finiteNum(q.postMarketPrice, null))
           : null);
-      const livePrice = (mktState !== 'REGULAR' && Number.isFinite(extPrice) && extPrice > 0) ? extPrice : regPrice;
+      const isFromEtoroApi = asset.source === 'etoro_api';
+      const livePrice = (isFromEtoroApi && Number.isFinite(Number(asset.brokerPrice)) && Number(asset.brokerPrice) > 0)
+        ? Number(asset.brokerPrice)
+        : ((mktState !== 'REGULAR' && Number.isFinite(extPrice) && extPrice > 0) ? extPrice : regPrice);
       const prevClose = finiteNum(q.regularMarketPreviousClose, livePrice);
       const sign = asset.side === 'SHORT' ? -1 : 1;
 
       const units = Number(asset.units) || 0;
       const avgOpen = Number(asset.avgOpen) || 0;
-      const livePnl = units * (livePrice - avgOpen) * sign;
+      const livePnl = (isFromEtoroApi && asset.brokerPnl != null && Number.isFinite(Number(asset.brokerPnl)))
+        ? Number(asset.brokerPnl)
+        : (units * (livePrice - avgOpen) * sign);
       const notionalValue = units * livePrice;
 
       let investedCapital = finiteNum(asset.invested, null);
@@ -4390,9 +4399,11 @@ function createIntelEngine(deps) {
       if (investedCapital === null) investedCapital = units * avgOpen;
 
       const isLeveraged = asset.isCfd || (asset.lots || []).some(l => l.isCfd) || (units * avgOpen > investedCapital * 1.15);
-      const netValue = isLeveraged
-        ? Math.max(0, investedCapital + livePnl)
-        : Math.max(0, asset.brokerNetValue != null && Math.abs(livePrice - (asset.brokerPrice || livePrice)) < 1e-4 ? asset.brokerNetValue : notionalValue);
+      const netValue = (isFromEtoroApi && asset.brokerNetValue != null && Number.isFinite(Number(asset.brokerNetValue)))
+        ? Math.max(0, Number(asset.brokerNetValue))
+        : (isLeveraged
+          ? Math.max(0, investedCapital + livePnl)
+          : Math.max(0, asset.brokerNetValue != null && Math.abs(livePrice - (asset.brokerPrice || livePrice)) < 1e-4 ? asset.brokerNetValue : notionalValue));
       const livePnlPct = investedCapital > 0
         ? (livePnl / investedCapital) * 100
         : (avgOpen > 0 ? ((livePrice - avgOpen) / avgOpen) * 100 * sign : 0);

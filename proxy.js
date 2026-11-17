@@ -3432,6 +3432,59 @@ const requestHandler = async (req, res) => {
     }
   }
 
+  // ─── ETORO READ-ONLY PORTFOLIO SYNC ENDPOINTS ──────────────────────────────
+  if (pathname.startsWith('/api/etoro/')) {
+    try {
+      const { createEtoroSyncService } = require('./etoro-sync-service');
+      if (!global.__tpEtoroService) {
+        global.__tpEtoroService = createEtoroSyncService({
+          onPortfolioSynced: async ({ userId, snapshot, positions }) => {
+            try {
+              const stPath = path.join(__dirname, 'users_state.json');
+              if (!fs.existsSync(stPath)) return;
+              const rawDb = JSON.parse(fs.readFileSync(stPath, 'utf8'));
+              const usersObj = rawDb.users || {};
+              const targetUser = usersObj[userId] || Object.values(usersObj).find(u => u.role === 'admin') || Object.values(usersObj)[0];
+              if (!targetUser) return;
+              targetUser.personal = targetUser.personal || {};
+              targetUser.personal.realPortfolio = global.__tpEtoroService.buildRealPortfolioFromEtoro({
+                existingPortfolio: targetUser.personal.realPortfolio,
+                snapshot,
+                positions
+              });
+              fs.writeFileSync(stPath, JSON.stringify(rawDb, null, 2), 'utf8');
+            } catch (_) {}
+          }
+        });
+        global.__tpEtoroService.configureScheduler('default');
+      }
+      const etoroSvc = global.__tpEtoroService;
+
+      if (pathname === '/api/etoro/status' && req.method === 'GET') {
+        return sendJson(res, 200, etoroSvc.getStatus('default'));
+      }
+      const body = req.method === 'POST' ? await readJsonBody(req) : {};
+      if (pathname === '/api/etoro/config' && req.method === 'POST') {
+        const st = etoroSvc.updateConfig('default', body || {});
+        return sendJson(res, 200, st);
+      }
+      if (pathname === '/api/etoro/test' && req.method === 'POST') {
+        const customKeys = (body?.apiKey && body?.userKey)
+          ? { apiKey: String(body.apiKey).trim(), userKey: String(body.userKey).trim() }
+          : null;
+        const result = await etoroSvc.testConnection(customKeys, 'default');
+        return sendJson(res, 200, result);
+      }
+      if (pathname === '/api/etoro/sync' && req.method === 'POST') {
+        const result = await etoroSvc.syncNow('default');
+        return sendJson(res, 200, result);
+      }
+      return sendJson(res, 404, { ok: false, error: 'Ruta eToro necunoscută.' });
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, error: e.message });
+    }
+  }
+
   const intel = getIntelEngine();
 
   // ─── TRADEPRO AI INTELLIGENCE ENDPOINTS (12 MODULES) ───────────────────────
@@ -3666,6 +3719,12 @@ const requestHandler = async (req, res) => {
   if (pathname === '/api/telegram/notify' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
+      const summaryStr = String(body.summary || '');
+      const htmlStr = String(body.html || '');
+      const isPortfolioSmartAlert = summaryStr.includes('Alerte Smart Portofoliu') || htmlStr.includes('Radar Smart Portofoliu');
+      if (isPortfolioSmartAlert && body.explicitUserClick !== true) {
+        return sendJson(res, 200, { ok: true, skipped: 'auto_portfolio_push_disabled', rateStats: getTgRateStats(), logs: tgRuntime.logs.slice(0, 20) });
+      }
       const sym = body.sym ? normalizeSymServer(body.sym) : '';
       const tf = body.tf || tgRuntime.terminal.activeTf || '15m';
       const replyMarkup = (body.includeActions && sym)
@@ -3676,9 +3735,9 @@ const requestHandler = async (req, res) => {
         sym,
         bias: body.bias || '',
         allowClosedMarket: !!body.allowClosedMarket,
-        dedupKey: body.dedupKey || '',
-        summary: body.summary || '',
-        html: String(body.html || ''),
+        dedupKey: body.dedupKey || (isPortfolioSmartAlert ? `pf_manual_${Math.floor(Date.now() / 30000)}` : ''),
+        summary: summaryStr,
+        html: htmlStr,
         replyMarkup
       });
       return sendJson(res, 200, { ...result, rateStats: getTgRateStats(), logs: tgRuntime.logs.slice(0, 20) });

@@ -71,15 +71,29 @@
     pfEditLotKey: '', // `${assetId}:${lotId}`
     pfFilter: 'all',
     pfSort: 'notional',
+    pfSortDir: 'desc',
+    pfLotSortCol: 'open',
+    pfLotSortDir: 'desc',
     pfNotice: null,
     pfParsePreview: null,
-    pfShowCalc: true,
+    pfShowCalc: false,
     pfCalcAssetId: '',
     pfCalcSlInput: '',
     pfCalcTpInput: '',
     pfCalcCashInput: '',
     pfCalcShowLots: false,
-    pfCalcConfirmApply: false
+    pfCalcConfirmApply: false,
+    pfShowEtoroConfig: false,
+    pfShowSmartAlerts: false,
+    pfAutoPushEnabled: false,
+    pfSentPushKeys: (() => {
+      try { return JSON.parse(localStorage.getItem('tp_pf_pushed_keys_v1') || '{}'); } catch (_) { return {}; }
+    })(),
+    etoroStatus: null,
+    portfolioTimer: null,
+    portfolioTickBusy: false,
+    prevPriceMap: {},
+    tickFlashMap: {}
   };
 
   function bridge() {
@@ -240,6 +254,31 @@
         }
       }, 15000);
     }
+    if (stateIntel.portfolioTimer) {
+      clearInterval(stateIntel.portfolioTimer);
+      stateIntel.portfolioTimer = null;
+    }
+    if (stateIntel.view === 'portfolio') {
+      stateIntel.portfolioTimer = setInterval(async () => {
+        if (stateIntel.view !== 'portfolio' || document.hidden || stateIntel.portfolioTickBusy) return;
+        const stage = document.getElementById('intelStage');
+        const activeEl = document.activeElement;
+        if (stage && activeEl && stage.contains(activeEl) && /^(INPUT|SELECT|TEXTAREA)$/i.test(activeEl.tagName)) {
+          return;
+        }
+        if (stateIntel.pfEditLotKey || stateIntel.pfShowEtoroConfig || stateIntel.pfShowImporter) return;
+        stateIntel.portfolioTickBusy = true;
+        try {
+          if (stateIntel.etoroStatus?.credentials?.configured) {
+            await fetch('/api/etoro/sync', { method: 'POST' }).catch(() => { });
+          }
+          await renderRealPortfolioView(true, true);
+        } catch (_) {
+        } finally {
+          stateIntel.portfolioTickBusy = false;
+        }
+      }, 4500);
+    }
   }
 
   async function getSymbolDeepData(sym, tf = '30m', force = false) {
@@ -298,7 +337,11 @@
     }
 
     if (next === 'chart') {
-      setTimeout(() => window.dispatchEvent(new Event('resize')), 40);
+      try { bridge().refreshChartsAfterShow?.(); } catch (_) { }
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+        try { bridge().refreshChartsAfterShow?.(); } catch (_) { }
+      }, 40);
       return;
     }
 
@@ -2852,7 +2895,7 @@
     };
   }
 
-  async function renderRealPortfolioView(force = false) {
+  async function renderRealPortfolioView(force = false, silent = false) {
     const stage = document.getElementById('intelStage');
     const curUser = bridge().getUser?.();
     if (!stage) return;
@@ -2882,10 +2925,12 @@
       return;
     }
 
-    renderLoadingState(
-      `Portofoliu Real · @${curUser.username}`,
-      `Se încarcă cotațiile live, analiza tehnică zilnică, SEC EDGAR, CBOE Options și auditul pe ${pf.assets?.length || 0} active...`
-    );
+    if (!silent && !stateIntel.pfEvalData) {
+      renderLoadingState(
+        `Portofoliu Real · @${curUser.username}`,
+        `Se încarcă cotațiile live, analiza tehnică zilnică, SEC EDGAR, CBOE Options și auditul pe ${pf.assets?.length || 0} active...`
+      );
+    }
 
     try {
       let evalData;
@@ -2907,33 +2952,78 @@
         evalData = await evaluatePortfolioClientFallback(pf);
       }
       if (stateIntel.view !== 'portfolio') return;
+      try {
+        const etRes = await fetch('/api/etoro/status', { cache: 'no-store' });
+        if (etRes.ok) stateIntel.etoroStatus = await etRes.json();
+      } catch (_) { }
+
+      const nextFlash = {};
+      const nextPrev = { ...(stateIntel.prevPriceMap || {}) };
+      for (const row of (evalData?.evaluatedAssets || [])) {
+        const key = row.brokerSym || row.id;
+        const old = nextPrev[key];
+        if (old) {
+          if (Number(row.livePrice) > Number(old.livePrice)) {
+            nextFlash[key] = 'pf-tick-up';
+          } else if (Number(row.livePrice) < Number(old.livePrice)) {
+            nextFlash[key] = 'pf-tick-dn';
+          }
+        }
+        nextPrev[key] = { livePrice: row.livePrice, livePnl: row.livePnl };
+      }
+      stateIntel.prevPriceMap = nextPrev;
+      stateIntel.tickFlashMap = nextFlash;
+
       stateIntel.pfEvalData = evalData;
       stateIntel.pfEvalTs = Date.now();
+      try {
+        bridge().ingestPortfolioQuotes?.(evalData?.evaluatedAssets || []);
+      } catch (_) { }
+      const prevScroll = stage.scrollTop;
       renderRealPortfolioStageFromData(pf, evalData);
+      if (silent && prevScroll > 0) {
+        stage.scrollTop = prevScroll;
+      }
     } catch (e) {
-      stage.innerHTML = `<div class="intel-card" style="padding:20px;color:var(--tv-red);">Eroare evaluare portofoliu: ${esc(e.message)}</div>`;
+      if (!silent) {
+        stage.innerHTML = `<div class="intel-card" style="padding:20px;color:var(--tv-red);">Eroare evaluare portofoliu: ${esc(e.message)}</div>`;
+      }
     }
   }
 
   function defaultCalcInputsForRow(r, rawAsset) {
     if (!r) return { sl: '', tp: '' };
     const lots = rawAsset?.lots || r.lotInsights || [];
-    const firstSl = lots.find(l => l.sl != null && Number(l.sl) > 0)?.sl ?? rawAsset?.sl ?? r.recommendation?.levels?.suggestedSl;
+    const lp = Number(r.livePrice || r.avgOpen || 1);
+    const dec = lp >= 1 ? 2 : 4;
+    const validSls = lots.map(l => Number(l.sl)).filter(v => Number.isFinite(v) && v > 0);
+    let pickSl = rawAsset?.sl ?? r.recommendation?.levels?.suggestedSl;
+    if (validSls.length > 0) {
+      // If most lots share a target SL (e.g. 14 lots at 3.60 and 1 lot at 3.62), default to the lowest/target SL (3.60) so the user immediately sees the cost to align the remaining lot(s)
+      const minSl = Math.min(...validSls);
+      const maxSl = Math.max(...validSls);
+      pickSl = minSl !== maxSl ? minSl : validSls[0];
+    }
     const firstTp = lots.find(l => l.tp != null && Number(l.tp) > 0)?.tp ?? rawAsset?.tp ?? r.recommendation?.levels?.trimZone;
     return {
-      sl: (firstSl != null && Number(firstSl) > 0) ? String(Number(firstSl)) : '',
-      tp: (firstTp != null && Number(firstTp) > 0) ? String(Number(firstTp)) : ''
+      sl: (pickSl != null && Number(pickSl) > 0) ? Number(pickSl).toFixed(dec) : '',
+      tp: (firstTp != null && Number(firstTp) > 0) ? Number(firstTp).toFixed(dec) : ''
     };
   }
 
   function computeSlTpSimulation(r, rawAsset, rawSlVal, rawTpVal, cashVal = null) {
     if (!r) return null;
-    const targetSl = pfParseNum(rawSlVal);
-    const targetTp = pfParseNum(rawTpVal);
+    const lpRef = Number(r.livePrice || r.avgOpen || 1);
+    const dec = lpRef >= 1 ? 2 : 4;
+    const rawTargetSl = pfParseNum(rawSlVal);
+    const rawTargetTp = pfParseNum(rawTpVal);
+    const targetSl = rawTargetSl !== null && rawTargetSl > 0 ? Number(rawTargetSl.toFixed(dec)) : null;
+    const targetTp = rawTargetTp !== null && rawTargetTp > 0 ? Number(rawTargetTp.toFixed(dec)) : null;
     const hasSl = targetSl !== null && targetSl > 0;
     const hasTp = targetTp !== null && targetTp > 0;
-    const cashAvail = (cashVal !== null && Number.isFinite(Number(cashVal)) && String(cashVal).trim() !== '') ? Number(cashVal) : null;
+    const cashAvail = (cashVal !== null && Number.isFinite(Number(cashVal)) && String(cashVal).trim() !== '') ? Number(Number(cashVal).toFixed(2)) : null;
     const liveP = Number(r.livePrice || 0);
+    const rawLotsById = new Map(((rawAsset && rawAsset.lots) || []).map(x => [String(x.id), x]));
     const srcLots = (r.lotInsights && r.lotInsights.length)
       ? r.lotInsights
       : ((rawAsset?.lots && rawAsset.lots.length)
@@ -2952,6 +3042,11 @@
 
     let extraCashTotal = 0;
     let cfdUnits = 0;
+    let cfdLotsCount = 0;
+    let changedLotsCount = 0;
+    let changedUnits = 0;
+    let minOldSl = null;
+    let maxOldSl = null;
     let cfdWeightedOldSlSum = 0;
     let totalUnits = 0;
     let totalPnlAtSl = 0;
@@ -2965,11 +3060,14 @@
     for (const l of srcLots) {
       const units = Number(l.units || 0);
       if (units <= 0) continue;
-      const isCfd = Boolean(l.isCfd);
+      const rawLot = rawLotsById.get(String(l.id)) || l;
+      const isCfd = Boolean(rawLot.isCfd ?? l.isCfd);
+      const lev = Number(rawLot.leverage || l.leverage || (isCfd ? 5 : 1));
+      const lotInv = Number(rawLot.invested ?? l.invested ?? 0);
       const isShort = (l.side || r.side) === 'SHORT';
       const sign = isShort ? -1 : 1;
       const open = Number(l.open ?? r.avgOpen ?? 0);
-      const oldSl = (l.sl != null && Number(l.sl) > 0) ? Number(l.sl) : null;
+      const oldSl = (l.sl != null && Number(l.sl) > 0) ? Number(Number(l.sl).toFixed(dec)) : null;
       const refSl = oldSl != null ? oldSl : (open > 0 ? open : liveP);
       if (oldSl == null && isCfd) usedFallbackOpen = true;
       if (oldSl == null) hasAllOldSl = false;
@@ -2977,25 +3075,43 @@
       let lotExtra = 0;
       let lotPnlSl = null;
       if (hasSl) {
-        lotPnlSl = (targetSl - open) * sign * units;
+        lotPnlSl = Number(((targetSl - open) * sign * units).toFixed(2));
         totalPnlAtSl += lotPnlSl;
         if (isCfd) {
           cfdUnits += units;
+          cfdLotsCount += 1;
           cfdWeightedOldSlSum += refSl * units;
-          lotExtra = (refSl - targetSl) * sign * units;
-          extraCashTotal += lotExtra;
+          if (oldSl != null) {
+            if (minOldSl === null || oldSl < minOldSl) minOldSl = oldSl;
+            if (maxOldSl === null || oldSl > maxOldSl) maxOldSl = oldSl;
+          }
+          // Exact eToro CFD margin formula: invested(sl) = units * (open - sl) * sign + 0.5 * initMargin
+          const initMargin = (units * open) / (lev > 1 ? lev : 5);
+          if (Math.abs(refSl - targetSl) < 1e-6) {
+            lotExtra = 0;
+          } else if (lotInv > 0 && oldSl != null && lev > 1) {
+            const newLotInv = Math.max(initMargin, Number((units * (open - targetSl) * sign + 0.5 * initMargin).toFixed(2)));
+            lotExtra = Number((newLotInv - lotInv).toFixed(2));
+          } else {
+            lotExtra = Number(((refSl - targetSl) * sign * units).toFixed(2));
+          }
+          if (Math.abs(lotExtra) >= 0.01) {
+            changedLotsCount += 1;
+            changedUnits += units;
+          }
+          extraCashTotal = Number((extraCashTotal + lotExtra).toFixed(2));
         }
       }
       if (oldSl != null) {
-        totalLossAtOldSl += (oldSl - open) * sign * units;
+        totalLossAtOldSl = Number((totalLossAtOldSl + (oldSl - open) * sign * units).toFixed(2));
       }
 
       let lotPnlTp = null;
       if (hasTp) {
-        lotPnlTp = (targetTp - open) * sign * units;
-        totalPnlAtTp += lotPnlTp;
+        lotPnlTp = Number(((targetTp - open) * sign * units).toFixed(2));
+        totalPnlAtTp = Number((totalPnlAtTp + lotPnlTp).toFixed(2));
         if (liveP > 0) {
-          totalGainFromLiveTp += (targetTp - liveP) * sign * units;
+          totalGainFromLiveTp = Number((totalGainFromLiveTp + (targetTp - liveP) * sign * units).toFixed(2));
         }
       }
 
@@ -3015,8 +3131,8 @@
     }
 
     const baseInvested = Number(r.investedCapital || 0) > 0 ? Number(r.investedCapital) : Number(r.notionalValue || 0);
-    const totalCapitalAfter = Math.max(0, baseInvested + (hasSl ? extraCashTotal : 0));
-    const cashAfter = (cashAvail !== null && hasSl) ? (cashAvail - extraCashTotal) : null;
+    const totalCapitalAfter = Math.max(0, Number((baseInvested + (hasSl ? extraCashTotal : 0)).toFixed(2)));
+    const cashAfter = (cashAvail !== null && hasSl) ? Number((cashAvail - extraCashTotal).toFixed(2)) : null;
     const avgRefSl = cfdUnits > 0 ? (cfdWeightedOldSlSum / cfdUnits) : null;
 
     const mainSign = r.side === 'SHORT' ? -1 : 1;
@@ -3027,7 +3143,27 @@
 
     let maxAffordableSl = null;
     if (hasSl && cfdUnits > 0 && avgRefSl != null && cashAvail !== null && cashAvail >= 0 && extraCashTotal > cashAvail) {
-      maxAffordableSl = Number((avgRefSl - (mainSign * (cashAvail / cfdUnits))).toFixed(2));
+      const factor = liveP >= 1 ? 100 : 10000;
+      const stepUnit = 1 / factor;
+      // Exact 2-decimal (or 4-decimal) lot-by-lot search so the suggested SL never exceeds cashAvail in eToro
+      const startSl = maxOldSl != null ? maxOldSl : Number(avgRefSl.toFixed(dec));
+      let bestCand = startSl;
+      for (let k = 0; k <= 5000; k++) {
+        const cand = Number((startSl - mainSign * k * stepUnit).toFixed(dec));
+        if (cand <= 0) break;
+        let candExtra = 0;
+        for (const lr of lotRows) {
+          if (!lr.isCfd) continue;
+          const rSl = lr.oldSl != null ? lr.oldSl : lr.open;
+          candExtra += (rSl - cand) * mainSign * lr.units;
+        }
+        if (Number(candExtra.toFixed(2)) <= cashAvail + 1e-6) {
+          bestCand = cand;
+        } else {
+          break;
+        }
+      }
+      maxAffordableSl = bestCand;
     }
 
     let rrRatio = null;
@@ -3064,6 +3200,11 @@
       liveP,
       totalUnits,
       cfdUnits,
+      cfdLotsCount,
+      changedLotsCount,
+      changedUnits,
+      minOldSl,
+      maxOldSl,
       baseInvested,
       extraCashTotal,
       totalCapitalAfter,
@@ -3091,6 +3232,10 @@
     let extraCls = '';
     let heroClass = '';
     let extraSub = 'Introdu SL mai sus';
+    const hasMixedOldSl = sim.minOldSl !== null && sim.maxOldSl !== null && Math.abs(sim.maxOldSl - sim.minOldSl) > 1e-4;
+    const oldSlRangeStr = hasMixedOldSl
+      ? `$${fmtPx(sim.minOldSl)}–$${fmtPx(sim.maxOldSl)}`
+      : (sim.avgRefSl ? `$${fmtPx(sim.avgRefSl)}` : '');
 
     if (sim.hasSl) {
       if (!hasCfd) {
@@ -3098,31 +3243,34 @@
         extraCls = 'up';
         heroClass = 'is-hero-ok';
         extraSub = 'Spot (fără levier)';
-      } else if (sim.extraCashTotal > 0.01) {
+      } else if (sim.extraCashTotal > 0.005) {
         extraLabel = `+${pfFmtUsd(sim.extraCashTotal)}`;
         extraCls = 'amber';
         heroClass = 'is-hero';
-        extraSub = sim.avgRefSl ? `SL $${fmtPx(sim.avgRefSl)} → $${fmtPx(sim.targetSl)}` : `SL → $${fmtPx(sim.targetSl)}`;
-      } else if (sim.extraCashTotal < -0.01) {
+        const lotInfo = (hasMixedOldSl && sim.changedLotsCount > 0 && sim.changedLotsCount < sim.cfdLotsCount)
+          ? ` (${sim.changedLotsCount}/${sim.cfdLotsCount} lot. · ${Number(sim.changedUnits).toLocaleString('en-US', { maximumFractionDigits: 2 })} u.)`
+          : '';
+        extraSub = oldSlRangeStr ? `SL ${oldSlRangeStr} → $${fmtPx(sim.targetSl)}${lotInfo}` : `SL → $${fmtPx(sim.targetSl)}`;
+      } else if (sim.extraCashTotal < -0.005) {
         extraLabel = `-${pfFmtUsd(Math.abs(sim.extraCashTotal))}`;
         extraCls = 'up';
         heroClass = 'is-hero-ok';
-        extraSub = sim.avgRefSl ? `Eliberat ($${fmtPx(sim.avgRefSl)} → $${fmtPx(sim.targetSl)})` : 'Cash eliberat';
+        extraSub = oldSlRangeStr ? `Eliberat (${oldSlRangeStr} → $${fmtPx(sim.targetSl)})` : 'Cash eliberat';
       } else {
         extraLabel = '$0.00';
         extraCls = 'up';
         heroClass = 'is-hero-ok';
-        extraSub = 'Același SL ca acum';
+        extraSub = 'Același SL pe toate loturile';
       }
     }
 
     let cashCheckHtml = '';
     if (sim.cashAfter !== null) {
       if (sim.cashAfter >= 0) {
-        cashCheckHtml = `<div style="margin-top:3px;font-weight:700;" class="up">Rămân ${pfFmtUsd(sim.cashAfter)} în Cash</div>`;
+        cashCheckHtml = `<div style="margin-top:3px;font-weight:700;" class="up">Rămân ${pfFmtUsd(sim.cashAfter)} în Cash Trading</div>`;
       } else {
         const miss = Math.abs(sim.cashAfter);
-        cashCheckHtml = `<div style="margin-top:3px;font-weight:700;" class="dn">Lipsesc ${pfFmtUsd(miss)}${sim.maxAffordableSl ? ` (max SL ~$${fmtPx(sim.maxAffordableSl)})` : ''}</div>`;
+        cashCheckHtml = `<div style="margin-top:3px;font-weight:700;" class="dn">Lipsesc ${pfFmtUsd(miss)} în Cash Trading${sim.maxAffordableSl ? ` (maxim permis: $${fmtPx(sim.maxAffordableSl)})` : ''}</div>`;
       }
     }
 
@@ -3167,9 +3315,9 @@
         ${(sim.hasSl || sim.hasTp) ? `
           <div style="display:flex;gap:6px;align-items:center;">
             ${confirmApply ? `
-              <button type="button" id="pfCalcApplyConfirm" class="pf-ico-btn" title="Confirmă salvarea">${ICO.check}</button>
+              <button type="button" id="pfCalcApplyConfirm" class="intel-chip-btn active" style="height:30px;" title="Confirmă salvarea în baza de date">${ICO.check}<span>Confirmă Bulk (${sim.lotRows.length} lot.)</span></button>
               <button type="button" id="pfCalcApplyCancel" class="pf-ico-btn" title="Anulează">${ICO.close}</button>
-            ` : `<button type="button" id="pfCalcApplyBtn" class="pf-ico-btn" title="Salvează acest SL / TP în portofoliu">${ICO.check}</button>`}
+            ` : `<button type="button" id="pfCalcApplyBtn" class="adm-btn-xs" title="Aplică acest SL / TP în bulk pe toate loturile simbolului">${ICO.check}<span>Aplică Bulk (${sim.lotRows.length} lot.)</span></button>`}
           </div>
         ` : ''}
       </div>
@@ -3207,6 +3355,95 @@
     `;
   }
 
+  function buildSmartPortfolioSignals(allRows, etSt) {
+    const signals = [];
+    const bySymBadge = {};
+    for (const r of (allRows || [])) {
+      const sym = r.brokerSym || r.sym;
+      const lp = Number(r.livePrice || 0);
+      const dayChg = Number(r.dayChgPct || 0);
+      const slDist = r.minSlDistPct != null ? Number(r.minSlDistPct) : null;
+      const firstSl = (r.lotInsights || []).find(l => l.sl)?.sl ?? r.sl;
+      const rsi = r.tech?.rsi14 != null ? Number(r.tech.rsi14) : null;
+      const sup1 = r.tech?.support1 != null ? Number(r.tech.support1) : null;
+      const res1 = r.tech?.resistance1 != null ? Number(r.tech.resistance1) : null;
+
+      if (slDist !== null && slDist <= 9.5 && firstSl) {
+        const isCrit = slDist <= 5.5;
+        const extra20c = Math.round(Number(r.units || 0) * 0.20);
+        signals.push({
+          key: `sl_${sym}_${isCrit ? 'crit' : 'warn'}`,
+          sym,
+          assetId: r.id,
+          kind: 'SL_WARN',
+          tone: isCrit ? 'crit' : 'warn',
+          badge: isCrit ? `SL CRITIC (${slDist.toFixed(1)}%)` : `SL APROPIAT (${slDist.toFixed(1)}%)`,
+          title: `${sym} este la doar ${slDist.toFixed(1)}% ($${Math.abs(lp - firstSl).toFixed(2)}) de Stop-Loss ($${fmtPx(firstSl)})`,
+          detail: `Preț live $${fmtPx(lp)}. Pentru a coborî SL-ul cu încă $0.20 pe toate cele ${Number(r.units).toLocaleString('en-US', { maximumFractionDigits: 0 })} unități sunt necesari ~$${extra20c}.`
+        });
+      }
+
+      const nearSupport = sup1 && lp > 0 && ((lp - sup1) / lp) <= 0.045 && ((lp - sup1) / lp) >= -0.02;
+      if ((rsi !== null && rsi <= 40) || nearSupport || dayChg <= -3.0) {
+        const addUnits = lp < 15 ? 200 : 15;
+        const newAvg = (r.units > 0 && r.avgOpen > 0)
+          ? ((r.units * r.avgOpen + addUnits * lp) / (r.units + addUnits))
+          : lp;
+        const reasonParts = [];
+        if (dayChg <= -2.0) reasonParts.push(`corecție azi ${fmtPct(dayChg)}`);
+        if (rsi !== null && rsi <= 42) reasonParts.push(`RSI ${rsi.toFixed(0)} (supravândut)`);
+        if (sup1) reasonParts.push(`suport tehnic S1 la $${fmtPx(sup1)}`);
+        signals.push({
+          key: `dip_${sym}`,
+          sym,
+          assetId: r.id,
+          kind: 'BUY_DIP',
+          tone: 'up',
+          badge: 'OPORTUNITATE DCA / SUPORT',
+          title: `${sym} ($${fmtPx(lp)}) — Zonă de suport / acumulare (${reasonParts.join(' · ') || 'pullback tehnic'})`,
+          detail: `Media ta actuală este $${fmtPx(r.avgOpen)}. O intrare de +${addUnits} u. la $${fmtPx(lp)} (cost ~$${(addUnits * lp / (r.isCfd ? 5 : 1)).toFixed(0)} CFD 5x) ar coborî media la $${fmtPx(newAvg)}.`
+        });
+      }
+
+      if (dayChg >= 1.8) {
+        signals.push({
+          key: `surge_${sym}`,
+          sym,
+          assetId: r.id,
+          kind: 'SURGE',
+          tone: 'up',
+          badge: `IMPULS ${fmtPct(dayChg)}`,
+          title: `${sym} urcă puternic azi (${fmtPct(dayChg)} la $${fmtPx(lp)})`,
+          detail: res1
+            ? `Prima rezistență tehnică (R1) este la $${fmtPx(res1)}. Poți ridica SL-ul dacă depășește rezistența.`
+            : `Impuls pozitiv intraday (+$${fmtPx(r.dailyPnl || 0)} azi).`
+        });
+      }
+    }
+    return { signals, bySymBadge };
+  }
+
+  async function pushSmartSignalsToTelegram(signals, manual = false) {
+    if (!manual) return { ok: true, skipped: true };
+    if (!signals || !signals.length) return { ok: false, error: 'Nicio alertă activă.' };
+    const toSend = signals.slice(0, 8);
+    if (!toSend.length) return { ok: true, skipped: true };
+    const lines = toSend.map(s => `• <b>${esc(s.badge)}</b> — <b>${esc(s.title)}</b>\n  <i>${esc(s.detail)}</i>`);
+    const html = `<b>TradePro · Radar Smart Portofoliu (@jeka7ro)</b>\n\n${lines.join('\n\n')}`;
+    const r = await fetch('/api/telegram/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: 'manual',
+        explicitUserClick: true,
+        allowClosedMarket: true,
+        summary: `Alerte Smart Portofoliu (${toSend.length})`,
+        html
+      })
+    });
+    return r.json();
+  }
+
   function renderRealPortfolioStageFromData(pf, evalData) {
     const stage = document.getElementById('intelStage');
     const curUser = bridge().getUser?.();
@@ -3216,6 +3453,7 @@
     const allRows = Array.isArray(evalData.evaluatedAssets) ? evalData.evaluatedAssets : [];
     const flt = stateIntel.pfFilter || 'all';
     const srt = stateIntel.pfSort || 'notional';
+    const srtDir = stateIntel.pfSortDir === 'asc' ? 1 : -1;
 
     const rows = allRows.filter(r => {
       if (flt === 'critical') return r.criticalSlLotsCount > 0 || r.recommendation?.severity === 'critical' || r.recommendation?.severity === 'warn';
@@ -3224,14 +3462,20 @@
       if (flt === 'winners') return r.livePnl >= 0;
       return true;
     }).sort((a, b) => {
-      if (srt === 'netValue') return b.netValue - a.netValue;
-      if (srt === 'pnlAsc') return a.livePnl - b.livePnl;
+      if (srt === 'sym') return srtDir * String(a.brokerSym || '').localeCompare(String(b.brokerSym || ''));
+      if (srt === 'livePrice') return srtDir * ((Number(a.livePrice) || 0) - (Number(b.livePrice) || 0));
+      if (srt === 'units') return srtDir * ((Number(a.units) || 0) - (Number(b.units) || 0));
+      if (srt === 'netValue') return srtDir * ((Number(a.netValue) || 0) - (Number(b.netValue) || 0));
+      if (srt === 'invested') return srtDir * ((Number(a.investedCapital) || 0) - (Number(b.investedCapital) || 0));
+      if (srt === 'dailyPnl') return srtDir * ((Number(a.dailyPnl) || 0) - (Number(b.dailyPnl) || 0));
+      if (srt === 'pnlAsc' || srt === 'livePnl') return srtDir * ((Number(a.livePnl) || 0) - (Number(b.livePnl) || 0));
+      if (srt === 'lotsCount') return srtDir * ((Number(a.lotsCount) || 0) - (Number(b.lotsCount) || 0));
       if (srt === 'slDist') {
-        const da = a.minSlDistPct ?? 999;
-        const db = b.minSlDistPct ?? 999;
-        return da - db;
+        const da = a.minSlDistPct ?? 9999;
+        const db = b.minSlDistPct ?? 9999;
+        return srtDir * (da - db);
       }
-      return b.notionalValue - a.notionalValue;
+      return srtDir * ((Number(a.notionalValue) || 0) - (Number(b.notionalValue) || 0));
     });
 
     const editAsset = stateIntel.pfEditAssetId
@@ -3248,9 +3492,12 @@
       if (!stateIntel.pfCalcTpInput) stateIntel.pfCalcTpInput = defs.tp;
     }
     const calcRawAsset = calcRow ? (pf.assets || []).find(a => a.id === calcRow.id || a.brokerSym === calcRow.brokerSym) : null;
+    const defaultTradingCash = pf.tradingCash != null
+      ? Number(pf.tradingCash).toFixed(2)
+      : (pf.cashAvailable != null ? Number(pf.cashAvailable).toFixed(2) : '');
     const effectiveCashStr = stateIntel.pfCalcCashInput !== ''
       ? stateIntel.pfCalcCashInput
-      : (pf.cashAvailable != null ? String(pf.cashAvailable) : '');
+      : defaultTradingCash;
     const calcSim = calcRow
       ? computeSlTpSimulation(calcRow, calcRawAsset, stateIntel.pfCalcSlInput, stateIntel.pfCalcTpInput, effectiveCashStr)
       : null;
@@ -3260,13 +3507,35 @@
     const pnlCls = (t.totalLivePnl || 0) >= 0 ? 'up' : 'dn';
     const dayCls = (t.totalDailyPnl || 0) >= 0 ? 'up' : 'dn';
 
+    const etSt = stateIntel.etoroStatus;
+    const etConnState = etSt?.account?.status || 'Disconnected';
+    const etDotCls = etConnState === 'Connected' ? 'up' : (etConnState === 'Error' ? 'crit' : (etConnState === 'Synchronizing' ? 'warn' : ''));
+    const etLastSyncStr = etSt?.account?.lastSyncAt
+      ? new Date(etSt.account.lastSyncAt).toLocaleTimeString('ro-RO', { hour12: false })
+      : null;
+    const smartPack = buildSmartPortfolioSignals(allRows, etSt);
+    const smartSignals = smartPack.signals;
+    const smartBySym = smartPack.bySymBadge;
+    const hasCritSmart = smartSignals.some(s => s.tone === 'crit' || s.tone === 'warn');
+
     stage.innerHTML = `
       <div class="intel-head">
-        <div class="intel-title-grp">
-          <div class="intel-h1">Portofoliu Real · @${esc(curUser?.username || 'cont')}</div>
-          <div class="intel-sub">${esc(pf.broker || 'eToro')} · Actualizat ${esc(evalData.updatedTimeRo || '')}</div>
+        <div class="intel-title-grp pf-title-with-av">
+          ${String(curUser?.username || '').toLowerCase() === 'jeka7ro' ? `<img src="/avatar-jeka7ro.jpg" alt="@jeka7ro" class="pf-user-hdr-av" />` : ''}
+          <div>
+            <div class="intel-h1 pf-h1-with-etoro"><span>Portofoliu Real</span><img src="/logo?sym=ETORO" alt="eToro" class="pf-etoro-brand-ico" /><span>· @${esc(curUser?.username || 'cont')}</span></div>
+            <div class="intel-sub">${esc(pf.broker || 'eToro')} · Actualizat ${esc(evalData.updatedTimeRo || '')}${etLastSyncStr ? ` · Sync eToro: ${esc(etLastSyncStr)}` : ''}</div>
+          </div>
         </div>
         <div class="intel-controls">
+          <button id="pfToggleSmartAlertsBtn" class="intel-chip-btn ${stateIntel.pfShowSmartAlerts ? 'active' : ''}" type="button" title="Alerte Smart Portofoliu: Stop-Loss, Moment Oportun Cumpărare (DCA), Creșteri/Scăderi &amp; Push Telegram">
+            <span class="pf-status-dot ${hasCritSmart ? 'crit' : 'up'}"></span>
+            <span>Alerte Smart (${smartSignals.length})</span>
+          </button>
+          <button id="pfToggleEtoroCfgBtn" class="intel-chip-btn ${stateIntel.pfShowEtoroConfig ? 'active' : ''}" type="button" title="Settings → Integrations → eToro (100% READ-ONLY)">
+            <span class="pf-status-dot ${etDotCls}"></span>
+            <span>eToro API: ${esc(etConnState)}</span>
+          </button>
           ${allRows.length ? `<button id="pfToggleCalcBtn" class="intel-chip-btn ${stateIntel.pfShowCalc ? 'active' : ''}" type="button" title="Calculator SL / TP">${ICO.calc}<span>Calculator</span></button>` : ''}
           <button id="pfToggleImportBtn" class="intel-chip-btn ${stateIntel.pfShowImporter || !allRows.length ? 'active' : ''}" type="button" title="Importă din Broker">${ICO.plus}<span>Import</span></button>
           <button id="pfAddAssetBtn" class="pf-ico-btn" type="button" title="Adaugă poziție nouă">${ICO.plus}</button>
@@ -3275,6 +3544,79 @@
           <button class="pf-ico-btn" type="button" data-jumpchart="true" title="Înapoi la Grafic">${ICO.chart}</button>
         </div>
       </div>
+
+      ${stateIntel.pfShowSmartAlerts ? `
+        <div class="intel-card pf-smart-panel" style="margin-bottom:14px;">
+          <div class="pf-sec-hdr">
+            <div>
+              <div class="pf-sec-title">Radar Smart &amp; Alerte Portofoliu (SL Warning · Moment Oportun Cumpărare / DCA · Impuls Live)</div>
+              <div class="pf-sec-sub">Monitorizare automată la fiecare 4.5s pe cele ${allRows.length} active din portofoliul tău + Push direct pe <b>Telegram (@jeka7ro_bot)</b> și notificări browser.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="pfAutoPushToggleBtn" type="button" class="adm-btn-xs ${stateIntel.pfAutoPushEnabled ? 'up' : ''}">
+                <span class="pf-status-dot ${stateIntel.pfAutoPushEnabled ? 'up' : ''}"></span>
+                <span>Auto-Push: ${stateIntel.pfAutoPushEnabled ? 'ON' : 'OFF'}</span>
+              </button>
+              <button id="pfPushTelegramNowBtn" type="button" class="intel-chip-btn active">Trimite Alertele pe Telegram</button>
+              <button id="pfCloseSmartAlertsBtn" type="button" class="pf-ico-btn" title="Închide">${ICO.close}</button>
+            </div>
+          </div>
+          <div class="pf-smart-list">
+            ${smartSignals.map(s => `
+              <div class="pf-smart-item tone-${esc(s.tone)}">
+                <div class="pf-smart-top">
+                  <span class="pf-smart-badge ${esc(s.tone)}">${esc(s.badge)}</span>
+                  <span class="pf-smart-title">${esc(s.title)}</span>
+                  <button type="button" class="adm-btn-xs pf-calc-sym-btn" data-pfcalc="${esc(s.assetId)}" style="margin-left:auto;">Simulează SL / DCA</button>
+                </div>
+                <div class="pf-smart-detail">${esc(s.detail)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${stateIntel.pfShowEtoroConfig ? `
+        <div class="intel-card pf-importer-card" style="margin-bottom:14px;">
+          <div class="pf-sec-hdr">
+            <div>
+              <div class="pf-sec-title">Settings → Integrations → eToro Public API (STRICT READ-ONLY)</div>
+              <div class="pf-sec-sub">Status: <b>${esc(etConnState)}</b> · Permisiune: <b>READ-ONLY (doar GET)</b> · Cont: <b>REAL</b>${etLastSyncStr ? ` · Ultima sincronizare: <b>${esc(etLastSyncStr)}</b>` : ''}${etSt?.account?.lastError ? ` · <span class="dn">Eroare: ${esc(etSt.account.lastError)}</span>` : ''}</div>
+            </div>
+            <button id="pfCloseEtoroCfgBtn" type="button" class="pf-ico-btn" title="Închide">${ICO.close}</button>
+          </div>
+          <div class="pf-calc-inputs" style="grid-template-columns: 1fr 1fr 0.7fr 0.7fr;">
+            <div class="adm-edit-field">
+              <label>Public API Key (x-api-key) ${etSt?.credentials?.maskedApiKey ? `· ${esc(etSt.credentials.maskedApiKey)}` : ''}</label>
+              <input id="etoroApiKeyInp" type="password" class="tv-input" placeholder="Lipește x-api-key din eToro..." autocomplete="off" />
+            </div>
+            <div class="adm-edit-field">
+              <label>User Key (x-user-key) ${etSt?.credentials?.maskedUserKey ? `· ${esc(etSt.credentials.maskedUserKey)}` : ''}</label>
+              <input id="etoroUserKeyInp" type="password" class="tv-input" placeholder="Lipește x-user-key (READ-ONLY)..." autocomplete="off" />
+            </div>
+            <div class="adm-edit-field">
+              <label>Cont &amp; Auto-Sync</label>
+              <select id="etoroAutoSyncSel" class="tv-input">
+                <option value="1" ${etSt?.account?.enabled ? 'selected' : ''}>REAL · Auto-Sync Activ</option>
+                <option value="0" ${!etSt?.account?.enabled ? 'selected' : ''}>REAL · Doar Manual</option>
+              </select>
+            </div>
+            <div class="adm-edit-field">
+              <label>Interval Sincronizare</label>
+              <select id="etoroIntervalSel" class="tv-input">
+                <option value="1" ${etSt?.account?.syncIntervalMin === 1 ? 'selected' : ''}>La 1 minut</option>
+                <option value="5" ${(etSt?.account?.syncIntervalMin || 5) === 5 ? 'selected' : ''}>La 5 minute</option>
+                <option value="15" ${etSt?.account?.syncIntervalMin === 15 ? 'selected' : ''}>La 15 minute</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button id="etoroSaveCfgBtn" type="button" class="intel-chip-btn active">Salvează Configurația (.env Backend)</button>
+            <button id="etoroTestConnBtn" type="button" class="adm-btn-xs">Testează Conexiunea READ</button>
+            <button id="etoroSyncNowBtn" type="button" class="adm-btn-xs">${ICO.refresh}<span>Sincronizează Acum din eToro</span></button>
+          </div>
+        </div>
+      ` : ''}
 
       ${stateIntel.pfNotice ? `
         <div class="adm-notice ${stateIntel.pfNotice.tone === 'err' ? 'is-err' : 'is-ok'}">
@@ -3285,25 +3627,44 @@
 
       <div class="pf-kpi-grid">
         <div class="intel-card pf-kpi-card">
-          <div class="pf-kpi-lbl">Valoare Netă</div>
-          <div class="pf-kpi-val tabular">${pfFmtUsd(t.totalNetValue)}</div>
+          <div class="pf-kpi-lbl">Valoare Totală (Total Value)</div>
+          <div class="pf-kpi-val tabular">${pfFmtUsd(t.totalAccountEquity ?? t.totalNetValue)}</div>
           <div class="pf-kpi-sub">Investit: <b>${pfFmtUsd(t.totalInvestedMargin)}</b>${t.cashAvailable != null ? ` · Cash: <b class="up">${pfFmtUsd(t.cashAvailable)}</b>` : ''}</div>
         </div>
         <div class="intel-card pf-kpi-card">
-          <div class="pf-kpi-lbl">Profit / Pierdere Live</div>
+          <div class="pf-kpi-lbl">Profit / Pierdere (P/L)</div>
           <div class="pf-kpi-val ${pnlCls} tabular">${pfFmtUsd(t.totalLivePnl, true)} <span style="font-size:12px;">(${fmtPct(t.totalLivePnlPct)})</span></div>
-          <div class="pf-kpi-sub">Azi: <b class="${dayCls}">${pfFmtUsd(t.totalDailyPnl, true)}</b></div>
+          <div class="pf-kpi-sub">Daily P/L: <b class="${dayCls}">${pfFmtUsd(t.totalDailyPnl, true)}</b></div>
         </div>
-        <div class="intel-card pf-kpi-card">
-          <div class="pf-kpi-lbl">Poziții &amp; Loturi</div>
-          <div class="pf-kpi-val tabular">${t.assetsCount || 0} active · ${t.totalLotsCount || 0} loturi</div>
-          <div class="pf-kpi-sub">${t.cfdLotsCount || 0} loturi CFD · Levier <b>${t.effectiveLeverage || 1}x</b></div>
-        </div>
-        <div class="intel-card pf-kpi-card ${t.criticalSlLotsTotal > 0 ? 'pf-kpi-danger' : ''}">
-          <div class="pf-kpi-lbl">Alerte Stop-Loss</div>
-          <div class="pf-kpi-val ${t.criticalSlLotsTotal > 0 ? 'dn' : 'up'} tabular">${t.criticalSlLotsTotal || 0} loturi sub 4%</div>
-          <div class="pf-kpi-sub">${allRows.filter(x => x.minSlDistPct != null && x.minSlDistPct <= 10).map(x => `${esc(x.brokerSym)} (${x.minSlDistPct.toFixed(1)}%)`).join(' · ') || 'Fără SL critic'}</div>
-        </div>
+        ${(() => {
+        const slSorted = [...allRows].filter(x => x.minSlDistPct != null).sort((a, b) => a.minSlDistPct - b.minSlDistPct);
+        const topSl = slSorted[0];
+        const topSlVal = topSl ? ((topSl.lotInsights || []).find(l => l.sl)?.sl ?? topSl.sl) : null;
+        const topSlDiff = (topSl && topSlVal) ? Math.abs(Number(topSl.livePrice) - Number(topSlVal)) : 0;
+        const slCardCls = !topSl ? 'up' : (topSl.minSlDistPct <= 5 ? 'dn' : (topSl.minSlDistPct <= 9 ? 'amber' : 'up'));
+        const nextSlStr = slSorted.slice(1, 3).map(x => `${esc(x.brokerSym)} −${x.minSlDistPct.toFixed(1)}%`).join(' · ');
+
+        const daySorted = [...allRows].sort((a, b) => (Number(b.dailyPnl) || 0) - (Number(a.dailyPnl) || 0));
+        const bestD = daySorted[0];
+        const worstD = daySorted[daySorted.length - 1];
+        return `
+            <div class="intel-card pf-kpi-card ${topSl && topSl.minSlDistPct <= 5 ? 'pf-kpi-danger' : ''}">
+              <div class="pf-kpi-lbl">Proximitate Stop-Loss (Risc Marjă)</div>
+              <div class="pf-kpi-val ${slCardCls} tabular" style="font-size:16px;">
+                ${topSl ? `${esc(topSl.brokerSym)} −${topSl.minSlDistPct.toFixed(1)}% <span style="font-size:12px;font-weight:600;">($${fmtPx(topSlDiff)} până la SL)</span>` : 'Fără SL activ'}
+              </div>
+              <div class="pf-kpi-sub">${nextSlStr ? `Următoarele: <b>${nextSlStr}</b>` : 'Distanță sigură față de SL'}</div>
+            </div>
+            <div class="intel-card pf-kpi-card">
+              <div class="pf-kpi-lbl">Impuls Azi &amp; Expunere</div>
+              <div class="pf-kpi-val tabular" style="font-size:15px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;">
+                ${bestD ? `<span class="${(bestD.dailyPnl || 0) >= 0 ? 'up' : 'dn'}">${esc(bestD.brokerSym)} ${pfFmtUsd(bestD.dailyPnl || 0, true)}</span>` : ''}
+                ${worstD && worstD !== bestD ? `<span class="dn" style="font-size:13px;">${esc(worstD.brokerSym)} ${pfFmtUsd(worstD.dailyPnl || 0, true)}</span>` : ''}
+              </div>
+              <div class="pf-kpi-sub">Expunere: <b>${pfFmtUsd(t.totalNotional)}</b> (${t.effectiveLeverage || 1}x) · Top 2: <b>${t.top2ConcentrationPct || 0}%</b></div>
+            </div>
+          `;
+      })()}
       </div>
 
       ${(stateIntel.pfShowImporter || !allRows.length) ? `
@@ -3423,25 +3784,25 @@
             <div class="adm-edit-field">
               <label>Stop-Loss Dorit ($)</label>
               <div class="pf-step-wrap">
-                <button type="button" class="pf-step-btn" data-step-target="pfCalcSl" data-step="-0.1" title="Scade cu 0.1">−</button>
-                <input id="pfCalcSl" type="number" step="0.1" class="tv-input pf-step-inp tabular" value="${esc(stateIntel.pfCalcSlInput)}" placeholder="6.00" />
-                <button type="button" class="pf-step-btn" data-step-target="pfCalcSl" data-step="0.1" title="Crește cu 0.1">+</button>
+                <button type="button" class="pf-step-btn" data-step-target="pfCalcSl" data-step="-0.01" title="Scade cu $0.01">−</button>
+                <input id="pfCalcSl" type="number" step="0.01" class="tv-input pf-step-inp tabular" value="${esc(stateIntel.pfCalcSlInput)}" placeholder="6.00" />
+                <button type="button" class="pf-step-btn" data-step-target="pfCalcSl" data-step="0.01" title="Crește cu $0.01">+</button>
               </div>
             </div>
             <div class="adm-edit-field">
               <label>Take-Profit Dorit ($)</label>
               <div class="pf-step-wrap">
-                <button type="button" class="pf-step-btn" data-step-target="pfCalcTp" data-step="-0.1" title="Scade cu 0.1">−</button>
-                <input id="pfCalcTp" type="number" step="0.1" class="tv-input pf-step-inp tabular" value="${esc(stateIntel.pfCalcTpInput)}" placeholder="12.50" />
-                <button type="button" class="pf-step-btn" data-step-target="pfCalcTp" data-step="0.1" title="Crește cu 0.1">+</button>
+                <button type="button" class="pf-step-btn" data-step-target="pfCalcTp" data-step="-0.01" title="Scade cu $0.01">−</button>
+                <input id="pfCalcTp" type="number" step="0.01" class="tv-input pf-step-inp tabular" value="${esc(stateIntel.pfCalcTpInput)}" placeholder="12.50" />
+                <button type="button" class="pf-step-btn" data-step-target="pfCalcTp" data-step="0.01" title="Crește cu $0.01">+</button>
               </div>
             </div>
             <div class="adm-edit-field">
-              <label>Cash Disponibil ($)</label>
+              <label>Cash Trading eToro ($)${pf.walletCashExtra > 0 ? ` <small style="font-weight:500;opacity:0.75;">(+ $${Number(pf.walletCashExtra).toFixed(2)} Wallet)</small>` : ''}</label>
               <div class="pf-step-wrap">
-                <button type="button" class="pf-step-btn" data-step-target="pfCalcCashInp" data-step="-100" title="Scade cu $100">−</button>
-                <input id="pfCalcCashInp" type="number" step="100" class="tv-input pf-step-inp tabular" value="${esc(effectiveCashStr)}" placeholder="4000" />
-                <button type="button" class="pf-step-btn" data-step-target="pfCalcCashInp" data-step="100" title="Crește cu $100">+</button>
+                <button type="button" class="pf-step-btn" data-step-target="pfCalcCashInp" data-step="-10" title="Scade cu $10">−</button>
+                <input id="pfCalcCashInp" type="number" step="0.01" class="tv-input pf-step-inp tabular" value="${esc(effectiveCashStr)}" placeholder="1.01" />
+                <button type="button" class="pf-step-btn" data-step-target="pfCalcCashInp" data-step="10" title="Crește cu $10">+</button>
               </div>
             </div>
           </div>
@@ -3450,69 +3811,69 @@
             <span class="pf-calc-preset-lbl">SL</span>
             <div class="pf-calc-preset-grp">
               ${(() => {
-                const isShort = calcRow.side === 'SHORT';
-                const sgn = isShort ? 1 : -1;
-                const lp = Number(calcRow.livePrice || 0);
-                if (lp <= 0) return '';
-                const dec = lp >= 1 ? 2 : 4;
-                const fmtBtn = v => `$${Number(v).toFixed(dec)}`;
-                const pcts = [0.03, 0.06, 0.10, 0.15, 0.20, 0.25, 0.35];
-                const items = pcts.map(p => {
-                  const val = Number((lp * (1 + sgn * p)).toFixed(dec));
-                  return { val, tip: `SL ${isShort ? '+' : '−'}${Math.round(p * 100)}% ($${fmtPx(val)})` };
-                });
-                const stSl = Number(calcRow.recommendation?.levels?.suggestedSl || 0);
-                if (stSl > 0) {
-                  const stRound = Number(stSl.toFixed(dec));
-                  if (!items.some(x => Math.abs(x.val - stRound) / lp < 0.015)) {
-                    items.push({ val: stRound, tip: `SL Sugerat ($${fmtPx(stRound)})` });
-                  }
-                }
-                items.sort((a, b) => isShort ? a.val - b.val : b.val - a.val);
-                const curSlNum = pfParseNum(stateIntel.pfCalcSlInput);
-                return items.slice(0, 7).map(it => {
-                  const act = curSlNum !== null && Math.abs(curSlNum - it.val) < 1e-4 ? 'active' : '';
-                  return `<button type="button" class="pf-calc-pre tabular ${act}" data-kind="sl" data-val="${it.val}" title="${it.tip}">${fmtBtn(it.val)}</button>`;
-                }).join('');
-              })()}
+          const isShort = calcRow.side === 'SHORT';
+          const sgn = isShort ? 1 : -1;
+          const lp = Number(calcRow.livePrice || 0);
+          if (lp <= 0) return '';
+          const dec = lp >= 1 ? 2 : 4;
+          const fmtBtn = v => `$${Number(v).toFixed(dec)}`;
+          const pcts = [0.03, 0.06, 0.10, 0.15, 0.20, 0.25, 0.35];
+          const items = pcts.map(p => {
+            const val = Number((lp * (1 + sgn * p)).toFixed(dec));
+            return { val, tip: `SL ${isShort ? '+' : '−'}${Math.round(p * 100)}% ($${fmtPx(val)})` };
+          });
+          const stSl = Number(calcRow.recommendation?.levels?.suggestedSl || 0);
+          if (stSl > 0) {
+            const stRound = Number(stSl.toFixed(dec));
+            if (!items.some(x => Math.abs(x.val - stRound) / lp < 0.015)) {
+              items.push({ val: stRound, tip: `SL Sugerat ($${fmtPx(stRound)})` });
+            }
+          }
+          items.sort((a, b) => isShort ? a.val - b.val : b.val - a.val);
+          const curSlNum = pfParseNum(stateIntel.pfCalcSlInput);
+          return items.slice(0, 7).map(it => {
+            const act = curSlNum !== null && Math.abs(curSlNum - it.val) < 1e-4 ? 'active' : '';
+            return `<button type="button" class="pf-calc-pre tabular ${act}" data-kind="sl" data-val="${it.val}" title="${it.tip}">${fmtBtn(it.val)}</button>`;
+          }).join('');
+        })()}
             </div>
             <span class="pf-calc-preset-lbl pf-tp-lbl">TP</span>
             <div class="pf-calc-preset-grp">
               ${(() => {
-                const isShort = calcRow.side === 'SHORT';
-                const sgn = isShort ? -1 : 1;
-                const lp = Number(calcRow.livePrice || 0);
-                if (lp <= 0) return '';
-                const dec = lp >= 1 ? 2 : 4;
-                const fmtBtn = v => `$${Number(v).toFixed(dec)}`;
-                const candidates = [
-                  { val: Number((lp * (1 + sgn * 0.10)).toFixed(dec)), tip: 'TP +10% față de live' },
-                  { val: Number((lp * (1 + sgn * 0.20)).toFixed(dec)), tip: 'TP +20% față de live' },
-                  { val: Number((lp * (1 + sgn * 0.35)).toFixed(dec)), tip: 'TP +35% față de live' },
-                  { val: Number((lp * (1 + sgn * 0.50)).toFixed(dec)), tip: 'TP +50% față de live' },
-                  { val: Number((lp * (1 + sgn * 0.75)).toFixed(dec)), tip: 'TP +75% față de live' },
-                  { val: Number((lp * (1 + sgn * 1.00)).toFixed(dec)), tip: 'TP +100% față de live' }
-                ];
-                const be = Number(calcRow.avgOpen || 0);
-                if (be > 0 && ((isShort && be < lp) || (!isShort && be > lp))) {
-                  candidates.push({ val: Number(be.toFixed(dec)), tip: `Breakeven Open Mediu ($${fmtPx(be)})` });
-                }
-                const trim = Number(calcRow.recommendation?.levels?.trimZone || 0);
-                if (trim > 0 && ((isShort && trim < lp) || (!isShort && trim > lp))) {
-                  candidates.push({ val: Number(trim.toFixed(dec)), tip: `Zonă Rezistență ($${fmtPx(trim)})` });
-                }
-                candidates.sort((a, b) => isShort ? b.val - a.val : a.val - b.val);
-                const dedup = [];
-                for (const c of candidates) {
-                  if (c.val <= 0) continue;
-                  if (!dedup.some(x => Math.abs(x.val - c.val) / lp < 0.02)) dedup.push(c);
-                }
-                const curTpNum = pfParseNum(stateIntel.pfCalcTpInput);
-                return dedup.slice(0, 7).map(it => {
-                  const act = curTpNum !== null && Math.abs(curTpNum - it.val) < 1e-4 ? 'active' : '';
-                  return `<button type="button" class="pf-calc-pre tabular ${act}" data-kind="tp" data-val="${it.val}" title="${it.tip}">${fmtBtn(it.val)}</button>`;
-                }).join('');
-              })()}
+          const isShort = calcRow.side === 'SHORT';
+          const sgn = isShort ? -1 : 1;
+          const lp = Number(calcRow.livePrice || 0);
+          if (lp <= 0) return '';
+          const dec = lp >= 1 ? 2 : 4;
+          const fmtBtn = v => `$${Number(v).toFixed(dec)}`;
+          const candidates = [
+            { val: Number((lp * (1 + sgn * 0.10)).toFixed(dec)), tip: 'TP +10% față de live' },
+            { val: Number((lp * (1 + sgn * 0.20)).toFixed(dec)), tip: 'TP +20% față de live' },
+            { val: Number((lp * (1 + sgn * 0.35)).toFixed(dec)), tip: 'TP +35% față de live' },
+            { val: Number((lp * (1 + sgn * 0.50)).toFixed(dec)), tip: 'TP +50% față de live' },
+            { val: Number((lp * (1 + sgn * 0.75)).toFixed(dec)), tip: 'TP +75% față de live' },
+            { val: Number((lp * (1 + sgn * 1.00)).toFixed(dec)), tip: 'TP +100% față de live' }
+          ];
+          const be = Number(calcRow.avgOpen || 0);
+          if (be > 0 && ((isShort && be < lp) || (!isShort && be > lp))) {
+            candidates.push({ val: Number(be.toFixed(dec)), tip: `Breakeven Open Mediu ($${fmtPx(be)})` });
+          }
+          const trim = Number(calcRow.recommendation?.levels?.trimZone || 0);
+          if (trim > 0 && ((isShort && trim < lp) || (!isShort && trim > lp))) {
+            candidates.push({ val: Number(trim.toFixed(dec)), tip: `Zonă Rezistență ($${fmtPx(trim)})` });
+          }
+          candidates.sort((a, b) => isShort ? b.val - a.val : a.val - b.val);
+          const dedup = [];
+          for (const c of candidates) {
+            if (c.val <= 0) continue;
+            if (!dedup.some(x => Math.abs(x.val - c.val) / lp < 0.02)) dedup.push(c);
+          }
+          const curTpNum = pfParseNum(stateIntel.pfCalcTpInput);
+          return dedup.slice(0, 7).map(it => {
+            const act = curTpNum !== null && Math.abs(curTpNum - it.val) < 1e-4 ? 'active' : '';
+            return `<button type="button" class="pf-calc-pre tabular ${act}" data-kind="tp" data-val="${it.val}" title="${it.tip}">${fmtBtn(it.val)}</button>`;
+          }).join('');
+        })()}
             </div>
           </div>
 
@@ -3536,201 +3897,210 @@
             <select id="pfSortSelect" class="tv-input" style="height:28px;font-size:11px;">
               <option value="notional" ${srt === 'notional' ? 'selected' : ''}>Expunere</option>
               <option value="netValue" ${srt === 'netValue' ? 'selected' : ''}>Valoare Netă</option>
+              <option value="invested" ${srt === 'invested' ? 'selected' : ''}>Investit ($)</option>
+              <option value="dailyPnl" ${srt === 'dailyPnl' ? 'selected' : ''}>Daily P/L (Azi)</option>
               <option value="slDist" ${srt === 'slDist' ? 'selected' : ''}>Cel mai aproape de SL</option>
-              <option value="pnlAsc" ${srt === 'pnlAsc' ? 'selected' : ''}>Pierdere / Profit ($)</option>
+              <option value="pnlAsc" ${srt === 'pnlAsc' || srt === 'livePnl' ? 'selected' : ''}>Pierdere / Profit ($)</option>
             </select>
           </div>
         </div>
 
-        <div class="pf-asset-list">
-          ${rows.map(r => {
+        <div class="intel-card pf-etoro-board">
+          <div class="pf-etoro-hdr">
+            ${(() => {
+          const sArrow = col => srt === col ? `<span class="pf-sort-arr">${stateIntel.pfSortDir === 'asc' ? '▴' : '▾'}</span>` : '';
+          return `
+                <div class="pf-sort-col ${srt === 'sym' ? 'active' : ''}" data-pfsortcol="sym">Instrument ${sArrow('sym')}</div>
+                <div class="r pf-sort-col ${srt === 'livePrice' ? 'active' : ''}" data-pfsortcol="livePrice">Preț Live ${sArrow('livePrice')}</div>
+                <div class="r pf-sort-col ${srt === 'units' ? 'active' : ''}" data-pfsortcol="units">Unități @ Open ${sArrow('units')}</div>
+                <div class="r pf-sort-col ${srt === 'slDist' ? 'active' : ''}" data-pfsortcol="slDist">Stop-Loss / TP ${sArrow('slDist')}</div>
+                <div class="r"><span class="pf-sort-col ${srt === 'netValue' ? 'active' : ''}" data-pfsortcol="netValue">Net${sArrow('netValue')}</span> / <span class="pf-sort-col ${srt === 'invested' ? 'active' : ''}" data-pfsortcol="invested">Investit${sArrow('invested')}</span></div>
+                <div class="r"><span class="pf-sort-col ${srt === 'livePnl' || srt === 'pnlAsc' ? 'active' : ''}" data-pfsortcol="livePnl">P&amp;L${sArrow('livePnl') || sArrow('pnlAsc')}</span> / <span class="pf-sort-col ${srt === 'dailyPnl' ? 'active' : ''}" data-pfsortcol="dailyPnl">Daily P&amp;L${sArrow('dailyPnl')}</span></div>
+                <div class="r pf-sort-col ${srt === 'lotsCount' ? 'active' : ''}" data-pfsortcol="lotsCount">Loturi ${sArrow('lotsCount')}</div>
+              `;
+        })()}
+          </div>
+          <div class="pf-etoro-body">
+            ${rows.map(r => {
       const expanded = stateIntel.pfExpandedIds.has(r.id);
-      const rec = r.recommendation || {};
-      const sev = rec.severity || 'neutral';
-      const dotCls = (r.minSlDistPct != null && r.minSlDistPct <= 4) || sev === 'critical' ? 'crit' : (sev === 'warn' ? 'warn' : '');
       const slDanger = r.minSlDistPct != null && r.minSlDistPct <= 5 ? 'dn' : '';
-      const firstSlVal = (r.lotInsights || []).find(l => l.sl)?.sl ?? r.sl;
+      const validRowSls = (r.lotInsights || []).map(l => Number(l.sl)).filter(v => Number.isFinite(v) && v > 0);
+      const minRowSl = validRowSls.length ? Math.min(...validRowSls) : (r.sl ? Number(r.sl) : null);
+      const maxRowSl = validRowSls.length ? Math.max(...validRowSls) : minRowSl;
+      const slLabelHtml = minRowSl
+        ? (maxRowSl && Math.abs(maxRowSl - minRowSl) > 1e-4 ? `SL $${fmtPx(minRowSl)}–$${fmtPx(maxRowSl)}` : `SL $${fmtPx(minRowSl)}`)
+        : 'Fără SL';
+      const firstTpVal = (r.lotInsights || []).find(l => l.tp)?.tp ?? r.tp;
+      const rawAst = (pf.assets || []).find(a => a.id === r.id || a.brokerSym === r.brokerSym);
+      const rawLotsById = new Map(((rawAst && rawAst.lots) || []).map(x => [String(x.id), x]));
+      const flashCls = stateIntel.tickFlashMap?.[r.brokerSym || r.id] || '';
       return `
-              <div class="intel-card pf-asset-card">
-                <div class="pf-asset-top">
-                  <div class="pf-asset-id">
+              <div class="pf-etoro-group ${expanded ? 'is-expanded' : ''}">
+                <div class="pf-etoro-row pf-expand-btn" data-pfexpand="${esc(r.id)}" data-pfcalc="${esc(r.id)}">
+                  <div class="pf-etoro-inst">
                     ${renderSymAvatar(r.sym, 'md')}
-                    <div class="pf-asset-titles">
-                      <div class="pf-asset-sym-row">
-                        <span class="pf-sym-title">${esc(r.brokerSym)}</span>
+                    <div class="pf-etoro-inst-txt">
+                      <div class="pf-etoro-sym-line">
+                        <span class="pf-sym-title">${esc(String(r.brokerSym || '').replace(/\.(24-7|24-5)$/i, ''))}</span>
                         <span class="pf-tag-mono">${r.isCfd ? 'CFD' : 'SPOT'}</span>
                       </div>
                       <div class="pf-asset-name">${esc(r.name)} · ${r.concentrationPct}%</div>
                     </div>
                   </div>
-
-                  <div class="pf-asset-metrics">
-                    <div class="pf-metric">
-                      <span class="k">Preț Live</span>
-                      <span class="v tabular">$${fmtPx(r.livePrice)} <small>(${fmtPct(r.dayChgPct)})</small></span>
-                    </div>
-                    <div class="pf-metric">
-                      <span class="k">Unități @ Open</span>
-                      <span class="v tabular">${Number(r.units).toLocaleString('en-US', { maximumFractionDigits: 2 })} @ $${fmtPx(r.avgOpen)}</span>
-                    </div>
-                    <div class="pf-metric">
-                      <span class="k">Net / Investit</span>
-                      <span class="v tabular">${pfFmtUsd(r.netValue)} <small>/ ${pfFmtUsd(r.investedCapital)}</small></span>
-                    </div>
-                    <div class="pf-metric">
-                      <span class="k">P&amp;L Live</span>
-                      <span class="v ${r.livePnl >= 0 ? 'up' : 'dn'} tabular">${pfFmtUsd(r.livePnl, true)} <small>(${fmtPct(r.livePnlPct)})</small></span>
-                    </div>
-                    <div class="pf-metric">
-                      <span class="k">Stop-Loss</span>
-                      <span class="v ${slDanger} tabular">${firstSlVal ? `$${fmtPx(firstSlVal)} <small>(−${r.minSlDistPct?.toFixed(1)}%)</small>` : '—'}</span>
-                    </div>
+                  <div class="pf-etoro-cell r tabular">
+                    <div class="pf-cell-main"><span class="pf-price-live ${flashCls}">$${fmtPx(r.livePrice)}</span></div>
+                    <div class="pf-cell-sub ${r.dayChgPct >= 0 ? 'up' : 'dn'}">${fmtPct(r.dayChgPct)}</div>
+                  </div>
+                  <div class="pf-etoro-cell r tabular">
+                    <div class="pf-cell-main">${Number(r.units).toLocaleString('en-US', { maximumFractionDigits: 2 })} u</div>
+                    <div class="pf-cell-sub">@ $${fmtPx(r.avgOpen)}</div>
+                  </div>
+                  <div class="pf-etoro-cell r tabular">
+                    <div class="pf-cell-main ${slDanger}">${slLabelHtml} ${r.minSlDistPct != null ? `<small>(−${r.minSlDistPct.toFixed(1)}%)</small>` : ''}</div>
+                    <div class="pf-cell-sub">${firstTpVal ? `TP $${fmtPx(firstTpVal)}` : 'Fără TP'}</div>
+                  </div>
+                  <div class="pf-etoro-cell r tabular">
+                    <div class="pf-cell-main">${pfFmtUsd(r.netValue)}</div>
+                    <div class="pf-cell-sub">Inv: ${pfFmtUsd(r.investedCapital)}</div>
+                  </div>
+                  <div class="pf-etoro-cell r tabular">
+                    <div class="pf-cell-main ${r.livePnl >= 0 ? 'up' : 'dn'}">${pfFmtUsd(r.livePnl, true)}</div>
+                    <div class="pf-cell-sub ${(r.dailyPnl || 0) >= 0 ? 'up' : 'dn'}">Daily: ${pfFmtUsd(r.dailyPnl || 0, true)}</div>
+                  </div>
+                  <div class="pf-etoro-cell r pf-etoro-actions" onclick="event.stopPropagation();">
+                    <button type="button" class="pf-lots-pill pf-expand-btn ${expanded ? 'active' : ''}" data-pfexpand="${esc(r.id)}" title="Vezi cele ${r.lotsCount || 1} poziții individuale">
+                      <span>${r.lotsCount || 1}</span>
+                      <span class="pf-chev">${expanded ? '▴' : '▾'}</span>
+                    </button>
                   </div>
                 </div>
-
-                <div class="pf-rec-footer">
-                  <div class="pf-levels-inline">
-                    <span><span class="pf-status-dot ${dotCls}"></span> <b>${esc(rec.actionBadge || 'ACTIV')}</b></span>
-                    ${rec.levels?.suggestedSl ? `<span>SL sug. <b>$${fmtPx(rec.levels.suggestedSl)}</b></span>` : ''}
-                    ${rec.levels?.trimZone ? `<span>Rezistență <b>$${fmtPx(rec.levels.trimZone)}</b></span>` : ''}
-                    ${r.breakevenGainPct > 0 ? `<span>BE <b>+${r.breakevenGainPct}%</b></span>` : ''}
-                  </div>
-                  <div class="pf-row-actions">
-                    <button type="button" class="pf-ico-btn pf-expand-btn" data-pfexpand="${esc(r.id)}" title="${expanded ? 'Ascunde loturile' : 'Vezi loturile individuale'}">${ICO.layers}${r.lotsCount ? `<span>${r.lotsCount}</span>` : ''}</button>
-                    <button type="button" class="pf-ico-btn pf-calc-sym-btn" data-pfcalc="${esc(r.id)}" title="Calculator SL / TP">${ICO.calc}</button>
-                    <button type="button" class="pf-ico-btn pf-reduce-toggle" data-pfred="${esc(r.id)}" title="Scoate / Închide parțial">${ICO.minus}</button>
-                    <button type="button" class="pf-ico-btn pf-edit-btn" data-pfedit="${esc(r.id)}" title="Editează poziția">${ICO.edit}</button>
-                    <button type="button" class="pf-ico-btn pf-jump-sym" data-pfsym="${esc(r.sym)}" title="Deschide Graficul">${ICO.chart}</button>
-                    <button type="button" class="pf-ico-btn pf-ask-sym" data-pfask="${esc(r.sym)}" data-pfpnl="${r.livePnlPct}" data-pfopen="${r.avgOpen}" title="Analiză AI">${ICO.spark}</button>
-                    ${stateIntel.pfConfirmDelAssetId === r.id ? `
-                      <button type="button" class="adm-btn-xs danger pf-del-confirm" data-pfdelok="${esc(r.id)}">Confirmă</button>
-                      <button type="button" class="adm-btn-xs pf-del-cancel">Nu</button>
-                    ` : `<button type="button" class="pf-ico-btn danger pf-del-btn" data-pfdel="${esc(r.id)}" title="Șterge poziția">${ICO.trash}</button>`}
-                  </div>
-                </div>
-
-                ${stateIntel.pfReduceAssetId === r.id ? `
-                  <div class="pf-reduce-bar" data-redid="${esc(r.id)}">
-                    <div class="pf-reduce-title">Scoate unități din <b>${esc(r.brokerSym)}</b> (deții ${Number(r.units).toLocaleString('en-US', { maximumFractionDigits: 5 })})</div>
-                    <div class="pf-reduce-fields">
-                      <div class="adm-edit-field" style="min-width:130px;">
-                        <label>Cantitate</label>
-                        <input id="pfRedQty_${esc(r.id)}" type="number" step="any" class="tv-input" value="${Number((r.units * 0.25).toFixed(4))}" />
-                      </div>
-                      ${r.lotsCount ? `
-                        <div class="adm-edit-field" style="min-width:210px;">
-                          <label>Din ce loturi</label>
-                          <select id="pfRedStrat_${esc(r.id)}" class="tv-input">
-                            <option value="nearest_be">Cel mai aproape de breakeven</option>
-                            <option value="oldest_high">Cele mai scumpe (open mare)</option>
-                            <option value="lifo">Cele mai recente (LIFO)</option>
-                            <option value="fifo">Cele mai vechi (FIFO)</option>
-                            <option value="proportional">Proporțional din toate</option>
-                          </select>
-                        </div>
-                      ` : ''}
-                      <button type="button" class="adm-btn-xs pf-red-pct" data-pct="0.25" data-units="${r.units}" data-target="pfRedQty_${esc(r.id)}">25%</button>
-                      <button type="button" class="adm-btn-xs pf-red-pct" data-pct="0.50" data-units="${r.units}" data-target="pfRedQty_${esc(r.id)}">50%</button>
-                      <button type="button" class="adm-btn-xs pf-red-pct" data-pct="1" data-units="${r.units}" data-target="pfRedQty_${esc(r.id)}">Tot</button>
-                      <button type="button" class="intel-chip-btn active pf-red-apply" data-pfrun="${esc(r.id)}" style="height:28px;">Scoate Acum</button>
-                      <button type="button" class="adm-btn-xs pf-red-close">Anulează</button>
-                    </div>
-                  </div>
-                ` : ''}
 
                 ${expanded ? `
                   <div class="pf-lots-wrap">
                     <div class="pf-lots-head">
-                      <span>Loturi Individuale · ${esc(r.brokerSym)} (${r.lotInsights.length})</span>
+                      <div class="pf-lots-title-left">
+                        <span>Poziții (${r.lotInsights.length}) · <b>${esc(r.brokerSym)}</b></span>
+                        <button type="button" class="adm-btn-xs pf-calc-sym-btn" data-pfcalc="${esc(r.id)}">Deschide în Calculator</button>
+                        <button type="button" class="adm-btn-xs pf-jump-sym" data-pfsym="${esc(r.sym)}">Grafic Live</button>
+                      </div>
                       <div class="pf-lots-head-tools">
                         ${r.lotInsights.length ? `
                           <div class="pf-bulk-sl">
-                            <input id="pfBulkSl_${esc(r.id)}" type="number" step="any" class="tv-input pf-bulk-inp" placeholder="SL nou toate" />
-                            <button type="button" class="adm-btn-xs pf-bulk-sl-btn" data-pfbulksl="${esc(r.id)}">Aplică SL pe toate</button>
+                            <input id="pfBulkSl_${esc(r.id)}" type="number" step="0.1" class="tv-input pf-bulk-inp" placeholder="SL Bulk ($)" />
+                            <input id="pfBulkTp_${esc(r.id)}" type="number" step="0.1" class="tv-input pf-bulk-inp" placeholder="TP Bulk ($)" />
+                            <button type="button" class="adm-btn-xs pf-bulk-sl-btn" data-pfbulksl="${esc(r.id)}">${ICO.check}<span>Aplică Bulk</span></button>
                           </div>
                         ` : ''}
-                        <button type="button" class="adm-btn-xs pf-add-lot-btn" data-pfaddlot="${esc(r.id)}">${stateIntel.pfAddLotAssetId === r.id ? 'Închide' : '+ Adaugă Lot Nou'}</button>
                       </div>
                     </div>
 
-                    ${stateIntel.pfAddLotAssetId === r.id ? `
-                      <div class="pf-inline-lot-form">
-                        <div class="adm-edit-field"><label>Tip</label><select id="pfNewLotType_${esc(r.id)}" class="tv-input"><option value="Buy CFD">Buy CFD</option><option value="Buy">Buy (Spot)</option><option value="Sell CFD">Sell CFD</option></select></div>
-                        <div class="adm-edit-field"><label>Cantitate</label><input id="pfNewLotUnits_${esc(r.id)}" type="number" step="any" class="tv-input" placeholder="ex: 200" /></div>
-                        <div class="adm-edit-field"><label>Preț Open</label><input id="pfNewLotOpen_${esc(r.id)}" type="number" step="any" class="tv-input" value="${r.livePrice || r.avgOpen || ''}" /></div>
-                        <div class="adm-edit-field"><label>SL (opțional)</label><input id="pfNewLotSl_${esc(r.id)}" type="number" step="any" class="tv-input" placeholder="ex: 6.20" /></div>
-                        <div class="adm-edit-field"><label>TP (opțional)</label><input id="pfNewLotTp_${esc(r.id)}" type="number" step="any" class="tv-input" placeholder="ex: 12.00" /></div>
-                        <button type="button" class="intel-chip-btn active pf-save-new-lot" data-pfast="${esc(r.id)}" style="height:30px;align-self:end;">Adaugă Lot</button>
-                      </div>
-                    ` : ''}
-
                     ${r.lotInsights.length ? `
                       <div class="adm-table-wrap">
-                        <table class="tv-table pf-lots-table">
+                        <table class="tv-table pf-lots-table pf-etoro-subtable">
                           <thead>
-                            <tr>
-                              <th>Data &amp; Tip</th>
-                              <th>Unități</th>
-                              <th>Open</th>
-                              <th>SL (Dist %)</th>
-                              <th>TP</th>
-                              <th>P&amp;L Live</th>
-                              <th>Acțiuni</th>
-                            </tr>
+                            ${(() => {
+                  const lCol = stateIntel.pfLotSortCol || 'open';
+                  const lArr = col => lCol === col ? `<span class="pf-sort-arr">${stateIntel.pfLotSortDir === 'asc' ? '▴' : '▾'}</span>` : '';
+                  return `
+                                <tr>
+                                  <th style="width:32px;"><input type="checkbox" class="pf-bulk-chk-all" data-pfast="${esc(r.id)}" checked title="Selectează / Deselectează toate loturile" /></th>
+                                  <th class="pf-sort-col ${lCol === 'date' ? 'active' : ''}" data-pflotsort="date">Poziție (${r.lotInsights.length}) ${lArr('date')}</th>
+                                  <th class="r pf-sort-col ${lCol === 'units' ? 'active' : ''}" data-pflotsort="units">Unități ${lArr('units')}</th>
+                                  <th class="r pf-sort-col ${lCol === 'open' ? 'active' : ''}" data-pflotsort="open">Open ${lArr('open')}</th>
+                                  <th class="c pf-sort-col ${lCol === 'sl' ? 'active' : ''}" data-pflotsort="sl">SL ${lArr('sl')}</th>
+                                  <th class="c pf-sort-col ${lCol === 'tp' ? 'active' : ''}" data-pflotsort="tp">TP ${lArr('tp')}</th>
+                                  <th class="r pf-sort-col ${lCol === 'invested' ? 'active' : ''}" data-pflotsort="invested">Investit ${lArr('invested')}</th>
+                                  <th class="r pf-sort-col ${lCol === 'dailyPnl' ? 'active' : ''}" data-pflotsort="dailyPnl">Daily P/L ${lArr('dailyPnl')}</th>
+                                  <th class="r pf-sort-col ${lCol === 'pnl' ? 'active' : ''}" data-pflotsort="pnl">P/L ($) ${lArr('pnl')}</th>
+                                </tr>
+                              `;
+                })()}
                           </thead>
                           <tbody>
-                            ${r.lotInsights.map(l => {
-        const lotKey = `${r.id}:${l.id}`;
-        const isEditingLot = stateIntel.pfEditLotKey === lotKey;
-        if (isEditingLot) {
-          return `
+                            ${[...r.lotInsights].sort((la, lb) => {
+                  const lCol = stateIntel.pfLotSortCol || 'open';
+                  const lDir = stateIntel.pfLotSortDir === 'asc' ? 1 : -1;
+                  const ra = rawLotsById.get(String(la.id)) || {};
+                  const rb = rawLotsById.get(String(lb.id)) || {};
+                  const invA = Number(ra.invested ?? la.invested ?? (la.units * la.open / (ra.leverage || 5)));
+                  const invB = Number(rb.invested ?? lb.invested ?? (lb.units * lb.open / (rb.leverage || 5)));
+                  const pnlA = ra.brokerPnl != null ? Number(ra.brokerPnl) : Number(la.livePnl || 0);
+                  const pnlB = rb.brokerPnl != null ? Number(rb.brokerPnl) : Number(lb.livePnl || 0);
+                  if (lCol === 'date') return lDir * String(la.openedAt || '').localeCompare(String(lb.openedAt || ''));
+                  if (lCol === 'units') return lDir * ((Number(la.units) || 0) - (Number(lb.units) || 0));
+                  if (lCol === 'open') return lDir * ((Number(la.open) || 0) - (Number(lb.open) || 0));
+                  if (lCol === 'sl') return lDir * ((Number(la.sl) || 0) - (Number(lb.sl) || 0));
+                  if (lCol === 'tp') return lDir * ((Number(la.tp) || 0) - (Number(lb.tp) || 0));
+                  if (lCol === 'invested') return lDir * (invA - invB);
+                  if (lCol === 'dailyPnl') return lDir * ((Number(la.units) || 0) - (Number(lb.units) || 0));
+                  if (lCol === 'pnl') return lDir * (pnlA - pnlB);
+                  return 0;
+                }).map(l => {
+                  const lotKey = `${r.id}:${l.id}`;
+                  const rawLot = rawLotsById.get(String(l.id)) || {};
+                  const lotInv = Number(rawLot.invested ?? l.invested ?? (l.units * l.open / (rawLot.leverage || 5)));
+                  const lotPnlUsd = rawLot.brokerPnl != null ? Number(rawLot.brokerPnl) : Number(l.livePnl || 0);
+                  const lotDailyPnl = r.units > 0 ? Number(((Number(r.dailyPnl || 0) * (Number(l.units || 0) / Number(r.units)))).toFixed(2)) : 0;
+                  const isEditingLot = stateIntel.pfEditLotKey === lotKey;
+                  if (isEditingLot) {
+                    return `
                                   <tr class="pf-lot-editing">
+                                    <td></td>
                                     <td>
                                       <select id="pfEdLotType" class="tv-input pf-lot-inp">
                                         <option value="Buy CFD" ${/buy cfd/i.test(l.type) ? 'selected' : ''}>Buy CFD</option>
                                         <option value="Buy" ${/^buy$/i.test(l.type) ? 'selected' : ''}>Buy</option>
-                                        <option value="Buy CFD 24/5" ${/24\/5/i.test(l.type) ? 'selected' : ''}>Buy CFD 24/5</option>
                                         <option value="Sell CFD" ${/sell cfd/i.test(l.type) ? 'selected' : ''}>Sell CFD</option>
                                       </select>
                                     </td>
-                                    <td><input id="pfEdLotUnits" type="number" step="any" class="tv-input pf-lot-inp" value="${l.units}" /></td>
-                                    <td><input id="pfEdLotOpen" type="number" step="any" class="tv-input pf-lot-inp" value="${l.open}" /></td>
-                                    <td><input id="pfEdLotSl" type="number" step="any" class="tv-input pf-lot-inp" value="${l.sl ?? ''}" placeholder="fără SL" /></td>
-                                    <td><input id="pfEdLotTp" type="number" step="any" class="tv-input pf-lot-inp" value="${l.tp ?? ''}" placeholder="fără TP" /></td>
-                                    <td class="tabular ${l.livePnl >= 0 ? 'up' : 'dn'}">${pfFmtUsd(l.livePnl, true)}</td>
-                                    <td style="white-space:nowrap;">
-                                      <button type="button" class="adm-btn-xs pf-save-edit-lot" data-pfast="${esc(r.id)}" data-pflotid="${esc(l.id)}">Salvează</button>
-                                      <button type="button" class="adm-btn-xs pf-cancel-edit-lot">Nu</button>
+                                    <td class="r"><input id="pfEdLotUnits" type="number" step="any" class="tv-input pf-lot-inp" value="${l.units}" /></td>
+                                    <td class="r"><input id="pfEdLotOpen" type="number" step="any" class="tv-input pf-lot-inp" value="${l.open}" /></td>
+                                    <td class="c"><input id="pfEdLotSl" type="number" step="any" class="tv-input pf-lot-inp" value="${l.sl ?? ''}" placeholder="SL" /></td>
+                                    <td class="c"><input id="pfEdLotTp" type="number" step="any" class="tv-input pf-lot-inp" value="${l.tp ?? ''}" placeholder="TP" /></td>
+                                    <td class="r tabular">${pfFmtUsd(lotInv)}</td>
+                                    <td class="r tabular ${lotDailyPnl >= 0 ? 'up' : 'dn'}">${pfFmtUsd(lotDailyPnl, true)}</td>
+                                    <td class="r" style="white-space:nowrap;">
+                                      <button type="button" class="adm-btn-xs pf-save-edit-lot" data-pfast="${esc(r.id)}" data-pflotid="${esc(l.id)}">OK</button>
+                                      <button type="button" class="adm-btn-xs pf-cancel-edit-lot">✕</button>
                                     </td>
                                   </tr>
                                 `;
-        }
-        return `
+                  }
+                  return `
                                 <tr class="${l.riskState === 'CRITICAL_SL' ? 'pf-lot-crit' : ''}">
-                                  <td><div style="font-weight:700;">${esc(l.type)}</div><div style="font-size:10px;color:var(--text-dim);">${esc(l.openedAt || '—')}</div></td>
-                                  <td class="tabular">${Number(l.units).toLocaleString('en-US', { maximumFractionDigits: 5 })}</td>
-                                  <td class="tabular">$${fmtPx(l.open)}</td>
-                                  <td class="tabular ${l.riskState === 'CRITICAL_SL' ? 'dn' : ''}">
-                                    ${l.sl ? `$${fmtPx(l.sl)} <small style="color:var(--text-dim);">(${l.slDistPct != null ? `−${l.slDistPct.toFixed(1)}%` : ''})</small>` : '<span style="color:var(--text-dim);">—</span>'}
+                                  <td><input type="checkbox" class="pf-lot-chk" data-pfast="${esc(r.id)}" data-pflotid="${esc(l.id)}" checked /></td>
+                                  <td>
+                                    <div class="pf-etoro-lot-type"><b>Buy</b> <span class="pf-tag-mono">${l.isCfd !== false ? 'CFD' : 'SPOT'}</span></div>
+                                    <div class="pf-etoro-lot-date">${esc(l.openedAt || '—')}</div>
                                   </td>
-                                  <td class="tabular">${l.tp ? `$${fmtPx(l.tp)}` : '—'}</td>
-                                  <td class="tabular ${l.livePnl >= 0 ? 'up' : 'dn'}">${pfFmtUsd(l.livePnl, true)}</td>
-                                  <td style="white-space:nowrap;">
-                                    <button type="button" class="pf-ico-btn pf-edit-lot-btn" data-pflotkey="${esc(lotKey)}" title="Editează lotul">${ICO.edit}</button>
-                                    <button type="button" class="pf-ico-btn danger pf-del-lot-btn" data-pfast="${esc(r.id)}" data-pflotid="${esc(l.id)}" title="Șterge lotul">${ICO.trash}</button>
+                                  <td class="r tabular">${Number(l.units).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</td>
+                                  <td class="r tabular">${Number(l.open).toFixed(l.open < 10 ? 2 : 2)}</td>
+                                  <td class="c tabular">
+                                    <button type="button" class="pf-etoro-box pf-edit-lot-btn ${l.riskState === 'CRITICAL_SL' ? 'dn' : ''}" data-pflotkey="${esc(lotKey)}" title="Click pentru a modifica SL">
+                                      ${l.sl ? Number(l.sl).toFixed(2) : '—'}
+                                    </button>
                                   </td>
+                                  <td class="c tabular">
+                                    <button type="button" class="pf-etoro-box pf-edit-lot-btn" data-pflotkey="${esc(lotKey)}" title="Click pentru a modifica TP">
+                                      ${l.tp ? Number(l.tp).toFixed(2) : '—'}
+                                    </button>
+                                  </td>
+                                  <td class="r tabular">${pfFmtUsd(lotInv)}</td>
+                                  <td class="r tabular ${lotDailyPnl >= 0 ? 'up' : 'dn'}">${pfFmtUsd(lotDailyPnl, true)}</td>
+                                  <td class="r tabular ${lotPnlUsd >= 0 ? 'up' : 'dn'}">${pfFmtUsd(lotPnlUsd, true)}</td>
                                 </tr>
                               `;
-      }).join('')}
+                }).join('')}
                           </tbody>
                         </table>
                       </div>
-                    ` : '<div style="font-size:11px;color:var(--text-muted);padding:8px 0;">Niciun sub-lot defalcat încă.</div>'}
+                    ` : ''}
                   </div>
                 ` : ''}
               </div>
       `;
-          }).join('')}
+        }).join('')}
+          </div>
         </div>
       ` : `
         <div class="intel-card" style="padding:26px;text-align:center;color:var(--text-muted);">
@@ -3742,6 +4112,13 @@
     const persistAndRefresh = async (nextPf, noticeText, noticeTone = 'ok') => {
       try {
         await bridge().saveRealPortfolio(nextPf);
+        const updAst = (nextPf?.assets || []).find(a => a.id === stateIntel.pfCalcAssetId || a.brokerSym === stateIntel.pfCalcAssetId);
+        if (updAst) {
+          const firstSl = (updAst.lots || []).find(l => l.sl != null && Number(l.sl) > 0)?.sl ?? updAst.sl;
+          const firstTp = (updAst.lots || []).find(l => l.tp != null && Number(l.tp) > 0)?.tp ?? updAst.tp;
+          if (firstSl != null && Number(firstSl) > 0) stateIntel.pfCalcSlInput = String(Number(firstSl));
+          if (firstTp != null && Number(firstTp) > 0) stateIntel.pfCalcTpInput = String(Number(firstTp));
+        }
         stateIntel.pfEvalData = null;
         stateIntel.pfNotice = noticeText ? { text: noticeText, tone: noticeTone } : null;
         await renderRealPortfolioView(true);
@@ -3752,8 +4129,13 @@
     };
 
     stage.querySelector('[data-jumpchart]')?.addEventListener('click', () => switchWorkspaceView('chart'));
-    stage.querySelector('#pfRefreshBtn')?.addEventListener('click', () => {
+    stage.querySelector('#pfRefreshBtn')?.addEventListener('click', async () => {
       stateIntel.pfNotice = null;
+      stateIntel.pfCalcSlInput = '';
+      stateIntel.pfCalcTpInput = '';
+      try {
+        await fetch('/api/etoro/sync', { method: 'POST' });
+      } catch (_) { }
       renderRealPortfolioView(true);
     });
     stage.querySelector('#pfNoticeClose')?.addEventListener('click', () => {
@@ -3763,6 +4145,105 @@
     stage.querySelector('#pfToggleImportBtn')?.addEventListener('click', () => {
       stateIntel.pfShowImporter = !stateIntel.pfShowImporter;
       renderRealPortfolioStageFromData(pf, evalData);
+    });
+    stage.querySelector('#pfToggleSmartAlertsBtn')?.addEventListener('click', () => {
+      stateIntel.pfShowSmartAlerts = !stateIntel.pfShowSmartAlerts;
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => { });
+      }
+      renderRealPortfolioStageFromData(pf, evalData);
+    });
+    stage.querySelector('#pfCloseSmartAlertsBtn')?.addEventListener('click', () => {
+      stateIntel.pfShowSmartAlerts = false;
+      renderRealPortfolioStageFromData(pf, evalData);
+    });
+    stage.querySelector('#pfAutoPushToggleBtn')?.addEventListener('click', () => {
+      stateIntel.pfAutoPushEnabled = !stateIntel.pfAutoPushEnabled;
+      renderRealPortfolioStageFromData(pf, evalData);
+    });
+    stage.querySelector('#pfPushTelegramNowBtn')?.addEventListener('click', async () => {
+      try {
+        const res = await pushSmartSignalsToTelegram(smartSignals, true);
+        if (res.ok === false) throw new Error(res.error || 'Eroare trimitere Telegram.');
+        stateIntel.pfNotice = { text: `Raportul Smart (${smartSignals.length} alerte & oportunități portofoliu) a fost trimis pe Telegram (@jeka7ro_bot)!`, tone: 'ok' };
+        renderRealPortfolioStageFromData(pf, evalData);
+      } catch (err) {
+        stateIntel.pfNotice = { text: err.message, tone: 'err' };
+        renderRealPortfolioStageFromData(pf, evalData);
+      }
+    });
+    stage.querySelector('#pfToggleEtoroCfgBtn')?.addEventListener('click', () => {
+      stateIntel.pfShowEtoroConfig = !stateIntel.pfShowEtoroConfig;
+      renderRealPortfolioStageFromData(pf, evalData);
+    });
+    stage.querySelector('#pfCloseEtoroCfgBtn')?.addEventListener('click', () => {
+      stateIntel.pfShowEtoroConfig = false;
+      renderRealPortfolioStageFromData(pf, evalData);
+    });
+    stage.querySelector('#etoroSaveCfgBtn')?.addEventListener('click', async () => {
+      try {
+        const apiKey = stage.querySelector('#etoroApiKeyInp')?.value.trim() || '';
+        const userKey = stage.querySelector('#etoroUserKeyInp')?.value.trim() || '';
+        const enabled = stage.querySelector('#etoroAutoSyncSel')?.value === '1';
+        const syncIntervalMin = Number(stage.querySelector('#etoroIntervalSel')?.value || 5);
+        const r = await fetch('/api/etoro/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey, userKey, enabled, syncIntervalMin })
+        });
+        const j = await r.json();
+        if (!r.ok || j.ok === false) throw new Error(j.error || 'Eroare salvare configurare eToro.');
+        stateIntel.etoroStatus = j;
+        stateIntel.pfNotice = { text: 'Configurația eToro READ-ONLY a fost salvată în backend.', tone: 'ok' };
+        renderRealPortfolioStageFromData(pf, evalData);
+      } catch (err) {
+        stateIntel.pfNotice = { text: err.message, tone: 'err' };
+        renderRealPortfolioStageFromData(pf, evalData);
+      }
+    });
+    stage.querySelector('#etoroTestConnBtn')?.addEventListener('click', async () => {
+      try {
+        const apiKey = stage.querySelector('#etoroApiKeyInp')?.value.trim() || '';
+        const userKey = stage.querySelector('#etoroUserKeyInp')?.value.trim() || '';
+        const r = await fetch('/api/etoro/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey, userKey })
+        });
+        const j = await r.json();
+        if (!r.ok || j.ok === false) throw new Error(j.error || 'Eroare la testarea conexiunii eToro.');
+        stateIntel.pfNotice = { text: `Conexiune eToro READ-ONLY verificată! Poziții active: ${j.positionsCount}, Ordine: ${j.ordersCount}.`, tone: 'ok' };
+        await renderRealPortfolioView(true);
+      } catch (err) {
+        stateIntel.pfNotice = { text: err.message, tone: 'err' };
+        await renderRealPortfolioView(true);
+      }
+    });
+    stage.querySelector('#etoroSyncNowBtn')?.addEventListener('click', async () => {
+      try {
+        const apiKey = stage.querySelector('#etoroApiKeyInp')?.value.trim() || '';
+        const userKey = stage.querySelector('#etoroUserKeyInp')?.value.trim() || '';
+        const enabled = stage.querySelector('#etoroAutoSyncSel')?.value === '1';
+        const syncIntervalMin = Number(stage.querySelector('#etoroIntervalSel')?.value || 5);
+        if (apiKey || userKey) {
+          await fetch('/api/etoro/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey, userKey, enabled, syncIntervalMin })
+          });
+        }
+        const r = await fetch('/api/etoro/sync', { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok || j.ok === false) throw new Error(j.error || 'Eroare sincronizare eToro.');
+        stateIntel.pfCalcSlInput = '';
+        stateIntel.pfCalcTpInput = '';
+        stateIntel.pfCalcCashInput = '';
+        stateIntel.pfNotice = { text: `Sincronizat din eToro READ-ONLY: ${j.positionsCount} poziții individuale (${j.changesDetected} modificări detectate).`, tone: 'ok' };
+        await renderRealPortfolioView(true);
+      } catch (err) {
+        stateIntel.pfNotice = { text: err.message, tone: 'err' };
+        await renderRealPortfolioView(true);
+      }
     });
     stage.querySelector('#pfToggleCalcBtn')?.addEventListener('click', () => {
       stateIntel.pfShowCalc = !stateIntel.pfShowCalc;
@@ -3796,8 +4277,12 @@
         if (!simNow || (!simNow.hasSl && !simNow.hasTp)) return;
         const nextAssets = (pf.assets || []).map(a => {
           if (a.id !== calcRow.id && a.brokerSym !== calcRow.brokerSym) return a;
+          const nextInv = (simNow.hasSl && a.invested != null && simNow.cfdUnits > 0)
+            ? Math.max(0, Number((Number(a.invested) + simNow.extraCashTotal).toFixed(2)))
+            : a.invested;
           return {
             ...a,
+            invested: nextInv,
             ...(simNow.hasSl ? { sl: simNow.targetSl } : {}),
             ...(simNow.hasTp ? { tp: simNow.targetTp } : {}),
             lots: (a.lots || []).map(l => ({
@@ -3812,7 +4297,7 @@
           simNow.hasSl ? `SL → $${fmtPx(simNow.targetSl)}` : '',
           simNow.hasTp ? `TP → $${fmtPx(simNow.targetTp)}` : ''
         ].filter(Boolean).join(', ');
-        persistAndRefresh({ ...pf, assets: nextAssets }, `${calcRow.brokerSym} actualizat în portofoliu (${msgParts}).`);
+        persistAndRefresh({ ...pf, assets: nextAssets }, `${calcRow.brokerSym} actualizat în bulk (${msgParts}).`);
       });
     };
 
@@ -3821,7 +4306,7 @@
       if (!outEl || !calcRow) return;
       const cashValNow = stateIntel.pfCalcCashInput !== ''
         ? stateIntel.pfCalcCashInput
-        : (pf.cashAvailable != null ? String(pf.cashAvailable) : '');
+        : defaultTradingCash;
       const simNow = computeSlTpSimulation(calcRow, calcRawAsset, stateIntel.pfCalcSlInput, stateIntel.pfCalcTpInput, cashValNow);
       outEl.innerHTML = renderSlTpCalcResultHtml(calcRow, simNow, stateIntel.pfCalcShowLots, stateIntel.pfCalcConfirmApply);
       wireCalcDynamicActions();
@@ -3849,9 +4334,45 @@
       stateIntel.pfCalcConfirmApply = false;
       refreshCalcOutput();
     });
-    stage.querySelector('#pfCalcCashInp')?.addEventListener('input', (e) => {
-      stateIntel.pfCalcCashInput = e.target.value;
+    const applyCashToSl = (rawCashStr) => {
+      stateIntel.pfCalcCashInput = rawCashStr;
+      stateIntel.pfCalcConfirmApply = false;
+      const cashNum = pfParseNum(rawCashStr);
+      if (cashNum !== null && cashNum >= 0 && calcRow) {
+        const baseSim = computeSlTpSimulation(calcRow, calcRawAsset, stateIntel.pfCalcSlInput || '1', stateIntel.pfCalcTpInput, null);
+        if (baseSim && baseSim.cfdUnits > 0 && baseSim.avgRefSl != null) {
+          const mainSign = calcRow.side === 'SHORT' ? -1 : 1;
+          const dec = Number(calcRow.livePrice || 0) >= 1 ? 2 : 4;
+          const factor = Math.pow(10, dec);
+          const stepUnit = 1 / factor;
+          // Exact 2-decimal lot-by-lot search so the suggested SL never exceeds cashNum in eToro
+          const startSl = baseSim.maxOldSl != null ? baseSim.maxOldSl : Number(baseSim.avgRefSl.toFixed(dec));
+          let bestCand = startSl;
+          for (let k = 0; k <= 5000; k++) {
+            const cand = Number((startSl - mainSign * k * stepUnit).toFixed(dec));
+            if (cand <= 0) break;
+            const testSim = computeSlTpSimulation(calcRow, calcRawAsset, cand.toFixed(dec), stateIntel.pfCalcTpInput, null);
+            if (testSim && testSim.extraCashTotal <= cashNum + 1e-6) {
+              bestCand = cand;
+            } else {
+              break;
+            }
+          }
+          const autoSl = Math.max(0.0001, Number(bestCand.toFixed(dec)));
+          const slStr = autoSl.toFixed(dec);
+          stateIntel.pfCalcSlInput = slStr;
+          const slInp = stage.querySelector('#pfCalcSl');
+          if (slInp) slInp.value = slStr;
+          stage.querySelectorAll('.pf-calc-pre[data-kind="sl"]').forEach(x => {
+            x.classList.toggle('active', Math.abs(Number(x.dataset.val) - autoSl) < 1e-4);
+          });
+        }
+      }
       refreshCalcOutput();
+    };
+
+    stage.querySelector('#pfCalcCashInp')?.addEventListener('input', (e) => {
+      applyCashToSl(e.target.value);
     });
     stage.querySelectorAll('.pf-step-btn').forEach(b => {
       b.addEventListener('click', () => {
@@ -3862,14 +4383,17 @@
         const curRaw = pfParseNum(inp.value);
         const fallback = targetId === 'pfCalcCashInp' ? 0 : (Number(calcRow?.livePrice) || 0);
         const base = curRaw !== null ? curRaw : fallback;
-        const decimals = Math.abs(delta) < 1 ? 2 : 0;
+        const decimals = (targetId === 'pfCalcSl' || targetId === 'pfCalcTp' || targetId === 'pfCalcCashInp') ? 2 : (Math.abs(delta) < 1 ? 2 : 0);
         const nextVal = Math.max(0, Number((base + delta).toFixed(decimals)));
-        const strVal = decimals > 0 ? nextVal.toFixed(decimals).replace(/\.00$/, '.0') : String(nextVal);
+        const strVal = decimals > 0 ? nextVal.toFixed(decimals) : String(nextVal);
         inp.value = strVal;
         stateIntel.pfCalcConfirmApply = false;
+        if (targetId === 'pfCalcCashInp') {
+          applyCashToSl(strVal);
+          return;
+        }
         if (targetId === 'pfCalcSl') stateIntel.pfCalcSlInput = strVal;
         else if (targetId === 'pfCalcTp') stateIntel.pfCalcTpInput = strVal;
-        else if (targetId === 'pfCalcCashInp') stateIntel.pfCalcCashInput = strVal;
         refreshCalcOutput();
       });
     });
@@ -4103,13 +4627,51 @@
     });
     stage.querySelector('#pfSortSelect')?.addEventListener('change', (e) => {
       stateIntel.pfSort = e.target.value;
+      stateIntel.pfSortDir = e.target.value === 'slDist' || e.target.value === 'pnlAsc' ? 'asc' : 'desc';
       renderRealPortfolioStageFromData(pf, evalData);
+    });
+    stage.querySelectorAll('[data-pfsortcol]').forEach(hdr => {
+      hdr.addEventListener('click', () => {
+        const col = hdr.dataset.pfsortcol;
+        if (stateIntel.pfSort === col) {
+          stateIntel.pfSortDir = stateIntel.pfSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          stateIntel.pfSort = col;
+          stateIntel.pfSortDir = (col === 'sym' || col === 'slDist') ? 'asc' : 'desc';
+        }
+        renderRealPortfolioStageFromData(pf, evalData);
+      });
+    });
+    stage.querySelectorAll('[data-pflotsort]').forEach(hdr => {
+      hdr.addEventListener('click', () => {
+        const col = hdr.dataset.pflotsort;
+        if (stateIntel.pfLotSortCol === col) {
+          stateIntel.pfLotSortDir = stateIntel.pfLotSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          stateIntel.pfLotSortCol = col;
+          stateIntel.pfLotSortDir = 'desc';
+        }
+        renderRealPortfolioStageFromData(pf, evalData);
+      });
     });
     stage.querySelectorAll('.pf-expand-btn').forEach(b => {
       b.addEventListener('click', () => {
         const id = b.dataset.pfexpand;
-        if (stateIntel.pfExpandedIds.has(id)) stateIntel.pfExpandedIds.delete(id);
-        else stateIntel.pfExpandedIds.add(id);
+        stateIntel.pfExpandedInit = true;
+        if (stateIntel.pfExpandedIds.has(id)) {
+          stateIntel.pfExpandedIds.delete(id);
+        } else {
+          stateIntel.pfExpandedIds.add(id);
+          const nextRow = allRows.find(x => x.id === id || x.brokerSym === id);
+          const nextRaw = nextRow ? (pf.assets || []).find(a => a.id === nextRow.id || a.brokerSym === nextRow.brokerSym) : null;
+          if (nextRow) {
+            const defs = defaultCalcInputsForRow(nextRow, nextRaw);
+            stateIntel.pfCalcAssetId = id;
+            stateIntel.pfCalcSlInput = defs.sl;
+            stateIntel.pfCalcTpInput = defs.tp;
+            stateIntel.pfCalcConfirmApply = false;
+          }
+        }
         renderRealPortfolioStageFromData(pf, evalData);
       });
     });
@@ -4203,20 +4765,84 @@
       });
     });
 
+    stage.querySelectorAll('.pf-bulk-chk-all').forEach(chk => {
+      chk.addEventListener('change', () => {
+        const astId = chk.dataset.pfast;
+        stage.querySelectorAll(`.pf-lot-chk[data-pfast="${CSS.escape(astId)}"]`).forEach(c => {
+          c.checked = chk.checked;
+        });
+      });
+    });
+
     stage.querySelectorAll('.pf-bulk-sl-btn').forEach(b => {
+      const astId = b.dataset.pfbulksl;
+      const bulkSlInp = stage.querySelector(`#pfBulkSl_${CSS.escape(astId)}`);
+      const bulkTpInp = stage.querySelector(`#pfBulkTp_${CSS.escape(astId)}`);
+      bulkSlInp?.addEventListener('input', (e) => {
+        const v = e.target.value;
+        if (calcRow && calcRow.id === astId && v !== '') {
+          stateIntel.pfCalcSlInput = v;
+          const topSl = stage.querySelector('#pfCalcSl');
+          if (topSl) topSl.value = v;
+          refreshCalcOutput();
+        }
+      });
+      bulkTpInp?.addEventListener('input', (e) => {
+        const v = e.target.value;
+        if (calcRow && calcRow.id === astId && v !== '') {
+          stateIntel.pfCalcTpInput = v;
+          const topTp = stage.querySelector('#pfCalcTp');
+          if (topTp) topTp.value = v;
+          refreshCalcOutput();
+        }
+      });
       b.addEventListener('click', () => {
-        const astId = b.dataset.pfbulksl;
-        const slVal = pfParseNum(stage.querySelector(`#pfBulkSl_${CSS.escape(astId)}`)?.value);
-        if (!slVal || slVal <= 0) {
-          stateIntel.pfNotice = { text: 'Introdu un Stop-Loss valid (>0) pentru aplicare.', tone: 'err' };
+        const slVal = pfParseNum(bulkSlInp?.value);
+        const tpVal = pfParseNum(bulkTpInp?.value);
+        const hasSl = slVal !== null && slVal > 0;
+        const hasTp = tpVal !== null && tpVal > 0;
+        if (!hasSl && !hasTp) {
+          stateIntel.pfNotice = { text: 'Introdu un SL (>0) sau TP (>0) pentru aplicarea Bulk.', tone: 'err' };
           renderRealPortfolioStageFromData(pf, evalData);
           return;
         }
+        stateIntel.pfCalcAssetId = astId;
+        if (hasSl) stateIntel.pfCalcSlInput = String(slVal);
+        if (hasTp) stateIntel.pfCalcTpInput = String(tpVal);
+        const checkedLotIds = new Set(
+          Array.from(stage.querySelectorAll(`.pf-lot-chk[data-pfast="${CSS.escape(astId)}"]:checked`)).map(c => c.dataset.pflotid)
+        );
+        let changedCount = 0;
         const nextAssets = (pf.assets || []).map(a => {
           if (a.id !== astId) return a;
-          return { ...a, sl: slVal, lots: (a.lots || []).map(l => ({ ...l, sl: slVal })) };
+          const allLotIds = (a.lots || []).map(l => l.id);
+          const applyAll = checkedLotIds.size === 0 || checkedLotIds.size === allLotIds.length;
+          let extraCashDelta = 0;
+          const nextLots = (a.lots || []).map(l => {
+            if (!applyAll && !checkedLotIds.has(l.id)) return l;
+            changedCount++;
+            if (hasSl && l.isCfd && l.sl != null && Number(l.sl) > 0) {
+              const sgn = (l.side || a.side) === 'SHORT' ? -1 : 1;
+              extraCashDelta += (Number(l.sl) - slVal) * sgn * Number(l.units || 0);
+            }
+            return {
+              ...l,
+              ...(hasSl ? { sl: slVal } : {}),
+              ...(hasTp ? { tp: tpVal } : {})
+            };
+          });
+          const nextInv = (hasSl && a.invested != null && Math.abs(extraCashDelta) > 0.01)
+            ? Math.max(0, Number((Number(a.invested) + extraCashDelta).toFixed(2)))
+            : a.invested;
+          return {
+            ...a,
+            invested: nextInv,
+            ...(applyAll && hasSl ? { sl: slVal } : {}),
+            ...(applyAll && hasTp ? { tp: tpVal } : {}),
+            lots: nextLots
+          };
         });
-        persistAndRefresh({ ...pf, assets: nextAssets }, `SL actualizat la $${slVal} pe toate loturile.`);
+        persistAndRefresh({ ...pf, assets: nextAssets }, `Actualizat în Bulk pe ${changedCount} loturi.`);
       });
     });
     stage.querySelectorAll('.pf-add-lot-btn').forEach(b => {
@@ -4308,41 +4934,41 @@
         persistAndRefresh({ ...pf, assets: nextAssets }, 'Lotul a fost actualizat.');
       });
     });
-  stage.querySelectorAll('.pf-del-lot-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      const astId = b.dataset.pfast;
-      const lotId = b.dataset.pflotid;
-      const nextAssets = [];
-      for (const a of (pf.assets || [])) {
-        if (a.id !== astId) {
-          nextAssets.push(a);
-          continue;
-        }
-        const delLot = (a.lots || []).find(l => l.id === lotId);
-        const remLots = (a.lots || []).filter(l => l.id !== lotId);
-        if (remLots.length > 0) {
-          const prevSum = (a.lots || []).reduce((s, l) => s + Number(l.units || 0), 0);
-          const newSum = remLots.reduce((s, l) => s + Number(l.units || 0), 0);
-          const ratio = prevSum > 0 ? newSum / prevSum : 1;
-          nextAssets.push({
-            ...a,
-            lots: remLots,
-            invested: a.invested != null ? Number((Number(a.invested) * ratio).toFixed(2)) : a.invested
-          });
-        } else if ((a.lots || []).length > 0 && delLot) {
-          // Removing the last remaining lot removes the position if it held all remaining units
-          const leftU = Math.max(0, Number(a.units || 0) - Number(delLot.units || 0));
-          if (leftU > 1e-6) {
-            nextAssets.push({ ...a, units: Number(leftU.toFixed(8)), lots: [] });
+    stage.querySelectorAll('.pf-del-lot-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const astId = b.dataset.pfast;
+        const lotId = b.dataset.pflotid;
+        const nextAssets = [];
+        for (const a of (pf.assets || [])) {
+          if (a.id !== astId) {
+            nextAssets.push(a);
+            continue;
           }
-        } else {
-          nextAssets.push(a);
+          const delLot = (a.lots || []).find(l => l.id === lotId);
+          const remLots = (a.lots || []).filter(l => l.id !== lotId);
+          if (remLots.length > 0) {
+            const prevSum = (a.lots || []).reduce((s, l) => s + Number(l.units || 0), 0);
+            const newSum = remLots.reduce((s, l) => s + Number(l.units || 0), 0);
+            const ratio = prevSum > 0 ? newSum / prevSum : 1;
+            nextAssets.push({
+              ...a,
+              lots: remLots,
+              invested: a.invested != null ? Number((Number(a.invested) * ratio).toFixed(2)) : a.invested
+            });
+          } else if ((a.lots || []).length > 0 && delLot) {
+            // Removing the last remaining lot removes the position if it held all remaining units
+            const leftU = Math.max(0, Number(a.units || 0) - Number(delLot.units || 0));
+            if (leftU > 1e-6) {
+              nextAssets.push({ ...a, units: Number(leftU.toFixed(8)), lots: [] });
+            }
+          } else {
+            nextAssets.push(a);
+          }
         }
-      }
-      persistAndRefresh({ ...pf, assets: nextAssets }, 'Lot șters și poziția recalculată.');
+        persistAndRefresh({ ...pf, assets: nextAssets }, 'Lot șters și poziția recalculată.');
+      });
     });
-  });
-}
+  }
 
   // ─── ADMIN USERS & SECURITY CONTROL PANEL (ADMIN ONLY) ───────────────────
   async function adminApiFetch(url, { method = 'GET', body = null } = {}) {
@@ -5151,5 +5777,5 @@
       renderPaperIntelSummary();
     }, 900);
   });
-}) ();
+})();
 

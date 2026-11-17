@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=1">
   <title>TradePro · AI Trading Intelligence Terminal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='4' y1='29' x2='32' y2='8' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23ff453a'/%3E%3Cstop offset='45%25' stop-color='%2310b981'/%3E%3Cstop offset='100%25' stop-color='%236ee7b7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='36' height='36' rx='10' fill='%230b1324'/%3E%3Cpath d='M4 28 Q14 29 20 21 T32 10' fill='none' stroke='url(%23g)' stroke-width='2.4' stroke-linecap='round' opacity='0.85'/%3E%3Cline x1='8' y1='17' x2='8' y2='28' stroke='%23ff6b63' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='5.8' y='19' width='4.4' height='6.5' rx='1.2' fill='%23ff453a'/%3E%3Cline x1='15.5' y1='12' x2='15.5' y2='24' stroke='%2334d399' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='13.3' y='14' width='4.4' height='7' rx='1.2' fill='%2310b981'/%3E%3Cline x1='23' y1='8' x2='23' y2='20' stroke='%236ee7b7' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='20.8' y='10' width='4.4' height='7.5' rx='1.2' fill='%2322c55e'/%3E%3Cline x1='30.5' y1='5' x2='30.5' y2='16' stroke='%23a7f3d0' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='28.3' y='6.5' width='4.4' height='7.5' rx='1.2' fill='%236ee7b7'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=ultimate99">
+  <link rel="stylesheet" href="styles.css?v=ultimate134">
   <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <script>try{if(!localStorage.getItem('tp_auth_token_v1')&&!String(location.hash||'').includes('authToken='))document.documentElement.classList.add('auth-locked-boot');}catch(_){}</script>
 </head>
@@ -346,6 +346,9 @@
       <button id="fullscreenBtn" class="tb-btn icon-only" title="Ecran Complet">
         <svg class="tv-ico" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
       </button>
+      <button id="appReloadBtn" class="tb-btn icon-only" type="button" title="Reîncarcă Aplicația / Refresh Pagină" onclick="window.location.reload()">
+        <svg class="tv-ico" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
       <button id="themeBtn" class="tb-btn icon-only" title="Comută Tema Dark / Light">
         <svg class="tv-ico" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
@@ -427,102 +430,105 @@
   ════════════════════════════════════════════════════════════════════════ -->
   <div id="workspace">
 
-    <!-- LEFT WORKSPACE INTELLIGENCE RAIL (5 COCKPIT ZONES: 01 MARKET · 02 EARLY RADAR · 03 MOMENTUM · 04 INTEL · 05 EXECUTION) -->
+    <!-- LEFT WORKSPACE INTELLIGENCE RAIL + INTEGRATED DRAWING TOOLS -->
     <nav id="intelNavRail" aria-label="Zone Cockpit Intelligence">
-      <button class="inav-btn active" type="button" data-wview="chart" data-tip="Superchart, Order Flow &amp; Paper Trading">
+      <button class="inav-btn active" type="button" data-wview="chart" data-tip="Superchart, Order Flow &amp; Paper Trading" title="Superchart, Order Flow &amp; Paper Trading">
         <svg class="tv-ico" viewBox="0 0 24 24"><path d="M8 4v16M5.5 8h5v8h-5zM16 3v18M13.5 7h5v9h-5z"/></svg>
         <span>Grafic</span>
       </button>
-      <button class="inav-btn" type="button" data-wview="market" data-tip="Market Environment · Macro, 11 Sectoare, Breadth &amp; Heatmap">
+      <button class="inav-btn" type="button" data-wview="market" data-tip="Market Environment · Macro, 11 Sectoare, Breadth &amp; Heatmap" title="Market Environment · Macro, 11 Sectoare, Breadth &amp; Heatmap">
         <svg class="tv-ico" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>
         <span>Piață</span>
       </button>
-      <button class="inav-btn" type="button" data-wview="radar" data-tip="Early Radar · Acțiuni Timpurii (-2%..+8%), RVOL TOD &amp; Tracker">
+      <button class="inav-btn" type="button" data-wview="radar" data-tip="Early Radar · Acțiuni Timpurii (-2%..+8%), RVOL TOD &amp; Tracker" title="Early Radar · Acțiuni Timpurii (-2%..+8%), RVOL TOD &amp; Tracker">
         <svg class="tv-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><line x1="12" y1="12" x2="18.5" y2="6.5"/></svg>
         <span>Radar</span>
       </button>
-      <button class="inav-btn" type="button" data-wview="cockpit" data-tip="Momentum Cockpit · Early Movers, Low Float, 5 Pillars, Squeeze &amp; Halts">
+      <button class="inav-btn" type="button" data-wview="cockpit" data-tip="Momentum Cockpit · Early Movers, Low Float, 5 Pillars, Squeeze &amp; Halts" title="Momentum Cockpit · Early Movers, Low Float, 5 Pillars, Squeeze &amp; Halts">
         <svg class="tv-ico" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>
         <span>Cockpit</span>
       </button>
-      <button class="inav-btn" type="button" data-wview="secnews" data-tip="Intelligence · 10 Catalizatori Știri, SEC EDGAR &amp; Diluție">
+      <button class="inav-btn" type="button" data-wview="secnews" data-tip="Intelligence · 10 Catalizatori Știri, SEC EDGAR &amp; Diluție" title="Intelligence · 10 Catalizatori Știri, SEC EDGAR &amp; Diluție">
         <svg class="tv-ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
         <span>SEC/Știri</span>
       </button>
-      <button class="inav-btn" type="button" data-wview="options" data-tip="Opțiuni CBOE, GEX, Max Pain &amp; Short Squeeze">
+      <button class="inav-btn" type="button" data-wview="options" data-tip="Opțiuni CBOE, GEX, Max Pain &amp; Short Squeeze" title="Opțiuni CBOE, GEX, Max Pain &amp; Short Squeeze">
         <svg class="tv-ico" viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 4-7 5 4"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
         <span>Opțiuni</span>
       </button>
-      <button class="inav-btn" type="button" data-wview="builder" data-tip="Strategy Builder &amp; Simulator Costuri">
+      <button class="inav-btn" type="button" data-wview="builder" data-tip="Strategy Builder &amp; Simulator Costuri" title="Strategy Builder &amp; Simulator Costuri">
         <svg class="tv-ico" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="5" rx="1"/><rect x="14" y="4" width="7" height="5" rx="1"/><rect x="8.5" y="15" width="7" height="5" rx="1"/><path d="M6.5 9v3h11V9M12 12v3"/></svg>
         <span>Builder</span>
       </button>
-      <button id="portfolioNavBtn" class="inav-btn inav-portfolio" type="button" data-wview="portfolio" data-tip="Portofoliu Real &amp; Evaluare AI (Strict izolat pe contul tău)">
+      <button id="portfolioNavBtn" class="inav-btn inav-portfolio" type="button" data-wview="portfolio" data-tip="Portofoliu Real &amp; Evaluare AI (Strict izolat pe contul tău)" title="Portofoliu Real &amp; Evaluare AI (Strict izolat pe contul tău)">
         <svg class="tv-ico" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M2 13h20"/></svg>
         <span>Portofoliu</span>
       </button>
-      <button id="adminNavBtn" class="inav-btn inav-admin" type="button" data-wview="admin" data-admin-only="1" style="display:none;" data-tip="Admin Conturi · Informații, Editare, Blocare &amp; Ștergere Conturi">
+      <button id="adminNavBtn" class="inav-btn inav-admin" type="button" data-wview="admin" data-admin-only="1" style="display:none;" data-tip="Admin Conturi · Informații, Editare, Blocare &amp; Ștergere Conturi" title="Admin Conturi · Informații, Editare, Blocare &amp; Ștergere Conturi">
         <svg class="tv-ico" viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a3.5 3.5 0 0 1 7 0"/></svg>
         <span>Admin</span>
       </button>
+
+      <div class="inav-draw-sep" aria-hidden="true"></div>
+
+      <!-- INTERACTIVE DRAWING TOOLBAR (INTEGRATED IN LEFT SIDEBAR BELOW ADMIN) -->
+      <div id="leftToolbar">
+        <button class="draw-btn active" type="button" data-drawtool="cursor" data-tip="Cursor Crosshair (Esc)" title="Cursor Crosshair (Esc)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="trend" data-tip="Linie de Trend (% automat)" title="Linie de Trend (% automat)">
+          <svg viewBox="0 0 24 24"><line x1="4" y1="19" x2="20" y2="5"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="5" r="2"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="ray" data-tip="Rază Orizontală (Suport / Rezistență)" title="Rază Orizontală (Suport / Rezistență)">
+          <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><line x1="7" y1="12" x2="21" y2="12"/><polyline points="17 8 21 12 17 16"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="hline" data-tip="Linie Orizontală Globală" title="Linie Orizontală Globală">
+          <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="2"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="vline" data-tip="Linie Verticală de Timp" title="Linie Verticală de Timp">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="2"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="rect" data-tip="Zonă Supply / Demand" title="Zonă Supply / Demand">
+          <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="fib" data-tip="Fibonacci Retracement" title="Fibonacci Retracement">
+          <svg viewBox="0 0 24 24"><line x1="3" y1="5" x2="21" y2="5"/><line x1="3" y1="10" x2="21" y2="10" stroke-dasharray="2 2"/><line x1="3" y1="14.5" x2="21" y2="14.5"/><line x1="3" y1="19" x2="21" y2="19"/></svg>
+        </button>
+
+        <div class="lt-sep"></div>
+
+        <button class="draw-btn" type="button" data-drawtool="long" data-tip="Poziție LONG (R:R pe Grafic)" title="Poziție LONG (R:R pe Grafic)">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="9" fill="rgba(8,153,129,0.22)" stroke="#089981"/><rect x="4" y="13" width="16" height="6" fill="rgba(242,54,69,0.22)" stroke="#f23645"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="short" data-tip="Poziție SHORT (R:R pe Grafic)" title="Poziție SHORT (R:R pe Grafic)">
+          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="6" fill="rgba(242,54,69,0.22)" stroke="#f23645"/><rect x="4" y="11" width="16" height="9" fill="rgba(8,153,129,0.22)" stroke="#089981"/></svg>
+        </button>
+        <button class="draw-btn" type="button" data-drawtool="measure" data-tip="Riglă Măsurare (Shift + Click)" title="Riglă Măsurare (Shift + Click)">
+          <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.5"/><line x1="7" y1="8" x2="7" y2="12"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="17" y1="8" x2="17" y2="12"/></svg>
+        </button>
+
+        <div class="lt-sep"></div>
+
+        <button id="magnetBtn" class="draw-btn" type="button" data-tip="Magnet OHLC" title="Magnet OHLC">
+          <svg viewBox="0 0 24 24"><path d="M6 4v7a6 6 0 0 0 12 0V4"/><line x1="4" y1="4" x2="8" y2="4"/><line x1="16" y1="4" x2="20" y2="4"/></svg>
+        </button>
+        <button id="hideDrawBtn" class="draw-btn" type="button" data-tip="Ascunde / Afișează Desenele" title="Ascunde / Afișează Desenele">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button id="undoDrawBtn" class="draw-btn" type="button" data-tip="Anulează Desen (Ctrl+Z)" title="Anulează Desen (Ctrl+Z)">
+          <svg viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+        </button>
+        <button id="clearDrawBtn" class="draw-btn" type="button" data-tip="Șterge Toate Desenele" title="Șterge Toate Desenele">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
+
       <div class="inav-spacer"></div>
-      <button id="railCopilotBtn" class="inav-btn inav-copilot" type="button" data-tip="AI Trading Copilot (Conectat pe toate cele 5 zone)">
+      <button id="railCopilotBtn" class="inav-btn inav-copilot" type="button" data-tip="AI Trading Copilot (Conectat pe toate cele 5 zone)" title="AI Trading Copilot (Conectat pe toate cele 5 zone)">
         <svg class="tv-ico" viewBox="0 0 24 24"><path d="M12 3l2.2 5.4L19.6 10.6l-5.4 2.2L12 18.2l-2.2-5.4L4.4 10.6l5.4-2.2z"/></svg>
         <span>Copilot</span>
       </button>
     </nav>
-
-    <!-- LEFT INTERACTIVE DRAWING TOOLBAR -->
-    <aside id="leftToolbar">
-      <button class="draw-btn active" data-drawtool="cursor" data-tip="Cursor Crosshair (Esc)">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="trend" data-tip="Linie de Trend (% automat)">
-        <svg viewBox="0 0 24 24"><line x1="4" y1="19" x2="20" y2="5"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="5" r="2"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="ray" data-tip="Rază Orizontală (Suport / Rezistență)">
-        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><line x1="7" y1="12" x2="21" y2="12"/><polyline points="17 8 21 12 17 16"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="hline" data-tip="Linie Orizontală Globală">
-        <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="2"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="vline" data-tip="Linie Verticală de Timp">
-        <svg viewBox="0 0 24 24"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="2"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="rect" data-tip="Zonă Supply / Demand">
-        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="fib" data-tip="Fibonacci Retracement">
-        <svg viewBox="0 0 24 24"><line x1="3" y1="5" x2="21" y2="5"/><line x1="3" y1="10" x2="21" y2="10" stroke-dasharray="2 2"/><line x1="3" y1="14.5" x2="21" y2="14.5"/><line x1="3" y1="19" x2="21" y2="19"/></svg>
-      </button>
-
-      <div class="lt-sep"></div>
-
-      <button class="draw-btn" data-drawtool="long" data-tip="Poziție LONG (R:R pe Grafic)">
-        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="9" fill="rgba(8,153,129,0.22)" stroke="#089981"/><rect x="4" y="13" width="16" height="6" fill="rgba(242,54,69,0.22)" stroke="#f23645"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="short" data-tip="Poziție SHORT (R:R pe Grafic)">
-        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="6" fill="rgba(242,54,69,0.22)" stroke="#f23645"/><rect x="4" y="11" width="16" height="9" fill="rgba(8,153,129,0.22)" stroke="#089981"/></svg>
-      </button>
-      <button class="draw-btn" data-drawtool="measure" data-tip="Riglă Măsurare (Shift + Click)">
-        <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.5"/><line x1="7" y1="8" x2="7" y2="12"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="17" y1="8" x2="17" y2="12"/></svg>
-      </button>
-
-      <div class="lt-sep"></div>
-
-      <button id="magnetBtn" class="draw-btn" data-tip="Magnet OHLC">
-        <svg viewBox="0 0 24 24"><path d="M6 4v7a6 6 0 0 0 12 0V4"/><line x1="4" y1="4" x2="8" y2="4"/><line x1="16" y1="4" x2="20" y2="4"/></svg>
-      </button>
-      <button id="hideDrawBtn" class="draw-btn" data-tip="Ascunde / Afișează Desenele">
-        <svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-      </button>
-      <button id="undoDrawBtn" class="draw-btn" data-tip="Anulează Desen (Ctrl+Z)">
-        <svg viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
-      </button>
-      <button id="clearDrawBtn" class="draw-btn" data-tip="Șterge Toate Desenele">
-        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-      </button>
-    </aside>
 
     <!-- CENTER STACK: MULTI-CHART GRID + INTELLIGENCE STAGE + COLLAPSIBLE BOTTOM DOCK -->
     <main id="centerColumn">
@@ -1175,6 +1181,9 @@
             <span id="dwBidPill" class="dw-ba-pill bid tabular">—</span>
             <span id="dwAskPill" class="dw-ba-pill ask tabular">—</span>
           </div>
+
+          <!-- Poziția din Portofoliu Real (eToro) -->
+          <div id="dwPortfolioBox" class="dw-pf-box" style="display:none;"></div>
 
           <!-- Volum & Medie Volum -->
           <div id="dwVolRow" class="dw-vol-row">
@@ -1909,9 +1918,9 @@
     </button>
   </nav>
 
-  <script src="quant-engine.js?v=ultimate99"></script>
-  <script src="drawing-engine.js?v=ultimate99"></script>
-  <script src="app.js?v=ultimate99"></script>
-  <script src="intel-ui.js?v=ultimate99"></script>
+  <script src="quant-engine.js?v=ultimate134"></script>
+  <script src="drawing-engine.js?v=ultimate134"></script>
+  <script src="app.js?v=ultimate134"></script>
+  <script src="intel-ui.js?v=ultimate134"></script>
 </body>
 </html>

@@ -4,3 +4,7 @@ node_modules/
 telegram_state.json
 screener_state.json
 users_state.json
+etoro_state.json
+early-signal-log.json
+inject_scanner.py
+*.pdf

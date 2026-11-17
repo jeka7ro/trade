@@ -1726,7 +1726,20 @@
         const rect = el.getBoundingClientRect();
         const w = Math.floor(rect.width);
         const h = Math.floor(rect.height);
-        if (w > 20 && h > 20) p.chart.resize(w, h);
+        if (w > 20 && h > 20) {
+          const wasHidden = !p._lastW || !p._lastH;
+          p._lastW = w;
+          p._lastH = h;
+          p.chart.resize(w, h);
+          if (wasHidden && p.bars && p.bars.length > 0) {
+            try {
+              renderSecondaryPaneIndicators(p, true);
+            } catch (_) { }
+          }
+        } else {
+          p._lastW = 0;
+          p._lastH = 0;
+        }
       }
       if (p.overlay) p.overlay.resize();
     });
@@ -2070,7 +2083,7 @@
     await Promise.all(chunks.map(async (sl) => {
       const u = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(sl.join(','))}&fields=${fields}`;
       try {
-        const json = await fetchViaProxy(u, 7500);
+        const json = await fetchViaProxy(u, 15000);
         const arr = json?.quoteResponse?.result || [];
         arr.forEach(q => {
           if (q && q.symbol) out[String(q.symbol).toUpperCase()] = q;
@@ -5857,6 +5870,74 @@
     if (w52Lbl) w52Lbl.textContent = '—';
     const w52Fill = document.getElementById('dw52wRangeFill');
     if (w52Fill) w52Fill.style.width = '0%';
+    renderDetailsPortfolioBox(dispSym, regPrice, lq?.regChg);
+  }
+
+  function renderDetailsPortfolioBox(sym, livePx, dayChgPerShare) {
+    const box = document.getElementById('dwPortfolioBox');
+    if (!box) return;
+    const pf = authState.realPortfolio;
+    const assets = Array.isArray(pf?.assets) ? pf.assets : [];
+    const upper = String(sym || '').toUpperCase().replace(/\.(24-7|24-5)$/i, '');
+    const hit = assets.find(a => {
+      const aSym = String(a.sym || '').toUpperCase();
+      const bSym = String(a.brokerSym || '').toUpperCase().replace(/\.(24-7|24-5)$/i, '');
+      return aSym === upper || bSym === upper || String(a.brokerSym || '').toUpperCase() === String(sym || '').toUpperCase();
+    });
+    if (!hit) {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+    const units = Number(hit.units || 0);
+    const avgOpen = Number(hit.avgOpen || 0);
+    const curPx = Number.isFinite(Number(livePx)) && Number(livePx) > 0 ? Number(livePx) : Number(hit.brokerPrice || avgOpen || 0);
+    const sign = hit.side === 'SHORT' ? -1 : 1;
+    const inv = Number(hit.invested ?? (units * avgOpen));
+    const pnl = (hit.source === 'etoro_api' && hit.brokerPnl != null && Math.abs(curPx - Number(hit.brokerPrice || curPx)) < 1e-3)
+      ? Number(hit.brokerPnl)
+      : (units * (curPx - avgOpen) * sign);
+    const netVal = Math.max(0, inv + pnl);
+    const pnlPct = inv > 0 ? (pnl / inv) * 100 : 0;
+    const dChg = Number.isFinite(Number(dayChgPerShare)) ? Number(dayChgPerShare) : 0;
+    const dailyPnl = units * dChg * sign;
+    const lots = Array.isArray(hit.lots) ? hit.lots : [];
+    const firstSl = lots.find(l => l.sl != null && Number(l.sl) > 0)?.sl ?? hit.sl ?? null;
+    const firstTp = lots.find(l => l.tp != null && Number(l.tp) > 0)?.tp ?? hit.tp ?? null;
+    const slDistPct = (firstSl && curPx > 0) ? Math.abs(((curPx - Number(firstSl)) / curPx) * 100) : null;
+    const fmtUsd = (v, sgn = false) => {
+      const n = Number(v || 0);
+      const prefix = sgn ? (n >= 0 ? '+$' : '-$') : (n < 0 ? '-$' : '$');
+      return `${prefix}${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div class="dw-pf-hdr">
+        <span>Poziție Portofoliu (${lots.length || 1} loturi · ${hit.isCfd ? 'CFD' : 'SPOT'})</span>
+        <span class="tabular">${units.toLocaleString('en-US', { maximumFractionDigits: 2 })} u @ $${fmt(avgOpen)}</span>
+      </div>
+      <div class="dw-pf-grid">
+        <div class="dw-pf-cell">
+          <div class="k">Valoare Totală (Net)</div>
+          <div class="v tabular">${fmtUsd(netVal)} <small>/ ${fmtUsd(inv)}</small></div>
+        </div>
+        <div class="dw-pf-cell r">
+          <div class="k">P/L Total</div>
+          <div class="v tabular ${pnl >= 0 ? 'up' : 'dn'}">${fmtUsd(pnl, true)} <small>(${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%)</small></div>
+        </div>
+        <div class="dw-pf-cell">
+          <div class="k">Daily P/L (Azi)</div>
+          <div class="v tabular ${dailyPnl >= 0 ? 'up' : 'dn'}">${fmtUsd(dailyPnl, true)}</div>
+        </div>
+        <div class="dw-pf-cell r">
+          <div class="k">Stop-Loss / TP</div>
+          <div class="v tabular ${slDistPct != null && slDistPct <= 5.5 ? 'dn' : ''}">
+            ${firstSl ? `SL $${fmt(Number(firstSl))}${slDistPct != null ? ` (−${slDistPct.toFixed(1)}%)` : ''}` : 'Fără SL'}${firstTp ? ` <small>· TP $${fmt(Number(firstTp))}</small>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function updateDetailsWidget(q, symOverride = null) {
@@ -6009,6 +6090,7 @@
       if (w52Lbl) w52Lbl.textContent = '—';
       if (w52Fill) w52Fill.style.width = '0%';
     }
+    renderDetailsPortfolioBox(dispSym, regPrice || q.regularMarketPrice, regChg ?? q.regularMarketChange);
   }
 
   function formatNewsDateBadge(n, { compact = false } = {}) {
@@ -7152,6 +7234,21 @@
       };
       paneEl.addEventListener('pointerdown', focusThisPane, { capture: true });
       paneEl.addEventListener('mousedown', focusThisPane, { capture: true });
+      if (canvasEl) {
+        canvasEl.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          focusThisPane();
+          const expPop = document.getElementById('chartExplainPopover');
+          if (expPop) expPop.style.display = 'none';
+          if (p.candle) {
+            const rect = canvasEl.getBoundingClientRect();
+            const localY = e.clientY - rect.top;
+            const coordP = p.candle.coordinateToPrice(localY);
+            if (coordP != null && isFinite(coordP)) state.ctxPrice = coordP;
+          }
+          openContextMenu(e.clientX, e.clientY, p);
+        });
+      }
 
       const inp = document.getElementById(`secSymInput${p.id}`);
       const sel = document.getElementById(`secTfSelect${p.id}`);
@@ -7572,67 +7669,76 @@
       p._renderedSym = targetSym;
       p.candle.setData((bars || []).map(b => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
       resizeAllCharts();
-      renderSecondaryPaneIndicators(p, true);
+      try {
+        renderSecondaryPaneIndicators(p, true);
+      } catch (indErr) {
+        console.warn('[SecPane] Indicator render err:', indErr);
+        focusLiveEvolution(p.chart, (bars || []).length, 72, 5);
+      }
 
       if (bars.length) {
-        const cached = liveQuoteCache[targetSym];
-        const fq = (fullQuoteCache[targetSym] && (!fullQuoteCache[targetSym].symbol || String(fullQuoteCache[targetSym].symbol).toUpperCase() === targetSym))
-          ? fullQuoteCache[targetSym]
-          : null;
-        const mExt = extractQuoteSessionInfo(fq || meta || {});
-        const extType = cached?.extType || mExt?.extType || '';
-        const extPrice = cached?.extPrice ?? mExt?.extPrice;
-        const extChg = cached?.extChg ?? mExt?.extChg;
-        const extChgPct = cached?.extChgPct ?? mExt?.extChgPct;
-        const lastB = bars[bars.length - 1];
-        const prevB = bars[bars.length - 2] || lastB;
-        const refPrev = meta?.chartPreviousClose ?? cached?.prevClose ?? prevB.close;
-        const regRef = cached?.regPrice ?? meta?.regularMarketPrice ?? fq?.regularMarketPrice ?? lastB.close;
-        const pct = cached && isFinite(cached.chgPct)
-          ? cached.chgPct
-          : (isFinite(fq?.regularMarketChangePercent) ? fq.regularMarketChangePercent : (refPrev ? ((regRef - refPrev) / refPrev) * 100 : 0));
-        const chgVal = cached && isFinite(cached.chg)
-          ? cached.chg
-          : (isFinite(fq?.regularMarketChange) ? fq.regularMarketChange : (refPrev ? (regRef - refPrev) : 0));
-        applySecondaryPaneQuoteUI(p, {
-          sym: targetSym,
-          priceHtml: cached?.html || formatSplitTickHTML(prevB.close, lastB.close, chgVal >= 0 ? 1 : -1),
-          regHtml: cached?.regHtml || formatSplitTickHTML(refPrev, regRef, chgVal >= 0 ? 1 : -1),
-          regPrice: regRef,
-          regChg: chgVal,
-          regChgPct: pct,
-          extType,
-          extPrice,
-          extChg,
-          extChgPct
-        });
+        try {
+          const cached = liveQuoteCache[targetSym];
+          const fq = (fullQuoteCache[targetSym] && (!fullQuoteCache[targetSym].symbol || String(fullQuoteCache[targetSym].symbol).toUpperCase() === targetSym))
+            ? fullQuoteCache[targetSym]
+            : null;
+          const mExt = extractQuoteSessionInfo(fq || meta || {});
+          const extType = cached?.extType || mExt?.extType || '';
+          const extPrice = cached?.extPrice ?? mExt?.extPrice;
+          const extChg = cached?.extChg ?? mExt?.extChg;
+          const extChgPct = cached?.extChgPct ?? mExt?.extChgPct;
+          const lastB = bars[bars.length - 1];
+          const prevB = bars[bars.length - 2] || lastB;
+          const refPrev = meta?.chartPreviousClose ?? cached?.prevClose ?? prevB.close;
+          const regRef = cached?.regPrice ?? meta?.regularMarketPrice ?? fq?.regularMarketPrice ?? lastB.close;
+          const pct = cached && isFinite(cached.chgPct)
+            ? cached.chgPct
+            : (isFinite(fq?.regularMarketChangePercent) ? fq.regularMarketChangePercent : (refPrev ? ((regRef - refPrev) / refPrev) * 100 : 0));
+          const chgVal = cached && isFinite(cached.chg)
+            ? cached.chg
+            : (isFinite(fq?.regularMarketChange) ? fq.regularMarketChange : (refPrev ? (regRef - refPrev) : 0));
+          applySecondaryPaneQuoteUI(p, {
+            sym: targetSym,
+            priceHtml: cached?.html || formatSplitTickHTML(prevB.close, lastB.close, chgVal >= 0 ? 1 : -1),
+            regHtml: cached?.regHtml || formatSplitTickHTML(refPrev, regRef, chgVal >= 0 ? 1 : -1),
+            regPrice: regRef,
+            regChg: chgVal,
+            regChgPct: pct,
+            extType,
+            extPrice,
+            extChg,
+            extChgPct
+          });
 
-        const wlItem = state.watchlist.find(w => w.sym === targetSym);
-        if (wlItem && !demo && wlItem.regPrice == null && bars.length >= 2) {
-          const chg = regRef - refPrev;
-          wlItem.price = regRef;
-          wlItem.regPrice = regRef;
-          wlItem.chg = chg;
-          wlItem.regChg = chg;
-          wlItem.chgPct = pct;
-          wlItem.regChgPct = pct;
-          wlItem.livePriceHtml = formatSplitTickHTML(refPrev, regRef, chg >= 0 ? 1 : -1);
-          renderWatchlist();
+          const wlItem = state.watchlist.find(w => w.sym === targetSym);
+          if (wlItem && !demo && wlItem.regPrice == null && bars.length >= 2) {
+            const chg = regRef - refPrev;
+            wlItem.price = regRef;
+            wlItem.regPrice = regRef;
+            wlItem.chg = chg;
+            wlItem.regChg = chg;
+            wlItem.chgPct = pct;
+            wlItem.regChgPct = pct;
+            wlItem.livePriceHtml = formatSplitTickHTML(refPrev, regRef, chg >= 0 ? 1 : -1);
+            renderWatchlist();
+          }
+        } catch (_) { }
+      }
+
+      try {
+        if (state.layout !== '1' && state.focusedPaneId === p.id && getActiveFocusedSymbol() === targetSym) {
+          syncDetailsWidgetForSymbol(targetSym, { bars, meta });
         }
-      }
-
-      if (state.layout !== '1' && state.focusedPaneId === p.id && getActiveFocusedSymbol() === targetSym) {
-        syncDetailsWidgetForSymbol(targetSym, { bars, meta });
-      }
-      if (!fullQuoteCache[targetSym]) {
-        refreshLiveQuotes({ prioritySyms: [targetSym] });
-      }
+        if (!fullQuoteCache[targetSym]) {
+          refreshLiveQuotes({ prioritySyms: [targetSym] });
+        }
+      } catch (_) { }
     } catch (_) {
       if (mySeq === p._loadSeq) {
         p.bars = [];
         p.meta = null;
         try { p.candle.setData([]); } catch (_) { }
-        renderSecondaryPaneIndicators(p, true);
+        try { renderSecondaryPaneIndicators(p, true); } catch (__) { }
       }
     }
   }
@@ -9265,15 +9371,15 @@
             ${(idea.news || []).length ? `
               <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:4px 0;">Catalizatori &amp; Știri Live</div>
               <div class="ai-news-list">${idea.news.map(n => {
-                const dtStr = formatNewsDateBadge(n, { compact: false });
-                const pubTxt = dtStr ? `${n.publisher || 'Știri'} · ${dtStr}` : (n.publisher || 'Știri');
-                return `
+      const dtStr = formatNewsDateBadge(n, { compact: false });
+      const pubTxt = dtStr ? `${n.publisher || 'Știri'} · ${dtStr}` : (n.publisher || 'Știri');
+      return `
                 <a class="ai-news-item" href="${escTg(n.link || '#')}" target="_blank" rel="noopener noreferrer" title="${escTg(pubTxt)}">
                   <span class="ai-news-title">${escTg(n.title || '')}</span>
                   <span class="ai-news-src">${escTg(pubTxt)}</span>
                 </a>
               `;
-              }).join('')}</div>
+    }).join('')}</div>
             ` : `<div style="font-size:10.5px;color:var(--text-muted);margin-top:6px;">Se încarcă știrile și catalizatorii fundamentali...</div>`}
           </div>
         </div>
@@ -9379,20 +9485,23 @@
   }
 
   // Context Menu
-  function openContextMenu(x, y) {
+  function openContextMenu(x, y, secPane = null) {
     const menu = document.getElementById('chartCtxMenu');
-    const p = state.ctxPrice || (state.bars.length ? state.bars[state.bars.length - 1].close : 0);
+    state.ctxPaneId = secPane ? secPane.id : 0;
+    const targetSym = secPane ? secPane.sym : state.symbol;
+    const targetBars = secPane ? (secPane.bars || []) : state.bars;
+    const p = state.ctxPrice || (targetBars.length ? targetBars[targetBars.length - 1].close : 0);
     state.ctxPrice = p;
     document.getElementById('ctxPriceSpan').textContent = fmt(p);
     document.getElementById('ctxAlertSpan').textContent = fmt(p);
-    document.getElementById('ctxBuySpan').textContent = `${state.symbol} @ ${fmt(p)}`;
-    document.getElementById('ctxSellSpan').textContent = `${state.symbol} @ ${fmt(p)}`;
+    document.getElementById('ctxBuySpan').textContent = `${targetSym} @ ${fmt(p)}`;
+    document.getElementById('ctxSellSpan').textContent = `${targetSym} @ ${fmt(p)}`;
     const ctxWlSpan = document.getElementById('ctxWatchlistSpan');
     if (ctxWlSpan) {
-      const inWl = isSymbolInWatchlist(state.symbol);
+      const inWl = isSymbolInWatchlist(targetSym);
       ctxWlSpan.textContent = inWl
-        ? `Elimină ${state.symbol} din Watchlist`
-        : `Adaugă ${state.symbol} în Watchlist`;
+        ? `Elimină ${targetSym} din Watchlist`
+        : `Adaugă ${targetSym} în Watchlist`;
     }
 
     const safeX = Math.max(8, Math.min(x, window.innerWidth - 242));
@@ -9619,7 +9728,13 @@
         ? `Cont activ: @${u.username} (${u.email})${isAdmin ? ' · ADMIN' : ''}`
         : 'Autentificare · Conectează-te cu username/email și parolă sau Google (Gmail)';
     }
-    if (av) av.textContent = u ? String(u.username || 'U').charAt(0).toUpperCase() : 'G';
+    if (av) {
+      if (u && String(u.username || '').toLowerCase() === 'jeka7ro') {
+        av.innerHTML = `<img src="/avatar-jeka7ro.jpg" alt="@jeka7ro" class="auth-avatar-img" />`;
+      } else {
+        av.textContent = u ? String(u.username || 'U').charAt(0).toUpperCase() : 'G';
+      }
+    }
     if (lbl) lbl.textContent = u ? `@${u.username}` : 'Conectare';
 
     const guestView = document.getElementById('authGuestView');
@@ -9644,7 +9759,13 @@
       const uAv = document.getElementById('authUserAvatar');
       const uName = document.getElementById('authUserName');
       const uMail = document.getElementById('authUserEmail');
-      if (uAv) uAv.textContent = String(u.username || 'U').charAt(0).toUpperCase();
+      if (uAv) {
+        if (String(u.username || '').toLowerCase() === 'jeka7ro') {
+          uAv.innerHTML = `<img src="/avatar-jeka7ro.jpg" alt="@jeka7ro" class="auth-avatar-img" />`;
+        } else {
+          uAv.textContent = String(u.username || 'U').charAt(0).toUpperCase();
+        }
+      }
       if (uName) uName.textContent = `@${u.username}`;
       if (uMail) uMail.textContent = u.email || '—';
       const stP = document.getElementById('authStatPersonal');
@@ -9669,11 +9790,40 @@
   function startLiveDataAndEnginesOnce() {
     if (_liveEnginesStarted || !authState.user) return;
     _liveEnginesStarted = true;
+    try {
+      const cachedWlQ = JSON.parse(localStorage.getItem('tp_watchlist_quotes_cache_v1') || '{}');
+      Object.entries(cachedWlQ).forEach(([k, v]) => {
+        if (v && isFinite(v.price) && !liveQuoteCache[k]) {
+          applyLiveTick(k, v.price, v);
+        }
+      });
+    } catch (_) { }
     connectYahooLiveStream();
     connectBinanceLiveStream();
+    refreshLiveQuotes();
     setInterval(() => {
       if (!document.hidden && authState.user) refreshLiveQuotes();
     }, 1500);
+    setInterval(() => {
+      try {
+        const snap = {};
+        (state.watchlist || []).forEach(w => {
+          const lq = liveQuoteCache[w.sym];
+          if (lq && isFinite(lq.price)) {
+            snap[w.sym] = {
+              price: lq.price,
+              regPrice: lq.regPrice ?? lq.price,
+              regChg: lq.regChg ?? 0,
+              regChgPct: lq.regChgPct ?? 0,
+              prevClose: lq.prevClose ?? lq.price
+            };
+          }
+        });
+        if (Object.keys(snap).length > 0) {
+          localStorage.setItem('tp_watchlist_quotes_cache_v1', JSON.stringify(snap));
+        }
+      } catch (_) { }
+    }, 6000);
     setInterval(() => {
       if (!document.hidden && authState.user) syncActiveChartBarsBackground();
     }, 15000);
@@ -9948,6 +10098,12 @@
         const localSyncTs = Number(getScopedItem('tp_ultra_last_sync_ts') || '0');
         const serverTs = Number(res.personalState?.updatedAt || 0);
         const sameUser = authState.user?.id === res.user.id;
+        authState.user = res.user;
+        authState.personalState = res.personalState;
+        authState.realPortfolio = res.personalState?.realPortfolio || res.mergedState?.realPortfolio || authState.realPortfolio;
+        setAuthGateLocked(false);
+        document.getElementById('authModal')?.classList.remove('open');
+        startLiveDataAndEnginesOnce();
         if (!sameUser || serverTs > localSyncTs || !getScopedItem('tp_ultra_watchlist_v4')) {
           await applyAccountBundleToWorkspace(res, { reloadCharts: true });
         } else {
@@ -10984,7 +11140,10 @@
 
     // Context Menu Actions
     document.getElementById('ctxActReset').onclick = () => {
-      if (mainChart) {
+      const secP = state.ctxPaneId > 0 ? secPanes.find(x => x.id === state.ctxPaneId) : null;
+      if (secP && secP.chart) {
+        focusLiveEvolution(secP.chart, (secP.bars || []).length, 72, 5);
+      } else if (mainChart) {
         focusLiveEvolution(mainChart, state.bars.length, 95, 8);
         updateJumpToLiveBtn();
         renderLiveEvolutionStrip();
@@ -10995,14 +11154,20 @@
       showToast('Preț Copiat', fmt(state.ctxPrice));
     };
     document.getElementById('ctxActAlert').onclick = () => {
-      const cur = state.bars.length ? state.bars[state.bars.length - 1].close : state.ctxPrice;
+      const secP = state.ctxPaneId > 0 ? secPanes.find(x => x.id === state.ctxPaneId) : null;
+      const barsArr = secP ? (secP.bars || []) : state.bars;
+      const cur = barsArr.length ? barsArr[barsArr.length - 1].close : state.ctxPrice;
       addAlert(state.ctxPrice, state.ctxPrice >= cur ? 'up' : 'dn');
     };
     document.getElementById('ctxActBuy').onclick = () => executePaperOrder('buy', state.ctxPrice);
     document.getElementById('ctxActSell').onclick = () => executePaperOrder('sell', state.ctxPrice);
     document.getElementById('ctxActWatchlist')?.addEventListener('click', () => toggleSymbolInWatchlist(getActiveFocusedSymbol()));
     document.getElementById('chartWlToggleBtn')?.addEventListener('click', () => toggleSymbolInWatchlist(getActiveFocusedSymbol()));
-    document.getElementById('ctxActClearDraw').onclick = () => overlayEngine.clearAll();
+    document.getElementById('ctxActClearDraw').onclick = () => {
+      const secP = state.ctxPaneId > 0 ? secPanes.find(x => x.id === state.ctxPaneId) : null;
+      if (secP && secP.overlay) secP.overlay.clearAll();
+      else if (overlayEngine) overlayEngine.clearAll();
+    };
 
     // Mobile Chart Controls, Sheet Close Buttons & 6-Tab Thumb Navigation
     const mobDrawBtn = document.getElementById('mobDrawToggleBtn');
@@ -11194,10 +11359,39 @@
       getAuthToken: () => authState.token,
       getUser: () => authState.user,
       getRealPortfolio: () => authState.realPortfolio,
+      ingestPortfolioQuotes: (evaluatedAssets = []) => {
+        try {
+          for (const row of evaluatedAssets) {
+            const sym = String(row.sym || row.brokerSym || '').toUpperCase().replace(/\.(24-7|24-5)$/i, '');
+            const px = Number(row.livePrice || 0);
+            if (!sym || !(px > 0)) continue;
+            const pct = Number(row.dayChgPct || 0);
+            const prevClose = pct !== -100 ? px / (1 + pct / 100) : px;
+            const chg = px - prevClose;
+            applyLiveTick(sym, px, {
+              regPrice: px,
+              regChg: chg,
+              regChgPct: pct,
+              prevClose,
+              name: row.name
+            });
+          }
+          const focusSym = getActiveFocusedSymbol();
+          const lq = liveQuoteCache[focusSym];
+          if (lq && isFinite(lq.regPrice)) {
+            syncDetailsWidgetForSymbol(focusSym, getPaneStateIfRendered(focusSym));
+          }
+        } catch (_) { }
+      },
       fetchRealPortfolio: async () => {
         if (!authState.token || !authState.user) return null;
         const res = await authApiRequest('/api/auth/portfolio', { method: 'GET' });
         authState.realPortfolio = res.realPortfolio || null;
+        try {
+          const s = getActiveFocusedSymbol();
+          const lq = liveQuoteCache[s];
+          renderDetailsPortfolioBox(s, lq?.regPrice, lq?.regChg);
+        } catch (_) { }
         return authState.realPortfolio;
       },
       saveRealPortfolio: async (nextPf) => {
@@ -11235,7 +11429,21 @@
       toggleWatchlist: (s) => toggleSymbolInWatchlist(s),
       isInWatchlist: (s) => isSymbolInWatchlist(s),
       renderLogoAvatar: (s, sizeCls) => renderLogoAvatar(s, sizeCls),
-      openBottomTab: (t) => openBottomDockTab(t)
+      openBottomTab: (t) => openBottomDockTab(t),
+      refreshChartsAfterShow: () => {
+        resizeAllCharts();
+        const needed = getNeededSecPanesCount(state.layout);
+        for (let i = 0; i < needed; i++) {
+          const p = secPanes[i];
+          if (!p) continue;
+          if (!p.chart) initSecondaryPaneChart(p);
+          if (!p.bars || !p.bars.length) {
+            loadSecondaryPaneData(p);
+          } else {
+            try { renderSecondaryPaneIndicators(p, true); } catch (_) { }
+          }
+        }
+      }
     };
 
     renderWorkspaceArrangementsUI();
