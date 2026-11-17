@@ -12,14 +12,29 @@ const {
   TV_INTERVAL_MAP,
   isUsEquityTicker,
   enrichQuotesWithTvExtended,
-  fetchBoatsOvernightSeries,
-  mergeBoatsBarsIntoChartPayload
+  fetchTvChartSupplement,
+  mergeTvChartSupplement
 } = require('./tv-overnight.js');
+const { handleAuthApiRequest } = require('./auth-store.js');
+const { createIntelEngine } = require('../../intel-backend.js');
+const serverlessIntelCache = new Map();
+const serverlessIntelEngine = createIntelEngine({
+  getCached: (k, ttl) => {
+    const v = serverlessIntelCache.get(k);
+    return (v && Date.now() - v.ts < ttl) ? v.val : null;
+  },
+  setCached: (k, val) => {
+    serverlessIntelCache.set(k, { ts: Date.now(), val });
+    if (serverlessIntelCache.size > 200) {
+      serverlessIntelCache.delete(serverlessIntelCache.keys().next().value);
+    }
+  }
+});
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Accept',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Accept, Authorization',
   'Cache-Control': 'no-store'
 };
 
@@ -50,6 +65,50 @@ exports.handler = async (event) => {
 
   const qs = event.queryStringParameters || {};
   const evPath = String(event.path || '');
+
+  // Shared User Auth, Google OAuth & Personal/General Settings API
+  if (evPath.includes('/api/auth/')) {
+    const bodyObj = event.body ? (() => { try { return JSON.parse(event.body); } catch (_) { return {}; } })() : {};
+    const out = await handleAuthApiRequest({
+      method: event.httpMethod,
+      pathname: evPath,
+      headers: event.headers || {},
+      body: bodyObj,
+      query: qs
+    });
+    if (out.redirect) {
+      return {
+        statusCode: 302,
+        headers: { ...CORS_HEADERS, Location: out.redirect },
+        body: ''
+      };
+    }
+    return {
+      statusCode: out.status || 200,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(out.body)
+    };
+  }
+
+  // Real Portfolio Live Risk & Technical Evaluator on Netlify
+  if (evPath.includes('/api/intel/portfolio-evaluate') && event.httpMethod === 'POST') {
+    try {
+      const bodyObj = event.body ? JSON.parse(event.body) : {};
+      const pf = bodyObj?.realPortfolio || bodyObj?.portfolio || bodyObj || {};
+      const data = await serverlessIntelEngine.evaluateRealPortfolio(pf);
+      return {
+        statusCode: 200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(data)
+      };
+    } catch (e) {
+      return {
+        statusCode: 500,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ ok: false, error: e.message })
+      };
+    }
+  }
 
   // Serverless Global Symbol Search on Netlify (/api/search?q=...)
   if (evPath.endsWith('/api/search')) {
@@ -99,7 +158,7 @@ exports.handler = async (event) => {
               it.chgPct = h.regularMarketChangePercent ?? 0;
             }
           });
-        } catch (_) {}
+        } catch (_) { }
       }
       return {
         statusCode: 200,
@@ -123,7 +182,7 @@ exports.handler = async (event) => {
     const bodyObj = event.body ? (() => { try { return JSON.parse(event.body); } catch (_) { return {}; } })() : {};
 
     if (evPath.endsWith('/status')) {
-      return jsonResp(200, { ok: true, configured: !!(tok && chat), botOk: !!tok, botUsername: 'jeka7ro_bot', chatId: chat, pollingActive: false, prefs: serverlessTgPrefs, logs: serverlessLogs });
+      return jsonResp(200, { ok: true, configured: !!(tok && chat), botOk: !!tok, botUsername: '', chatId: chat, pollingActive: false, prefs: serverlessTgPrefs, logs: serverlessLogs });
     }
     if (evPath.endsWith('/config')) {
       if (bodyObj.prefs) serverlessTgPrefs = { ...serverlessTgPrefs, ...bodyObj.prefs };
@@ -216,7 +275,7 @@ exports.handler = async (event) => {
             list.find(it => it.logoid);
           if (best?.logoid) logoid = best.logoid;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     const cands = [];
     if (logoid) cands.push(`https://s3-symbol-logo.tradingview.com/${logoid}--big.svg`);
@@ -237,7 +296,7 @@ exports.handler = async (event) => {
             };
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     const mono = upper.replace(/[^A-Z0-9]/g, '').slice(0, 3) || 'TP';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56"><rect width="56" height="56" fill="#1E53E5"/><text x="28" y="35" text-anchor="middle" fill="#FFFFFF" font-family="sans-serif" font-size="18" font-weight="800">${mono}</text></svg>`;
@@ -266,10 +325,10 @@ exports.handler = async (event) => {
       const includePrePost = parsed.searchParams.get('includePrePost') === 'true';
       const period1 = rangeToPeriod1(range, yfInterval);
 
-      const wantBoats = includePrePost && TV_INTERVAL_MAP[yfInterval] && isUsEquityTicker(rawSym);
-      const [ch, boatsBars] = await Promise.all([
+      const wantExt = includePrePost && TV_INTERVAL_MAP[yfInterval] && isUsEquityTicker(rawSym);
+      const [ch, tvSupp] = await Promise.all([
         yf.chart(rawSym, { period1, interval: yfInterval, includePrePost }, { validateResult: false }),
-        wantBoats ? fetchBoatsOvernightSeries(rawSym, yfInterval).catch(() => []) : Promise.resolve([])
+        wantExt ? fetchTvChartSupplement(rawSym, yfInterval).catch(() => null) : Promise.resolve(null)
       ]);
       const quotes = (ch?.quotes || []).filter(q => q && q.date && q.close != null);
       const payload = {
@@ -290,7 +349,9 @@ exports.handler = async (event) => {
           error: null
         }
       };
-      if (boatsBars.length) mergeBoatsBarsIntoChartPayload(payload, boatsBars);
+      if (tvSupp && (tvSupp.extendedBars?.length || tvSupp.boatsBars?.length)) {
+        mergeTvChartSupplement(payload, tvSupp, yfInterval);
+      }
       return {
         statusCode: 200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
@@ -311,11 +372,11 @@ exports.handler = async (event) => {
             try {
               const single = await yf.quote(s, {}, { validateResult: false });
               if (single) results.push(single);
-            } catch (_) {}
+            } catch (_) { }
           }));
         }
       }
-      await enrichQuotesWithTvExtended(results).catch(() => {});
+      await enrichQuotesWithTvExtended(results).catch(() => { });
       return {
         statusCode: 200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },

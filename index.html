@@ -11,8 +11,9 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=1">
   <title>TradePro · AI Trading Intelligence Terminal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='4' y1='29' x2='32' y2='8' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23ff453a'/%3E%3Cstop offset='45%25' stop-color='%2310b981'/%3E%3Cstop offset='100%25' stop-color='%236ee7b7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='36' height='36' rx='10' fill='%230b1324'/%3E%3Cpath d='M4 28 Q14 29 20 21 T32 10' fill='none' stroke='url(%23g)' stroke-width='2.4' stroke-linecap='round' opacity='0.85'/%3E%3Cline x1='8' y1='17' x2='8' y2='28' stroke='%23ff6b63' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='5.8' y='19' width='4.4' height='6.5' rx='1.2' fill='%23ff453a'/%3E%3Cline x1='15.5' y1='12' x2='15.5' y2='24' stroke='%2334d399' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='13.3' y='14' width='4.4' height='7' rx='1.2' fill='%2310b981'/%3E%3Cline x1='23' y1='8' x2='23' y2='20' stroke='%236ee7b7' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='20.8' y='10' width='4.4' height='7.5' rx='1.2' fill='%2322c55e'/%3E%3Cline x1='30.5' y1='5' x2='30.5' y2='16' stroke='%23a7f3d0' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='28.3' y='6.5' width='4.4' height='7.5' rx='1.2' fill='%236ee7b7'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=ultimate49">
+  <link rel="stylesheet" href="styles.css?v=ultimate99">
   <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script>try{if(!localStorage.getItem('tp_auth_token_v1')&&!String(location.hash||'').includes('authToken='))document.documentElement.classList.add('auth-locked-boot');}catch(_){}</script>
 </head>
 <body>
 
@@ -115,6 +116,7 @@
         <div class="tv-menu-item" data-customtf="5s"><span>5 Secunde</span></div>
         <div class="tv-menu-item" data-customtf="15s"><span>15 Secunde</span></div>
         <div class="tv-menu-item" data-customtf="30s"><span>30 Secunde</span></div>
+        <div class="tv-menu-item" id="extHoursMenuToggle" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px;"><span>Ore Extinse (ETH: Pre/Ovn/Post)</span></div>
       </div>
     </div>
 
@@ -194,6 +196,7 @@
       <button class="qind-btn" data-qind="footprint" title="Delta &amp; Absorbție [OHLCV Proxy] (NU este Trade Tape Bid/Ask)">Delta [OHLCV]</button>
       <button class="qind-btn" data-qind="autoPatterns" title="Auto Chart Patterns">Patterns</button>
       <button class="qind-btn" data-qind="expectedMove" title="Expected Move Cone (±1σ)">ExpMove</button>
+      <button class="qind-btn" data-qind="fibAuto" title="Auto-Fibonacci Retracement &amp; Extensions">Fib</button>
       <button class="qind-btn" data-qind="rsi">RSI</button>
       <button class="qind-btn" data-qind="macd">MACD</button>
     </div>
@@ -204,6 +207,12 @@
     <button id="smartSigTopBtn" class="tb-btn accent-sig active" title="Activează / Ascunde Semnalele Smart Buy/Sell &amp; Planul R:R">
       <svg class="tv-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
       <span>Semnale</span>
+    </button>
+
+    <!-- Auto-Fibonacci On/Off Toggle -->
+    <button id="fibTopBtn" class="tb-btn accent-fib" title="Activează / Ascunde Auto-Fibonacci pe grafic (ON / OFF)">
+      <svg class="tv-ico" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10.5" x2="21" y2="10.5" stroke-dasharray="3 2"/><line x1="3" y1="15" x2="21" y2="15" stroke-dasharray="3 2"/><line x1="3" y1="19.5" x2="21" y2="19.5"/></svg>
+      <span>Fib</span>
     </button>
 
     <!-- Bar Replay -->
@@ -238,7 +247,15 @@
         <span id="activeLayoutLbl" class="tabular" style="font-weight:800;font-size:10.5px;color:var(--text-bright);">1</span>
         <svg class="tv-ico sm" style="opacity:0.6;width:11px;height:11px;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <div id="layoutMenu" class="tv-menu" style="min-width:246px;max-height:78vh;overflow-y:auto;right:0;left:auto;">
+      <div id="layoutMenu" class="tv-menu" style="min-width:258px;max-height:78vh;overflow-y:auto;right:0;left:auto;">
+        <div id="layoutSavedWrap" style="padding:7px 9px 8px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+          <div style="font-size:9.5px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:5px;">Aranjamente Salvate</div>
+          <div style="display:flex;gap:4px;margin-bottom:6px;">
+            <input id="arrNameInp" class="tv-input" style="height:26px;font-size:11px;min-width:0;" maxlength="24" placeholder="Ex: 4 Grafice Setup">
+            <button type="button" id="arrSaveBtn" class="ind-act-btn pro" style="height:26px;padding:0 9px;flex-shrink:0;">Salvează</button>
+          </div>
+          <div id="layoutArrChips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        </div>
         <div class="tv-menu-item active" data-layout="1">
           <svg class="tv-ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
           <span>1 Grafic (Maxim)</span>
@@ -332,6 +349,76 @@
       <button id="themeBtn" class="tb-btn icon-only" title="Comută Tema Dark / Light">
         <svg class="tv-ico" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
+      <div class="tv-dropdown auth-dropdown">
+        <button id="authAccountBtn" class="tb-btn auth-pill" type="button" aria-haspopup="true" title="Autentificare · Simboluri și setări personale + generale">
+          <span id="authAvatarBadge" class="auth-avatar">G</span>
+          <span id="authBtnLbl">Conectare</span>
+          <svg class="auth-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        <div id="authAccountMenu" class="tv-menu auth-account-menu" style="right:0;left:auto;">
+          <div class="auth-dd-hdr">
+            <div id="authUserAvatar" class="auth-dd-avatar">U</div>
+            <div class="auth-dd-meta">
+              <div class="auth-dd-name-row">
+                <span id="authUserName" class="auth-dd-name">@utilizator</span>
+                <span id="authUserRoleBadge" class="pill pill-buy">Sincronizat</span>
+              </div>
+              <div id="authUserEmail" class="auth-dd-email">—</div>
+            </div>
+          </div>
+
+          <div class="auth-dd-stats">
+            <div class="auth-dd-stat">
+              <div class="lbl">Personale</div>
+              <div id="authStatPersonal" class="val blue tabular">0</div>
+            </div>
+            <div class="auth-dd-stat">
+              <div class="lbl">Generale</div>
+              <div id="authStatGeneral" class="val tabular">0</div>
+            </div>
+            <div class="auth-dd-stat">
+              <div class="lbl">Profile</div>
+              <div id="authStatProfiles" class="val amber tabular">0</div>
+            </div>
+            <div class="auth-dd-stat">
+              <div class="lbl">Aranj.</div>
+              <div id="authStatLayouts" class="val up tabular">0</div>
+            </div>
+          </div>
+
+          <div class="auth-dd-sep"></div>
+
+          <button id="authOpenPortfolioBtn" type="button" class="tv-menu-item auth-dd-item portfolio">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="12.01"/></svg>
+            <span>Portofoliu Real &amp; Evaluare</span>
+          </button>
+          <button id="authOpenAdminBtn" type="button" class="tv-menu-item auth-dd-item admin" data-admin-only="1" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+            <span>Panou Admin Conturi</span>
+          </button>
+          <button id="authClaimGuestBtn" type="button" class="tv-menu-item auth-dd-item warn" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Importă datele anterioare din browser</span>
+          </button>
+          <button id="authSyncNowBtn" type="button" class="tv-menu-item auth-dd-item primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span>Sincronizează contul acum</span>
+          </button>
+          <button id="authRestoreGenBtn" type="button" class="tv-menu-item auth-dd-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <span>Re-include simboluri generale</span>
+          </button>
+
+          <div class="auth-dd-sep"></div>
+
+          <button id="authLogoutBtn" type="button" class="tv-menu-item auth-dd-item danger">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Deconectare</span>
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -369,6 +456,14 @@
       <button class="inav-btn" type="button" data-wview="builder" data-tip="Strategy Builder &amp; Simulator Costuri">
         <svg class="tv-ico" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="5" rx="1"/><rect x="14" y="4" width="7" height="5" rx="1"/><rect x="8.5" y="15" width="7" height="5" rx="1"/><path d="M6.5 9v3h11V9M12 12v3"/></svg>
         <span>Builder</span>
+      </button>
+      <button id="portfolioNavBtn" class="inav-btn inav-portfolio" type="button" data-wview="portfolio" data-tip="Portofoliu Real &amp; Evaluare AI (Strict izolat pe contul tău)">
+        <svg class="tv-ico" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M2 13h20"/></svg>
+        <span>Portofoliu</span>
+      </button>
+      <button id="adminNavBtn" class="inav-btn inav-admin" type="button" data-wview="admin" data-admin-only="1" style="display:none;" data-tip="Admin Conturi · Informații, Editare, Blocare &amp; Ștergere Conturi">
+        <svg class="tv-ico" viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a3.5 3.5 0 0 1 7 0"/></svg>
+        <span>Admin</span>
       </button>
       <div class="inav-spacer"></div>
       <button id="railCopilotBtn" class="inav-btn inav-copilot" type="button" data-tip="AI Trading Copilot (Conectat pe toate cele 5 zone)">
@@ -440,6 +535,8 @@
         <button class="mmode-btn" type="button" data-wview="secnews">SEC &amp; Știri</button>
         <button class="mmode-btn" type="button" data-wview="options">Opțiuni/Short</button>
         <button class="mmode-btn" type="button" data-wview="builder">Builder</button>
+        <button id="mobPortfolioChipBtn" class="mmode-btn mmode-portfolio" type="button" data-wview="portfolio">Portofoliu</button>
+        <button id="mobAdminChipBtn" class="mmode-btn mmode-admin" type="button" data-wview="admin" data-admin-only="1" style="display:none;">Admin</button>
         <button id="mobCopilotChipBtn" class="mmode-btn mmode-copilot" type="button">AI Copilot</button>
         <button id="mobTgChipBtn" class="mmode-btn mmode-tg is-on" type="button" aria-pressed="true" title="Pornește / Oprește mesajele automate Telegram">TG ON</button>
       </div>
@@ -459,12 +556,13 @@
               <span>Live</span>
               <svg viewBox="0 0 24 24"><polyline points="7 7 12 12 7 17"/><polyline points="13 7 18 12 13 17"/></svg>
             </button>
-            <button id="chartWlToggleBtn" type="button" title="Adaugă sau elimină simbolul curent din Watchlist">
+            <button id="chartWlToggleBtn" type="button" aria-label="Adaugă sau elimină din Watchlist" title="Adaugă sau elimină simbolul curent din Watchlist">
               <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-              <span id="chartWlToggleTxt">+ Watchlist</span>
             </button>
+            <div id="activeIndLegend" aria-label="Indicatori activi pe grafic"></div>
+            <div id="chartExplainPopover" role="dialog" aria-live="polite" style="display:none;"></div>
 
-            <!-- Compact 2-Row Chart Legend (Row 1: Symbol + OHLC · Row 2: Trade + AI Signal + Indicators) -->
+            <!-- Single-Row Chart Legend (Symbol + OHLC + Trade + AI Signal + Profile) -->
             <div id="tvLegendBox">
               <div class="tv-symbol-line">
                 <span id="curLogoWrap">
@@ -478,7 +576,7 @@
                 <span id="curCompanySub">NVIDIA Corp</span>
                 <span id="curTfBadge">1D</span>
                 <span id="curLivePriceHero" class="tabular">—</span>
-                <span id="curSessionChgBadge" class="pill pill-neut tabular">—</span>
+                <span id="curSessionChgBadge" class="pill pill-neut tabular" style="display:none;"></span>
                 <span id="curExtSessionBadge" class="ext-sess-pill tabular" style="display:none;" title="Cotație live Pre-Market / Post-Market"></span>
                 <span id="barCountdownBadge" class="tabular" title="Timp rămas până la închiderea lumânării curente / Ticks">LIVE</span>
                 <button id="mobLegendToggleBtn" type="button" title="Afișează / Ascunde detalii OHLC și indicatori">
@@ -488,23 +586,23 @@
               </div>
 
               <div class="tv-substatus-row">
-                <div class="tv-bidask-row">
-                  <button id="baSellBtn" class="ba-btn sell" title="Ordin SHORT rapid în Paper Trading">
-                    <span class="ba-lbl">SELL</span>
-                    <span id="baSellPrice" class="ba-val">—</span>
-                  </button>
-                  <span id="baSpreadVal" class="ba-spread">0.02</span>
-                  <button id="baBuyBtn" class="ba-btn buy" title="Ordin BUY rapid în Paper Trading">
-                    <span class="ba-lbl">BUY</span>
-                    <span id="baBuyPrice" class="ba-val">—</span>
-                  </button>
-                </div>
-
                 <!-- Sleek Inline Signal Status Chip -->
                 <div id="smartHudCard" title="Click pentru detalii semnal"></div>
 
-                <!-- Inline Compact Active Indicators -->
-                <div id="activeIndLegend"></div>
+                <!-- Chart Pane Active Skin / Profile + Copy / Paste -->
+                <div id="priProfileTab" class="pane-prof-tab pane-prof-tab--pri">
+                  <button id="priProfBtn" type="button" class="pane-prof-btn" title="Profil / Skin &amp; Indicatori pentru Ecranul #1">
+                    <span class="pane-prof-dot"></span>
+                    <span id="priProfLbl">Pro</span>
+                  </button>
+                  <button id="priProfCopyBtn" type="button" class="pane-prof-copy" title="Copiază profilul și indicatorii acestui grafic" aria-label="Copiază profilul">
+                    <svg class="tv-ico sm" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                  <button id="priProfPasteBtn" type="button" class="pane-prof-paste" style="display:none;" title="Preia profilul copiat pe Ecranul #1">
+                    <svg class="tv-ico sm" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+                    <span id="priProfPasteLbl">Preia</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1313,10 +1411,10 @@
 
           <div class="rp-sec-label">
             <span>Conexiune Bot</span>
-            <span id="tgBotHandleLbl" class="tabular">@jeka7ro_bot</span>
+            <span id="tgBotHandleLbl" class="tabular">—</span>
           </div>
           <div style="display:flex;gap:5px;margin-bottom:7px;">
-            <input id="tgChatIdInput" type="text" class="tv-input" placeholder="Telegram Chat ID (ex: -5151044673)">
+            <input id="tgChatIdInput" type="text" class="tv-input" placeholder="Telegram Chat ID (ex: -1001234567890)">
             <button id="tgSaveCfgBtn" class="tb-btn" style="border:1px solid var(--border-strong);height:28px;padding:0 10px;" type="button">Salvează</button>
           </div>
           <div class="ticket-actions" style="margin-top:0;">
@@ -1523,16 +1621,34 @@
       <div class="tv-modal-hdr">
         <h3>
           <svg class="tv-ico" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
-          <span>Indicatori Instituționali, SMC &amp; Strategii</span>
+          <span>Indicatori &amp; Skin-uri</span>
+          <span id="indTargetPaneBadge" class="pill pill-neut" style="font-size:10px;">Ecran #1</span>
         </h3>
         <button class="tv-modal-close" data-close-modal="indicatorsModal">
           <svg class="tv-ico" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
-      <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
-        <input id="indModalSearch" class="tv-input" style="width:100%;height:34px;" placeholder="Filtrează indicatori (ex: SuperTrend, SMC, VPVR, VWAP, Bollinger)...">
+      <div id="indTargetPaneBar" class="ind-pane-bar" style="display:none;" aria-label="Alege ecranul țintă"></div>
+      <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <input id="indModalSearch" class="tv-input" style="display:block;width:100%;flex:none;height:36px;min-height:36px;margin-bottom:8px;" placeholder="Filtrează indicatori (ex: VWAP, VPVR, SMC, SuperTrend, Fib, Wolfe)...">
+        <div id="indSkinsWrap" class="ind-skins-wrap">
+          <div class="ind-skins-hdr">
+            <span class="ind-skins-lbl">Skin-uri &amp; Profiluri Grafic</span>
+            <div class="ind-save-grp">
+              <input id="indProfileNameInp" class="tv-input ind-prof-inp" maxlength="24" placeholder="Nume profil (ex: Swing)">
+              <button type="button" id="indSaveProfileBtn" class="ind-act-btn pro" title="Salvează configurația curentă de indicatori ca profil propriu">+ Salvează Profil</button>
+            </div>
+          </div>
+          <div id="indSkinsChips" class="ind-skins-chips"></div>
+        </div>
+        <div class="ind-modal-bar">
+          <div class="ind-modal-tabs" role="tablist" aria-label="Filtrare listă indicatori">
+            <button type="button" id="indTabTop10Btn" class="ind-tab-btn active" data-indtab="top10">Top 10 Smart Pro (10)</button>
+            <button type="button" id="indTabAllBtn" class="ind-tab-btn" data-indtab="all">Toți Indicatorii (20)</button>
+          </div>
+        </div>
       </div>
-      <div id="indModalList" style="overflow-y:auto;flex:1;max-height:58vh;"></div>
+      <div id="indModalList" style="overflow-y:auto;flex:1;min-height:0;max-height:54vh;"></div>
     </div>
   </div>
 
@@ -1590,6 +1706,146 @@
 
   <!-- FLOATING SYMBOL AUTOCOMPLETE FOR SECONDARY PANES & INPUTS -->
   <div id="floatingSymSuggest" class="wl-suggest-box floating-sym-suggest"></div>
+
+  <!-- USER ACCOUNT & PERSONAL WORKSPACE MODAL -->
+  <div id="authModal" class="tv-modal-backdrop">
+    <div class="tv-modal auth-modal-box">
+      <div class="auth-hero-hdr">
+        <div class="auth-hero-brand">
+          <span class="tv-brand-mark auth-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="tpAuthLogoRedBar" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ff6b63"/>
+                  <stop offset="100%" stop-color="#e11d48"/>
+                </linearGradient>
+                <linearGradient id="tpAuthLogoGreen1" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#34d399"/>
+                  <stop offset="100%" stop-color="#059669"/>
+                </linearGradient>
+                <linearGradient id="tpAuthLogoGreen2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#4ade80"/>
+                  <stop offset="100%" stop-color="#10b981"/>
+                </linearGradient>
+                <linearGradient id="tpAuthLogoGreen3" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#a7f3d0"/>
+                  <stop offset="100%" stop-color="#22c55e"/>
+                </linearGradient>
+                <linearGradient id="tpAuthLogoWaveStroke" x1="4" y1="34" x2="60" y2="10" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#ff453a"/>
+                  <stop offset="38%" stop-color="#10b981"/>
+                  <stop offset="100%" stop-color="var(--tp-logo-mint, #6ee7b7)"/>
+                </linearGradient>
+                <linearGradient id="tpAuthLogoWaveBeam" x1="4" y1="34" x2="60" y2="10" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#ff8a80"/>
+                  <stop offset="42%" stop-color="#34d399"/>
+                  <stop offset="100%" stop-color="var(--tp-logo-beam, #ecfdf5)"/>
+                </linearGradient>
+                <linearGradient id="tpAuthLogoArea" x1="0" y1="8" x2="0" y2="38" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#34d399" stop-opacity="0.28"/>
+                  <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M5 33 C16 33 25 27 36 20 C46 14 53 12 60 11 L60 38 L5 38 Z" fill="url(#tpAuthLogoArea)"/>
+              <path class="tp-logo-wave-base" pathLength="100" d="M5 33 C16 33 25 27 36 20 C46 14 53 12 60 11" stroke="url(#tpAuthLogoWaveStroke)" stroke-width="2.4" stroke-linecap="round"/>
+              <path class="tp-logo-wave-flow" pathLength="100" d="M5 33 C16 33 25 27 36 20 C46 14 53 12 60 11" stroke="url(#tpAuthLogoWaveBeam)" stroke-width="2.9" stroke-linecap="round"/>
+              <g class="tp-bar tp-bar-1">
+                <line x1="10" y1="20" x2="10" y2="34" stroke="#ff6b63" stroke-width="2" stroke-linecap="round"/>
+                <rect x="6.5" y="22.5" width="7" height="8.5" rx="1.8" fill="url(#tpAuthLogoRedBar)"/>
+              </g>
+              <g class="tp-bar tp-bar-2">
+                <line x1="24" y1="15" x2="24" y2="30" stroke="#34d399" stroke-width="2" stroke-linecap="round"/>
+                <rect x="20.5" y="17.5" width="7" height="9" rx="1.8" fill="url(#tpAuthLogoGreen1)"/>
+              </g>
+              <g class="tp-bar tp-bar-3">
+                <line x1="38" y1="9.5" x2="38" y2="25.5" stroke="#4ade80" stroke-width="2" stroke-linecap="round"/>
+                <rect x="34.5" y="12" width="7" height="10" rx="1.8" fill="url(#tpAuthLogoGreen2)"/>
+              </g>
+              <g class="tp-bar tp-bar-4">
+                <line x1="52" y1="4" x2="52" y2="21.5" stroke="#a7f3d0" stroke-width="2.1" stroke-linecap="round"/>
+                <rect x="48.5" y="6.5" width="7" height="11.5" rx="1.8" fill="url(#tpAuthLogoGreen3)"/>
+              </g>
+            </svg>
+          </span>
+          <div class="auth-hero-titles">
+            <div class="auth-hero-wordmark">
+              <span class="tv-brand-name">Trade<span class="tv-brand-pro">Pro</span></span>
+            </div>
+            <div id="authModalTitle" class="auth-hero-sub">Conectează-te la contul tău</div>
+          </div>
+        </div>
+        <button class="tv-modal-close auth-close-btn" data-close-modal="authModal" type="button" aria-label="Închide fereastra de autentificare">
+          <svg class="tv-ico" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div id="authGuestView" class="auth-modal-body">
+        <div id="authGoogleSection" class="auth-google-section">
+          <button type="button" id="authGoogleBtn" class="auth-google-btn" title="Conectează-te rapid prin contul tău Google (Gmail)">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M23.5 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.63v3.01h3.88c2.27-2.09 3.55-5.17 3.55-8.88z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.01c-1.08.72-2.45 1.15-4.05 1.15-3.12 0-5.77-2.11-6.72-4.96H1.29v3.11A12 12 0 0 0 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.38-2.27V6.62H1.29A12 12 0 0 0 0 12c0 1.94.46 3.77 1.29 5.38l3.99-3.11z"/>
+              <path fill="#EA4335" d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.29 6.62l3.99 3.11C6.23 6.88 8.88 4.77 12 4.77z"/>
+            </svg>
+            <span id="authGoogleBtnLbl">Continuă cu Google (Gmail)</span>
+          </button>
+          <div class="auth-divider"><span>sau cu Username / Email &amp; Parolă</span></div>
+        </div>
+
+        <div class="auth-mode-tabs">
+          <button type="button" id="authTabLoginBtn" class="auth-mode-tab active">Autentificare</button>
+          <button type="button" id="authTabRegBtn" class="auth-mode-tab">Cont Nou</button>
+        </div>
+
+        <div id="authFormErr" class="auth-err-banner" style="display:none;"></div>
+
+        <form id="authLoginForm" class="auth-form">
+          <label class="auth-field">
+            <span>Username sau Email</span>
+            <input id="authLoginId" class="tv-input auth-inp" type="text" autocomplete="username" placeholder="Username sau email..." required>
+          </label>
+          <label class="auth-field">
+            <span>Parolă</span>
+            <div class="auth-pass-wrap">
+              <input id="authLoginPass" class="tv-input auth-inp" type="password" autocomplete="current-password" placeholder="Introdu parola..." required>
+              <button type="button" class="auth-eye-btn" data-toggle-pass="authLoginPass" title="Arată / Ascunde parola">
+                <svg class="tv-ico sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </label>
+          <div class="auth-hint">Fiecare cont își păstrează propriile simboluri, indicatori și setări personale.</div>
+          <button id="authLoginSubmitBtn" type="submit" class="tv-primary-btn auth-submit-btn">Intră în cont</button>
+        </form>
+
+        <form id="authRegForm" class="auth-form" style="display:none;">
+          <label class="auth-field">
+            <span>Username</span>
+            <input id="authRegUser" class="tv-input auth-inp" type="text" autocomplete="username" placeholder="ex: trader (litere, cifre, _ . -)" required>
+          </label>
+          <label class="auth-field">
+            <span>Email (Gmail / personal)</span>
+            <input id="authRegEmail" class="tv-input auth-inp" type="email" autocomplete="email" placeholder="ex: nume@gmail.com" required>
+          </label>
+          <label class="auth-field">
+            <span>Parolă (min. 4 caractere)</span>
+            <div class="auth-pass-wrap">
+              <input id="authRegPass" class="tv-input auth-inp" type="password" autocomplete="new-password" placeholder="Alege o parolă sigură..." required>
+              <button type="button" class="auth-eye-btn" data-toggle-pass="authRegPass" title="Arată / Ascunde parola">
+                <svg class="tv-ico sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </label>
+          <label class="auth-check-row auth-claim-box">
+            <input id="authRegClaimCurrent" type="checkbox">
+            <span><b>Mută ce am acum pe ecran în acest cont</b> (simboluri, indicatori, profile, aranjamente) și resetează baza generală pentru conturile noi</span>
+          </label>
+          <div class="auth-hint">Dacă lași debifat, contul nou pornește curat doar cu simbolurile generale ale pieței (fără indicatorii/simbolurile altui cont).</div>
+          <button id="authRegSubmitBtn" type="submit" class="tv-primary-btn auth-submit-btn">Creează cont și conectează-mă</button>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <!-- FLOATING TOAST NOTIFICATIONS -->
   <div id="toastContainer"></div>
@@ -1653,9 +1909,9 @@
     </button>
   </nav>
 
-  <script src="quant-engine.js?v=ultimate49"></script>
-  <script src="drawing-engine.js?v=ultimate49"></script>
-  <script src="app.js?v=ultimate49"></script>
-  <script src="intel-ui.js?v=ultimate49"></script>
+  <script src="quant-engine.js?v=ultimate99"></script>
+  <script src="drawing-engine.js?v=ultimate99"></script>
+  <script src="app.js?v=ultimate99"></script>
+  <script src="intel-ui.js?v=ultimate99"></script>
 </body>
 </html>

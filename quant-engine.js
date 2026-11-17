@@ -820,10 +820,10 @@
       const tot = Math.max(1, b + s + n);
       const sc = (b - s) / tot; // -1..+1
       const label = sc >= 0.45 ? 'CUMPĂRARE PUTERNICĂ'
-                  : sc >= 0.15 ? 'CUMPĂRARE'
-                  : sc <= -0.45 ? 'VÂNZARE PUTERNICĂ'
-                  : sc <= -0.15 ? 'VÂNZARE'
-                  : 'NEUTRU';
+        : sc >= 0.15 ? 'CUMPĂRARE'
+          : sc <= -0.45 ? 'VÂNZARE PUTERNICĂ'
+            : sc <= -0.15 ? 'VÂNZARE'
+              : 'NEUTRU';
       return { buy: b, sell: s, neutral: n, score: sc, label };
     };
 
@@ -1375,7 +1375,7 @@
         // Only reverse runner when already locked in profit (tp1Hit) + strong opposite macro reversal
         if (!closed && activeTrade && !ev.isThinGhostBar && t.tp1Hit) {
           const oppFlip = (t.isBuy && !ev.stBull && ev.bearTrigger && ev.bearScore >= 82 && ev.bearScore >= ev.bullScore + 22)
-                       || (!t.isBuy && ev.stBull && ev.bullTrigger && ev.bullScore >= 82 && ev.bullScore >= ev.bearScore + 22);
+            || (!t.isBuy && ev.stBull && ev.bullTrigger && ev.bullScore >= 82 && ev.bullScore >= ev.bearScore + 22);
           if (oppFlip) {
             const rawMove = t.isBuy ? (b.close - t.entry) : (t.entry - b.close);
             const remR = rawMove / t.risk;
@@ -2338,6 +2338,151 @@
     };
   }
 
+  // 9D-bis. Wolfe Wave Detector (Bill Wolfe 1-2-3-4-5 Converging Wedge + EPA 1->4 Target)
+  function calcWolfeWave(bars) {
+    if (!bars || bars.length < 28) return null;
+    const n = bars.length;
+    const scanStart = Math.max(2, n - 160);
+    const L = 3, R = 2;
+
+    // Collect major swing highs & lows cleanly
+    const rawSwings = [];
+    for (let i = scanStart; i < n - R; i++) {
+      let isH = true, isL = true;
+      for (let k = i - L; k <= i + R; k++) {
+        if (k < 0 || k === i) continue;
+        if (bars[k].high > bars[i].high) isH = false;
+        if (bars[k].low < bars[i].low) isL = false;
+      }
+      if (isH) rawSwings.push({ type: 'H', idx: i, time: bars[i].time, price: bars[i].high });
+      if (isL) rawSwings.push({ type: 'L', idx: i, time: bars[i].time, price: bars[i].low });
+    }
+    if (rawSwings.length < 4) return null;
+
+    // Enforce strict alternation (H -> L -> H -> L) keeping sharper extremes
+    const alt = [];
+    for (const sw of rawSwings) {
+      const prev = alt[alt.length - 1];
+      if (!prev) {
+        alt.push(sw);
+      } else if (prev.type === sw.type) {
+        if ((sw.type === 'H' && sw.price >= prev.price) || (sw.type === 'L' && sw.price <= prev.price)) {
+          alt[alt.length - 1] = sw;
+        }
+      } else {
+        alt.push(sw);
+      }
+    }
+
+    // Add live trailing edge candidate for developing Wave 5 if last pivot occurred >= 2 bars ago
+    const lastAlt = alt[alt.length - 1];
+    if (lastAlt && (n - 1 - lastAlt.idx) >= 2) {
+      const wantType = lastAlt.type === 'H' ? 'L' : 'H';
+      let bestIdx = n - 1;
+      let bestPx = wantType === 'L' ? bars[n - 1].low : bars[n - 1].high;
+      for (let k = lastAlt.idx + 1; k < n; k++) {
+        const px = wantType === 'L' ? bars[k].low : bars[k].high;
+        if ((wantType === 'L' && px <= bestPx) || (wantType === 'H' && px >= bestPx)) {
+          bestPx = px;
+          bestIdx = k;
+        }
+      }
+      alt.push({ type: wantType, idx: bestIdx, time: bars[bestIdx].time, price: bestPx, isLive: true });
+    }
+
+    if (alt.length < 5) return null;
+
+    let bestWave = null;
+    let bestScore = -Infinity;
+    const minWindowIdx = Math.max(5, alt.length - 14);
+
+    for (let s = Math.max(0, minWindowIdx - 5); s <= alt.length - 5; s++) {
+      const p1 = alt[s];
+      const p2 = alt[s + 1];
+      const p3 = alt[s + 2];
+      const p4 = alt[s + 3];
+      const p5 = alt[s + 4];
+      if (p5.idx < n - 30) continue; // Keep only recent active or newly triggered waves
+      const totalSpan = p5.idx - p1.idx;
+      if (totalSpan < 10) continue;
+
+      const d13 = p3.idx - p1.idx;
+      const d24 = p4.idx - p2.idx;
+      const d35 = p5.idx - p3.idx;
+      if (d13 < 2 || d24 < 2 || d35 < 2) continue;
+
+      const isBull = p1.type === 'L' && p2.type === 'H' && p3.type === 'L' && p4.type === 'H' && p5.type === 'L';
+      const isBear = p1.type === 'H' && p2.type === 'L' && p3.type === 'H' && p4.type === 'L' && p5.type === 'H';
+      if (!isBull && !isBear) continue;
+
+      const s13 = (p3.price - p1.price) / d13;
+      const s24 = (p4.price - p2.price) / d24;
+      const s14 = (p4.price - p1.price) / Math.max(1, p4.idx - p1.idx);
+
+      let valid = false;
+      if (isBull) {
+        // Bullish Wolfe: 3 < 1, 4 > 1 (above Point 1 floor), 4 < 2, converging falling wedge (s24 < s13)
+        if (p3.price < p1.price && p4.price > p1.price * 0.992 && p4.price < p2.price && s24 < s13) {
+          valid = true;
+        }
+      } else {
+        // Bearish Wolfe: 3 > 1, 4 < 1 (below Point 1 ceiling), 4 > 2, converging rising wedge (s24 > s13)
+        if (p3.price > p1.price && p4.price < p1.price * 1.008 && p4.price > p2.price && s24 > s13) {
+          valid = true;
+        }
+      }
+      if (!valid) continue;
+
+      // Line 1-3 projection at Point 5 (Sweet Zone trigger check)
+      const proj13At5 = p1.price + s13 * (p5.idx - p1.idx);
+      const devRatio = Math.abs(p5.price - proj13At5) / Math.max(1e-9, proj13At5);
+      if (isBull) {
+        if (p5.price > proj13At5 * 1.015 || p5.price < proj13At5 * 0.945 || p5.price > p3.price * 1.008) continue;
+      } else {
+        if (p5.price < proj13At5 * 0.985 || p5.price > proj13At5 * 1.055 || p5.price < p3.price * 0.992) continue;
+      }
+
+      // Convergence apex (ETA) between Line 1-3 and Line 2-4
+      const b13 = p1.price - s13 * p1.idx;
+      const b24 = p2.price - s24 * p2.idx;
+      const rawApex = (b13 - b24) / (s24 - s13);
+      if (!isFinite(rawApex) || rawApex <= p4.idx || rawApex > p5.idx + totalSpan * 1.8) continue;
+
+      const etaIdx = Math.min(n - 1 + 22, Math.max(p5.idx + 4, Math.round(rawApex)));
+      const epaPrice = p1.price + s14 * (etaIdx - p1.idx);
+      if (isBull && epaPrice <= p5.price) continue;
+      if (isBear && epaPrice >= p5.price) continue;
+
+      // Score: tighter Point 5 fit on 1-3 + balanced wave timing + freshness near n-1
+      const touchScore = Math.max(0, 40 - devRatio * 1400);
+      const symScore = 25 * (Math.min(d13, d35) / Math.max(d13, d35));
+      const recencyScore = Math.max(0, 35 - (n - 1 - p5.idx) * 1.2);
+      const score = touchScore + symScore + recencyScore;
+
+      if (score > bestScore) {
+        bestScore = score;
+        const projEndIdx = Math.min(etaIdx, n - 1 + 14);
+        const curClose = bars[n - 1].close;
+        const moveFrom5Pct = Math.abs((curClose - p5.price) / p5.price);
+        const status = (n - 1 - p5.idx <= 4 || moveFrom5Pct < 0.015) ? 'SWEET ZONE (5)' : 'CONFIRMAT SPRE EPA';
+        bestWave = {
+          bullish: isBull,
+          status,
+          p1, p2, p3, p4, p5,
+          proj13At5,
+          extIdx: projEndIdx,
+          ext13Price: p1.price + s13 * (projEndIdx - p1.idx),
+          ext24Price: p2.price + s24 * (projEndIdx - p2.idx),
+          etaIdx,
+          epaPrice,
+          score: Math.round(score)
+        };
+      }
+    }
+
+    return bestWave;
+  }
+
   // 9E. Expected Move Cone (±1σ 68% & ±2σ 95% Statistical Volatility Envelope)
   function calcExpectedMove(bars, horizonBars = 10) {
     if (!bars || bars.length < 22) return null;
@@ -2662,6 +2807,7 @@
     calcTPO,
     calcOrderflowFootprint,
     calcAutoPatterns,
+    calcWolfeWave,
     calcExpectedMove,
     calcAutoFib,
     calcPivotPoints,

@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { toEpochSec } = require('./netlify/functions/tv-overnight.js');
+const { toEpochSec, isUsEquityTicker } = require('./netlify/functions/tv-overnight.js');
 
 const UA_BROWSER = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const UA_SEC = 'TradeProTerminal/2.0 research@tradepro.local';
@@ -215,6 +215,12 @@ const TV_SECTOR_TO_ETF = {
 };
 
 function safeNum(v, fallback = null) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function finiteNum(v, fallback = null) {
+  if (v === null || v === undefined || v === '') return fallback;
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -4066,6 +4072,518 @@ function createIntelEngine(deps) {
     return out;
   }
 
+  // ─── 10. MULTI-TENANT REAL PORTFOLIO AUGMENTATION & RISK ADVISOR ──────────
+  function calcDailyTechLevels(bars, spotPrice) {
+    if (!Array.isArray(bars) || bars.length < 5) {
+      return {
+        sma20: null, sma50: null, sma200: null, rsi14: null, atr14: null, atrPct: null,
+        support1: null, support2: null, resistance1: null, resistance2: null,
+        high52w: null, off52wHighPct: null, trend: 'NECUNOSCUT'
+      };
+    }
+    const closes = bars.map(b => b.close).filter(v => Number.isFinite(v) && v > 0);
+    const avgTail = (arr, n) => arr.length >= n
+      ? arr.slice(-n).reduce((s, v) => s + v, 0) / n
+      : null;
+    const sma20 = avgTail(closes, 20);
+    const sma50 = avgTail(closes, 50);
+    const sma200 = avgTail(closes, 200);
+
+    let rsi14 = null;
+    if (closes.length >= 15) {
+      let gains = 0, losses = 0;
+      const start = Math.max(1, closes.length - 14);
+      for (let i = start; i < closes.length; i++) {
+        const d = closes[i] - closes[i - 1];
+        if (d > 0) gains += d;
+        else losses -= d;
+      }
+      const avgG = gains / 14;
+      const avgL = losses / 14;
+      rsi14 = avgL === 0 ? 100 : 100 - (100 / (1 + avgG / avgL));
+    }
+
+    let atr14 = null;
+    if (bars.length >= 15) {
+      const trs = [];
+      for (let i = Math.max(1, bars.length - 14); i < bars.length; i++) {
+        const b = bars[i], p = bars[i - 1];
+        const tr = Math.max(b.high - b.low, Math.abs(b.high - p.close), Math.abs(b.low - p.close));
+        if (Number.isFinite(tr)) trs.push(tr);
+      }
+      if (trs.length) atr14 = trs.reduce((s, v) => s + v, 0) / trs.length;
+    }
+
+    const spot = Number.isFinite(spotPrice) && spotPrice > 0 ? spotPrice : closes[closes.length - 1];
+    const atrPct = (atr14 != null && spot > 0) ? (atr14 / spot) * 100 : null;
+    const w20 = bars.slice(-20);
+    const w60 = bars.slice(-60);
+    const low20 = Math.min(...w20.map(b => b.low));
+    const low60 = Math.min(...w60.map(b => b.low));
+    const high20 = Math.max(...w20.map(b => b.high));
+    const high60 = Math.max(...w60.map(b => b.high));
+    const high52w = Math.max(...bars.map(b => b.high));
+    const off52wHighPct = high52w > 0 ? ((spot - high52w) / high52w) * 100 : null;
+
+    let trend = 'CONSOLIDARE';
+    if (sma20 && sma50 && spot > sma20 && sma20 > sma50) trend = 'ASCENDENT';
+    else if (sma50 && spot < sma50 && (!sma20 || spot < sma20)) trend = 'DESCENDENT';
+    else if (sma20 && spot > sma20 && sma50 && spot < sma50) trend = 'REBOUND SUB SMA50';
+
+    const resCandidates = [sma20, sma50, high20, high60].filter(v => Number.isFinite(v) && v > spot * 1.015).sort((a, b) => a - b);
+    return {
+      sma20,
+      sma50,
+      sma200,
+      rsi14,
+      atr14,
+      atrPct,
+      support1: Number.isFinite(low20) ? low20 : null,
+      support2: Number.isFinite(low60) ? low60 : null,
+      resistance1: resCandidates[0] || (Number.isFinite(high20) ? high20 : null),
+      resistance2: resCandidates[1] || (Number.isFinite(high60) ? high60 : null),
+      high52w: Number.isFinite(high52w) ? high52w : null,
+      off52wHighPct,
+      trend
+    };
+  }
+
+  function formatCompactPx(v) {
+    if (!Number.isFinite(v)) return '—';
+    if (Math.abs(v) >= 100) return v.toFixed(2);
+    if (Math.abs(v) >= 1) return v.toFixed(2);
+    if (Math.abs(v) >= 0.01) return v.toFixed(4);
+    return v.toFixed(6);
+  }
+
+  function buildLotInsights(asset, livePrice) {
+    const lots = Array.isArray(asset.lots) ? asset.lots : [];
+    const cur = Number.isFinite(livePrice) && livePrice > 0 ? livePrice : (asset.brokerPrice || asset.avgOpen);
+    return lots.map((l) => {
+      const sign = l.side === 'SHORT' ? -1 : 1;
+      const lotLivePnl = cur > 0 ? l.units * (cur - l.open) * sign : (l.brokerPnl ?? 0);
+      const slDistPct = (l.sl && cur > 0)
+        ? (sign > 0 ? ((cur - l.sl) / cur) * 100 : ((l.sl - cur) / cur) * 100)
+        : null;
+      const tpUpsidePct = (l.tp && cur > 0)
+        ? (sign > 0 ? ((l.tp - cur) / cur) * 100 : ((cur - l.tp) / cur) * 100)
+        : null;
+      const breakevenNeedPct = (l.open > 0 && cur > 0)
+        ? (sign > 0 ? Math.max(0, ((l.open - cur) / cur) * 100) : Math.max(0, ((cur - l.open) / cur) * 100))
+        : 0;
+
+      let riskState = 'OK';
+      let hint = 'Menține supravegherea nivelurilor tehnice.';
+      if (slDistPct !== null && slDistPct <= 0) {
+        riskState = 'CRITICAL_SL';
+        hint = `Prețul (${formatCompactPx(cur)}) a depășit SL (${formatCompactPx(l.sl)}) — risc iminent de execuție/lichidare!`;
+      } else if (slDistPct !== null && slDistPct <= 4.0) {
+        riskState = 'CRITICAL_SL';
+        hint = `Critic: SL la ${formatCompactPx(l.sl)} este la doar ${slDistPct.toFixed(2)}% distanță — un singur wick îl declanșează.`;
+      } else if (slDistPct !== null && slDistPct <= 11.0) {
+        riskState = 'NEAR_SL';
+        hint = `SL la ${formatCompactPx(l.sl)} (${slDistPct.toFixed(1)}% buffer); verifică dacă stă sub suport real.`;
+      } else if (!l.sl && l.isCfd) {
+        riskState = 'NO_SL';
+        hint = 'CFD fără SL setat explicit — adaugă protecție sub suport ca să limitezi apelul în marjă.';
+      } else if (breakevenNeedPct <= 15 && breakevenNeedPct > 0) {
+        hint = `Lot recent cel mai aproape de breakeven (+${breakevenNeedPct.toFixed(1)}% până la ${formatCompactPx(l.open)}) — candidat bun de marcare / reducere expunere pe rebound.`;
+      } else if (breakevenNeedPct >= 150 && l.isCfd) {
+        hint = `Lot vechi adânc în pierdere (necesită +${Math.round(breakevenNeedPct)}% la open) cu taxă CFD zilnică — redu parțial pe rally-uri spre rezistență.`;
+      } else if (lotLivePnl > 0) {
+        hint = 'Lot pe profit — mută SL la breakeven sau folosește trailing stop sub ultimul swing low.';
+      }
+
+      return {
+        ...l,
+        livePnl: Number(lotLivePnl.toFixed(2)),
+        slDistPct: slDistPct !== null ? Number(slDistPct.toFixed(2)) : null,
+        tpUpsidePct: tpUpsidePct !== null ? Number(tpUpsidePct.toFixed(2)) : null,
+        breakevenNeedPct: Number(breakevenNeedPct.toFixed(1)),
+        riskState,
+        hint
+      };
+    });
+  }
+
+  function classifyAndRecommendAsset({
+    asset, livePrice, livePnl, livePnlPct, netValue, notionalValue, concentrationPct,
+    tech, sec, opt, struct, lotInsights
+  }) {
+    const reasons = [];
+    const critSlLots = lotInsights.filter(l => l.riskState === 'CRITICAL_SL');
+    const cfdCount = lotInsights.filter(l => l.isCfd).length + (lotInsights.length === 0 && asset.isCfd ? 1 : 0);
+    const hasNoSlCfd = lotInsights.some(l => l.riskState === 'NO_SL') || (!lotInsights.length && asset.isCfd && !asset.sl);
+    const singleSlDist = (asset.sl && livePrice > 0) ? (((livePrice - asset.sl) / livePrice) * 100) : null;
+    const minSlDist = lotInsights.reduce((m, l) => (l.slDistPct !== null && (m === null || l.slDistPct < m)) ? l.slDistPct : m, singleSlDist);
+    const isZombie = netValue < 20 && livePnlPct <= -92;
+
+    const atrBuf = tech.atr14 ? Math.max(livePrice * 0.04, Math.min(livePrice * 0.45, tech.atr14 * 1.35)) : livePrice * 0.08;
+    const structSupport = [tech.support1, tech.support2, opt?.putWall?.strike].filter(v => Number.isFinite(v) && v > 0 && v < livePrice).sort((a, b) => b - a)[0];
+    const rawSl = structSupport ? Math.min(structSupport * 0.985, livePrice - atrBuf) : (livePrice - atrBuf);
+    const suggestedSl = Math.max(livePrice * 0.18, rawSl);
+    const trimZone = [tech.resistance1, opt?.callWall?.strike, tech.sma50].filter(v => Number.isFinite(v) && v > livePrice * 1.03).sort((a, b) => a - b)[0] || livePrice * 1.12;
+    const target2 = tech.resistance2 || (trimZone * 1.15);
+
+    if (critSlLots.length > 0) {
+      reasons.push(
+        `${critSlLots.length}/${lotInsights.length} loturi au Stop-Loss critic (buffer minim ${(minSlDist ?? 0).toFixed(2)}% — mai mic decât volatilitatea zilnică ATR ${tech.atrPct ? tech.atrPct.toFixed(1) + '%' : 'uzuală'}).`
+      );
+    } else if (minSlDist !== null && minSlDist <= 13) {
+      reasons.push(`Cel mai apropiat SL este la ${minSlDist.toFixed(1)}% sub prețul live ($${formatCompactPx(livePrice)}).`);
+    }
+    if (cfdCount > 0) {
+      const levX = netValue > 0 ? (notionalValue / netValue) : 1;
+      reasons.push(`Structură CFD (${cfdCount} ${cfdCount === 1 ? 'lot' : 'loturi'}, levier efectiv ~${levX.toFixed(1)}x pe valoarea netă actuală) — suportă costuri overnight zilnice.`);
+    }
+    if (concentrationPct >= 20) {
+      reasons.push(`Concentrare foarte mare: reprezintă ${concentrationPct.toFixed(1)}% din valoarea netă a pozițiilor afișate.`);
+    }
+    if (tech.trend !== 'NECUNOSCUT') {
+      const rsiTxt = tech.rsi14 != null ? `, RSI(14) = ${tech.rsi14.toFixed(1)}` : '';
+      const smaTxt = tech.sma50 != null ? `, SMA50 = $${formatCompactPx(tech.sma50)}` : '';
+      reasons.push(`Tehnic zilnic: trend ${tech.trend}${rsiTxt}${smaTxt}. Suport cheie ~$${formatCompactPx(tech.support1)}, rezistență ~$${formatCompactPx(trimZone)}.`);
+    }
+    if (sec?.dilutionRisk && sec.dilutionRisk !== 'NECUNOSCUT' && sec.dilutionRisk !== 'N/A') {
+      if (sec.dilutionRisk === 'RIDICAT') {
+        reasons.push(`Risc SEC de diluție RIDICAT (${sec.dilutionHits180?.length || 1} raportări S-3/424B recente) — reduce pe creșteri rapide.`);
+      }
+    }
+    if (opt?.available && (opt.putWall?.strike || opt.callWall?.strike)) {
+      reasons.push(`Opțiuni CBOE: Put Wall $${opt.putWall?.strike ?? '—'} · Call Wall $${opt.callWall?.strike ?? '—'} · Max Pain $${opt.maxPain ? formatCompactPx(opt.maxPain) : '—'}.`);
+    }
+    if (struct?.nextEarnings) {
+      reasons.push(`Următorul raport Earnings estimat: ${struct.nextEarnings} (atenție la risc de gap peste SL).`);
+    }
+
+    let actionBadge = 'MONITORIZEAZĂ';
+    let severity = 'neutral';
+    let headline = `Păstrează cu monitorizare spre $${formatCompactPx(trimZone)}`;
+
+    if (isZombie) {
+      actionBadge = 'CURĂȚĂ REZIDUAL';
+      severity = 'warn';
+      headline = `Valoare rămasă minusculă ($${netValue.toFixed(2)}, ${livePnlPct.toFixed(1)}%) — ocupă spațiu mental / tax-loss harvest`;
+    } else if (critSlLots.length > 0 || (singleSlDist !== null && singleSlDist <= 4)) {
+      actionBadge = 'URGENT SL / MARJĂ';
+      severity = 'critical';
+      headline = `Pericol iminent de Stop-Out la ${(minSlDist ?? singleSlDist ?? 0).toFixed(2)}% distanță! Mută SL sub $${formatCompactPx(suggestedSl)} sau taie parțial loturile slabe.`;
+    } else if (concentrationPct >= 25 && livePnlPct <= -50) {
+      actionBadge = 'REDUCE PE REBOUND';
+      severity = 'warn';
+      headline = `Supraponderat (${concentrationPct.toFixed(1)}% din capital) și adânc sub open — eliberează treptat 20–35% spre $${formatCompactPx(trimZone)}.`;
+    } else if (hasNoSlCfd) {
+      actionBadge = 'ADAUGĂ SL';
+      severity = 'warn';
+      headline = `Poziție fără Stop-Loss explicit — setează protecție de invalidare sub $${formatCompactPx(suggestedSl)}.`;
+    } else if (livePnlPct >= 15) {
+      actionBadge = 'TRAIL / PROFIT';
+      severity = 'good';
+      headline = `Poziție profitabilă — protejează câștigul cu trailing SL spre $${formatCompactPx(suggestedSl)} și țintă parțială $${formatCompactPx(trimZone)}.`;
+    } else if (tech.rsi14 != null && tech.rsi14 <= 34 && livePnlPct < 0) {
+      actionBadge = 'SUPRAVÂNDUT · AȘTEAPTĂ REBOUND';
+      severity = 'neutral';
+      headline = `RSI scăzut (${tech.rsi14.toFixed(0)}) lângă suport $${formatCompactPx(tech.support1)} — evită vânzarea în panică dacă SL rezistă; evaluează reducere la $${formatCompactPx(trimZone)}.`;
+    }
+
+    return {
+      actionBadge,
+      severity,
+      headline,
+      reasons,
+      levels: {
+        suggestedSl: Number(suggestedSl.toFixed(livePrice >= 1 ? 2 : 4)),
+        trimZone: Number(trimZone.toFixed(livePrice >= 1 ? 2 : 4)),
+        target2: Number(target2.toFixed(livePrice >= 1 ? 2 : 4)),
+        invalidation: tech.support2 ? Number(tech.support2.toFixed(livePrice >= 1 ? 2 : 4)) : null
+      }
+    };
+  }
+
+  async function evaluateRealPortfolio(rawPortfolio) {
+    const assets = Array.isArray(rawPortfolio?.assets) ? rawPortfolio.assets : [];
+    const sessionCtx = getMarketSessionContext();
+    const mktOverview = await fetchMarketOverview(false).catch(() => null);
+    if (!assets.length) {
+      return {
+        ok: true,
+        empty: true,
+        sessionCtx,
+        updatedTimeRo: nowTimeRo(),
+        marketRegime: mktOverview?.regime || null,
+        healthScore: 100,
+        healthLabel: 'FĂRĂ POZIȚII ACTIVE',
+        totals: {
+          assetsCount: 0, totalLotsCount: 0, cfdLotsCount: 0, totalInvestedMargin: 0,
+          totalNotional: 0, totalNetValue: 0, cashAvailable: rawPortfolio?.cashAvailable ?? null,
+          totalAccountEquity: rawPortfolio?.cashAvailable ?? 0, totalLivePnl: 0, totalLivePnlPct: 0,
+          totalDailyPnl: 0, effectiveLeverage: 1, top2ConcentrationPct: 0, criticalSlLotsTotal: 0, zombieAssetsCount: 0
+        },
+        priorityActions: [],
+        evaluatedAssets: []
+      };
+    }
+
+    const uniqueSyms = Array.from(new Set(assets.map(a => String(a.sym || a.brokerSym || '').trim().toUpperCase()).filter(Boolean)));
+    const quoteMap = await fetchYahooQuoteBatch(uniqueSyms);
+
+    const perSymIntel = new Map();
+    await Promise.all(uniqueSyms.map(async (sym) => {
+      const ck = `pf:sym:${sym}`;
+      const cached = getCached(ck, 45000);
+      if (cached) {
+        perSymIntel.set(sym, cached);
+        return;
+      }
+      const isEquity = isUsEquityTicker(sym);
+      const q = quoteMap.get(sym) || {};
+      const spotHint = finiteNum(q.regularMarketPrice, null);
+      const [dailyPack, secPack, optPack, structPack, newsList] = await Promise.all([
+        fetchYahooBars(sym, '1d', '1y', false).catch(() => ({ bars: [], meta: null })),
+        isEquity ? fetchSecFilings(sym).catch(() => ({ available: false, dilutionRisk: 'N/A' })) : Promise.resolve({ available: false, dilutionRisk: 'N/A' }),
+        isEquity ? fetchCboeOptionsIntel(sym, spotHint).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+        isEquity ? fetchYahooStructureSummary(sym).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+        fetchNewsForSymbol(sym).catch(() => [])
+      ]);
+      const tech = calcDailyTechLevels(dailyPack.bars || [], spotHint);
+      const pack = {
+        dailyMeta: dailyPack.meta || null,
+        tech,
+        sec: secPack,
+        opt: optPack,
+        struct: structPack,
+        news: Array.isArray(newsList) ? newsList.slice(0, 2) : []
+      };
+      setCached(ck, pack);
+      perSymIntel.set(sym, pack);
+    }));
+
+    const prelimRows = assets.map((asset) => {
+      const sym = String(asset.sym || asset.brokerSym || '').toUpperCase();
+      const q = quoteMap.get(sym) || {};
+      const intelPack = perSymIntel.get(sym) || {};
+      const mktState = String(q.marketState || '').toUpperCase();
+      const regPrice = finiteNum(q.regularMarketPrice, finiteNum(intelPack.dailyMeta?.regularMarketPrice, asset.brokerPrice ?? asset.avgOpen));
+      const extPrice = mktState === 'PRE'
+        ? finiteNum(q.preMarketPrice, null)
+        : ((mktState === 'POST' || mktState === 'POSTPOST' || mktState === 'PREPRE' || mktState === 'CLOSED')
+          ? finiteNum(q.overnightPrice, finiteNum(q.postMarketPrice, null))
+          : null);
+      const livePrice = (mktState !== 'REGULAR' && Number.isFinite(extPrice) && extPrice > 0) ? extPrice : regPrice;
+      const prevClose = finiteNum(q.regularMarketPreviousClose, livePrice);
+      const sign = asset.side === 'SHORT' ? -1 : 1;
+
+      const units = Number(asset.units) || 0;
+      const avgOpen = Number(asset.avgOpen) || 0;
+      const livePnl = units * (livePrice - avgOpen) * sign;
+      const notionalValue = units * livePrice;
+
+      let investedCapital = finiteNum(asset.invested, null);
+      if (investedCapital === null && asset.brokerNetValue != null && asset.brokerPnl != null) {
+        const diff = Number(asset.brokerNetValue) - Number(asset.brokerPnl);
+        if (Number.isFinite(diff) && diff > 0) investedCapital = diff;
+      }
+      if (investedCapital === null && asset.brokerPnl != null && asset.brokerPnlPct != null && Math.abs(asset.brokerPnlPct) > 0.25 && Math.abs(asset.brokerPnlPct) < 99.5) {
+        const inf = Math.abs(Number(asset.brokerPnl) / (Number(asset.brokerPnlPct) / 100));
+        if (Number.isFinite(inf) && inf > 0) investedCapital = inf;
+      }
+      if (investedCapital === null) investedCapital = units * avgOpen;
+
+      const isLeveraged = asset.isCfd || (asset.lots || []).some(l => l.isCfd) || (units * avgOpen > investedCapital * 1.15);
+      const netValue = isLeveraged
+        ? Math.max(0, investedCapital + livePnl)
+        : Math.max(0, asset.brokerNetValue != null && Math.abs(livePrice - (asset.brokerPrice || livePrice)) < 1e-4 ? asset.brokerNetValue : notionalValue);
+      const livePnlPct = investedCapital > 0
+        ? (livePnl / investedCapital) * 100
+        : (avgOpen > 0 ? ((livePrice - avgOpen) / avgOpen) * 100 * sign : 0);
+      const dailyPnl = units * (livePrice - (prevClose || livePrice)) * sign;
+      const dayChgPct = finiteNum(q.regularMarketChangePercent, prevClose > 0 ? ((livePrice - prevClose) / prevClose) * 100 : 0);
+
+      return {
+        asset, sym, q, intelPack, mktState, regPrice, extPrice, livePrice, dayChgPct,
+        units, avgOpen, livePnl, livePnlPct, dailyPnl, notionalValue, investedCapital, netValue
+      };
+    });
+
+    const totalNetPositionsValue = prelimRows.reduce((s, r) => s + Math.max(0, r.netValue), 0);
+    const totalInvestedMargin = prelimRows.reduce((s, r) => s + Math.max(0, r.investedCapital), 0);
+    const totalNotional = prelimRows.reduce((s, r) => s + Math.max(0, r.notionalValue), 0);
+    const totalLivePnl = prelimRows.reduce((s, r) => s + r.livePnl, 0);
+    const totalDailyPnl = prelimRows.reduce((s, r) => s + r.dailyPnl, 0);
+    const totalLivePnlPct = totalInvestedMargin > 0 ? (totalLivePnl / totalInvestedMargin) * 100 : 0;
+
+    const evaluatedAssets = prelimRows.map((r) => {
+      const concentrationPct = totalNetPositionsValue > 0 ? (r.netValue / totalNetPositionsValue) * 100 : 0;
+      const lotInsights = buildLotInsights(r.asset, r.livePrice);
+      const critLots = lotInsights.filter(l => l.riskState === 'CRITICAL_SL').length;
+      const singleSlDist = (r.asset.sl && r.livePrice > 0) ? (((r.livePrice - r.asset.sl) / r.livePrice) * 100) : null;
+      const minSlDistPct = lotInsights.reduce((m, l) => (l.slDistPct !== null && (m === null || l.slDistPct < m)) ? l.slDistPct : m, singleSlDist);
+      const rec = classifyAndRecommendAsset({
+        asset: r.asset,
+        livePrice: r.livePrice,
+        livePnl: r.livePnl,
+        livePnlPct: r.livePnlPct,
+        netValue: r.netValue,
+        notionalValue: r.notionalValue,
+        concentrationPct,
+        tech: r.intelPack.tech || {},
+        sec: r.intelPack.sec || {},
+        opt: r.intelPack.opt || {},
+        struct: r.intelPack.struct || {},
+        lotInsights
+      });
+
+      return {
+        id: r.asset.id,
+        brokerSym: r.asset.brokerSym,
+        sym: r.sym,
+        name: r.asset.name || r.q.shortName || r.q.longName || r.sym,
+        side: r.asset.side,
+        isCfd: r.asset.isCfd || lotInsights.some(l => l.isCfd) || (r.units * r.avgOpen > r.investedCapital * 1.15),
+        is24_5: r.asset.is24_5,
+        is24_7: r.asset.is24_7,
+        units: r.units,
+        avgOpen: r.avgOpen,
+        livePrice: Number(r.livePrice.toFixed(r.livePrice >= 1 ? 4 : 6)),
+        regPrice: Number(r.regPrice.toFixed(r.regPrice >= 1 ? 4 : 6)),
+        extPrice: r.extPrice !== null ? Number(r.extPrice.toFixed(r.extPrice >= 1 ? 4 : 6)) : null,
+        mktState: r.mktState || 'UNKNOWN',
+        dayChgPct: Number((r.dayChgPct || 0).toFixed(2)),
+        investedCapital: Number(r.investedCapital.toFixed(2)),
+        notionalValue: Number(r.notionalValue.toFixed(2)),
+        netValue: Number(r.netValue.toFixed(2)),
+        livePnl: Number(r.livePnl.toFixed(2)),
+        livePnlPct: Number(r.livePnlPct.toFixed(2)),
+        dailyPnl: Number(r.dailyPnl.toFixed(2)),
+        concentrationPct: Number(concentrationPct.toFixed(1)),
+        breakevenGainPct: r.livePrice > 0 && r.avgOpen > r.livePrice && r.asset.side === 'LONG'
+          ? Number((((r.avgOpen - r.livePrice) / r.livePrice) * 100).toFixed(1))
+          : 0,
+        lotsCount: lotInsights.length,
+        criticalSlLotsCount: critLots,
+        minSlDistPct: minSlDistPct !== null ? Number(minSlDistPct.toFixed(2)) : null,
+        lotInsights,
+        tech: r.intelPack.tech || null,
+        sec: r.intelPack.sec || null,
+        options: r.intelPack.opt || null,
+        structure: r.intelPack.struct || null,
+        news: r.intelPack.news || [],
+        recommendation: rec
+      };
+    }).sort((a, b) => Math.abs(b.notionalValue) - Math.abs(a.notionalValue));
+
+    const sortedByNet = [...evaluatedAssets].sort((a, b) => b.netValue - a.netValue);
+    const top2ConcentrationPct = totalNetPositionsValue > 0
+      ? ((sortedByNet.slice(0, 2).reduce((s, x) => s + x.netValue, 0) / totalNetPositionsValue) * 100)
+      : 0;
+    const totalLotsCount = evaluatedAssets.reduce((s, a) => s + Math.max(1, a.lotsCount), 0);
+    const cfdLotsCount = evaluatedAssets.reduce((s, a) => s + (a.lotsCount ? a.lotInsights.filter(l => l.isCfd).length : (a.isCfd ? 1 : 0)), 0);
+    const criticalSlAssets = evaluatedAssets.filter(a => a.criticalSlLotsCount > 0 || (a.minSlDistPct !== null && a.minSlDistPct <= 4));
+    const criticalSlLotsTotal = evaluatedAssets.reduce((s, a) => s + a.criticalSlLotsCount, 0);
+    const zombieAssetsCount = evaluatedAssets.filter(a => a.netValue < 20 && a.livePnlPct <= -92).length;
+    const dilutionRiskAssets = evaluatedAssets.filter(a => a.sec?.dilutionRisk === 'RIDICAT').map(a => a.sym);
+    const effectiveLeverage = totalNetPositionsValue > 0 ? (totalNotional / totalNetPositionsValue) : 1;
+
+    let healthScore = 88;
+    if (criticalSlAssets.length > 0) healthScore -= Math.min(34, criticalSlAssets.length * 16 + criticalSlLotsTotal);
+    if (top2ConcentrationPct >= 65) healthScore -= 18;
+    else if (top2ConcentrationPct >= 45) healthScore -= 10;
+    if (effectiveLeverage >= 2.2) healthScore -= 16;
+    else if (effectiveLeverage >= 1.4) healthScore -= 8;
+    if (totalLivePnlPct <= -50) healthScore -= 15;
+    else if (totalLivePnlPct <= -20) healthScore -= 8;
+    if (zombieAssetsCount > 0) healthScore -= Math.min(10, zombieAssetsCount * 3);
+    if (dilutionRiskAssets.length > 0) healthScore -= Math.min(12, dilutionRiskAssets.length * 6);
+    healthScore = Math.max(5, Math.min(100, Math.round(healthScore)));
+
+    const healthLabel = healthScore <= 35
+      ? 'CRITIC · Acțiune Imediată'
+      : healthScore <= 55
+        ? 'RISC RIDICAT · Necesită Rebalansare'
+        : healthScore <= 75
+          ? 'MODERAT · Supraveghere Activă'
+          : 'ECHILIBRAT';
+
+    const priorityActions = [];
+    for (const crit of criticalSlAssets) {
+      priorityActions.push({
+        severity: 'critical',
+        sym: crit.sym,
+        title: `URGENT ${crit.brokerSym}: ${crit.criticalSlLotsCount || 1} ${(crit.criticalSlLotsCount || 1) === 1 ? 'lot' : 'loturi'} la doar ${crit.minSlDistPct}% de Stop-Loss!`,
+        detail: `Preț live $${formatCompactPx(crit.livePrice)} vs SL activ ($${formatCompactPx(crit.lotInsights.find(l => l.riskState === 'CRITICAL_SL')?.sl)}). Sugestie: mută protecția sub $${formatCompactPx(crit.recommendation.levels.suggestedSl)} (dacă ai marjă) SAU închide 20–30% înainte de open ca să nu pierzi toată poziția simultan pe un singur wick.`
+      });
+    }
+    if (top2ConcentrationPct >= 45) {
+      const top2Names = sortedByNet.slice(0, 2).map(x => `${x.brokerSym} (${x.concentrationPct.toFixed(0)}%)`).join(' + ');
+      priorityActions.push({
+        severity: 'warn',
+        sym: sortedByNet[0]?.sym || '',
+        title: `Concentrare extremă: ${top2Names} = ${top2ConcentrationPct.toFixed(1)}% din valoarea netă`,
+        detail: `Prea mult capital activ depinde de 2 acțiuni volatile. Pe orice rebound spre rezistențe ($${sortedByNet[0]?.brokerSym}: ~$${formatCompactPx(sortedByNet[0]?.recommendation.levels.trimZone)}), redu gradual loturile cele mai aproape de breakeven pentru a muta riscul în cash sau lideri cu trend ascendent.`
+      });
+    }
+    if (cfdLotsCount > 0 && effectiveLeverage > 1.25) {
+      priorityActions.push({
+        severity: 'warn',
+        sym: '',
+        title: `Expunere CFD cu levier ${effectiveLeverage.toFixed(2)}x (${cfdLotsCount} loturi CFD cu costuri overnight)`,
+        detail: `Expunerea noțională totală este $${Math.round(totalNotional).toLocaleString('en-US')} față de valoarea netă curentă de $${Math.round(totalNetPositionsValue).toLocaleString('en-US')}. Prioritate pe CFD-urile blocate long-term: înlocuiește treptat expunerea pe scăderi de volatilitate cu acțiuni spot 1:1 (fără taxe zilnice) odată ce eliberezi marjă.`
+      });
+    }
+    if (dilutionRiskAssets.length > 0) {
+      priorityActions.push({
+        severity: 'warn',
+        sym: dilutionRiskAssets[0],
+        title: `Alertă SEC EDGAR Diluție pe ${dilutionRiskAssets.join(', ')}`,
+        detail: `Raportări S-3 / 424B active în ultimele 180 zile detectate pe SEC. Evită adăugarea de loturi noi (averaging down) fără confirmare clară peste SMA50 / volum instituțional.`
+      });
+    }
+    if (zombieAssetsCount > 0) {
+      const zList = evaluatedAssets.filter(a => a.netValue < 20 && a.livePnlPct <= -92).map(a => `${a.brokerSym} ($${a.netValue.toFixed(2)})`).join(', ');
+      priorityActions.push({
+        severity: 'info',
+        sym: '',
+        title: `Curățenie portofoliu: ${zombieAssetsCount} poziții reziduale (${zList})`,
+        detail: `Aceste poziții au scăzut peste -92% și valorează sub $20 — nu mai pot influența recuperarea contului. Închiderea lor curăță contul (și poate ajuta fiscal în funcție de jurisdicție).`
+      });
+    }
+
+    const cash = rawPortfolio?.cashAvailable != null && Number.isFinite(Number(rawPortfolio.cashAvailable))
+      ? Number(rawPortfolio.cashAvailable)
+      : null;
+
+    return {
+      ok: true,
+      empty: false,
+      sessionCtx,
+      updatedTimeRo: nowTimeRo(),
+      marketRegime: mktOverview?.regime || null,
+      healthScore,
+      healthLabel,
+      totals: {
+        assetsCount: evaluatedAssets.length,
+        totalLotsCount,
+        cfdLotsCount,
+        totalInvestedMargin: Number(totalInvestedMargin.toFixed(2)),
+        totalNotional: Number(totalNotional.toFixed(2)),
+        totalNetValue: Number(totalNetPositionsValue.toFixed(2)),
+        cashAvailable: cash,
+        totalAccountEquity: Number((totalNetPositionsValue + (cash || 0)).toFixed(2)),
+        totalLivePnl: Number(totalLivePnl.toFixed(2)),
+        totalLivePnlPct: Number(totalLivePnlPct.toFixed(2)),
+        totalDailyPnl: Number(totalDailyPnl.toFixed(2)),
+        effectiveLeverage: Number(effectiveLeverage.toFixed(2)),
+        top2ConcentrationPct: Number(top2ConcentrationPct.toFixed(1)),
+        criticalSlLotsTotal,
+        criticalSlAssetSyms: criticalSlAssets.map(a => a.brokerSym),
+        zombieAssetsCount,
+        dilutionRiskAssets
+      },
+      priorityActions,
+      evaluatedAssets
+    };
+  }
+
   return {
     fetchMarketOverview,
     computeEarlyRadar,
@@ -4077,6 +4595,7 @@ function createIntelEngine(deps) {
     resolveCopilotSymbols,
     answerCopilotQuery,
     fetchScannerCockpit,
+    evaluateRealPortfolio,
     auditDataQuality,
     evaluatePreBuySafetyChecks,
     compute5InterpretableScores,

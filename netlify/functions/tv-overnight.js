@@ -14,6 +14,7 @@ const TV_INTERVAL_MAP = {
 };
 
 const internalCache = new Map();
+const tvPrefixCache = new Map();
 const quoteBatchInFlight = new Map();
 const seriesInFlight = new Map();
 let etTimeFmt = null;
@@ -71,7 +72,36 @@ function resolveTvExchangePrefix(quoteObj) {
   return 'NASDAQ';
 }
 
-function isOvernightWindowET(unixSec) {
+async function resolveTvExchangePrefixForSym(sym) {
+  const cleanSym = String(sym || '').trim().toUpperCase();
+  const hit = tvPrefixCache.get(cleanSym);
+  if (hit && Date.now() - hit.ts < 24 * 3600 * 1000) return hit.prefix;
+  try {
+    const tvTicker = cleanSym.replace(/-/g, '.');
+    const url = `https://symbol-search.tradingview.com/symbol_search/v3/?text=${encodeURIComponent(tvTicker)}&hl=0&lang=en&domain=production`;
+    const res = await fetch(url, {
+      headers: { Origin: TV_ORIGIN, Referer: `${TV_ORIGIN}/`, 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(1400)
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const match = (json?.symbols || []).find(s => {
+        const sSym = String(s.symbol || '').replace(/<[^>]+>/g, '').trim().toUpperCase();
+        const exch = String(s.exchange || '').replace(/<[^>]+>/g, '').trim().toUpperCase();
+        return (sSym === cleanSym || sSym === tvTicker) && s.country === 'US' && /^(NASDAQ|NYSE|AMEX|NYSE ARCA|BATS|CBOE)$/.test(exch);
+      });
+      if (match?.exchange) {
+        let prefix = String(match.exchange).replace(/<[^>]+>/g, '').trim().toUpperCase();
+        if (/ARCA|BATS|CBOE/.test(prefix)) prefix = 'AMEX';
+        tvPrefixCache.set(cleanSym, { ts: Date.now(), prefix });
+        return prefix;
+      }
+    }
+  } catch (_) {}
+  return 'NASDAQ';
+}
+
+function getEtMinuteOfDay(unixSec) {
   try {
     if (!etTimeFmt) {
       etTimeFmt = new Intl.DateTimeFormat('en-US', {
@@ -88,13 +118,21 @@ function isOvernightWindowET(unixSec) {
       if (parts[i].type === 'hour') hh = parseInt(parts[i].value, 10) % 24;
       else if (parts[i].type === 'minute') mm = parseInt(parts[i].value, 10);
     }
-    const mins = hh * 60 + mm;
-    return mins >= 1200 || mins < 240;
+    return hh * 60 + mm;
   } catch (_) {
     const d = new Date((unixSec - 5 * 3600) * 1000);
-    const mins = d.getUTCHours() * 60 + d.getUTCMinutes();
-    return mins >= 1200 || mins < 240;
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
   }
+}
+
+function isOvernightWindowET(unixSec) {
+  const mins = getEtMinuteOfDay(unixSec);
+  return mins >= 1200 || mins < 240;
+}
+
+function isRegularWindowET(unixSec) {
+  const mins = getEtMinuteOfDay(unixSec);
+  return mins >= 570 && mins < 960;
 }
 
 function packTvMsg(m, p) {
@@ -310,6 +348,9 @@ async function fetchTvQuotesForUsStocks(quoteObjs, { getCached = defaultCacheGet
       continue;
     }
     const prefix = resolveTvExchangePrefix(q);
+    if (!tvPrefixCache.has(sym) && (q.exchange || q.fullExchangeName)) {
+      tvPrefixCache.set(sym, { ts: Date.now(), prefix });
+    }
     pairs.push({ sym, tvSym: `${prefix}:${sym.replace(/-/g, '.')}` });
   }
 
@@ -442,85 +483,123 @@ async function enrichQuotesWithTvExtended(quoteObjs, cacheOpts = {}) {
   return quoteObjs;
 }
 
-async function fetchBoatsOvernightSeries(sym, yfInterval, { getCached = defaultCacheGet, setCached = defaultCacheSet } = {}) {
+const TV_STEP_SEC = {
+  '1m': 60,
+  '5m': 300,
+  '15m': 900,
+  '30m': 1800,
+  '60m': 3600,
+  '1h': 3600
+};
+
+function parseTvBarTuple(v) {
+  if (!Array.isArray(v) || v.length < 5) return null;
+  const t = Math.floor(Number(v[0]));
+  const o = Number(v[1]);
+  const h = Number(v[2]);
+  const l = Number(v[3]);
+  const c = Number(v[4]);
+  const vol = Math.max(0, Number(v[5]) || 0);
+  if (!isFinite(t) || !isFinite(o) || !isFinite(h) || !isFinite(l) || !isFinite(c) || o <= 0 || c <= 0) return null;
+  return {
+    time: t,
+    open: o,
+    high: Math.max(h, o, c),
+    low: Math.min(l, o, c),
+    close: c,
+    volume: vol
+  };
+}
+
+async function fetchTvChartSupplement(sym, yfInterval, { getCached = defaultCacheGet, setCached = defaultCacheSet } = {}) {
   const cleanSym = String(sym || '').trim().toUpperCase();
   const tvInt = TV_INTERVAL_MAP[String(yfInterval || '').toLowerCase()];
-  if (!tvInt || !isUsEquityTicker(cleanSym)) return [];
+  if (!tvInt || !isUsEquityTicker(cleanSym)) return { extendedBars: [], boatsBars: [] };
 
-  const cKey = `boatsSeries:${cleanSym}:${tvInt}`;
-  const cached = getCached(cKey, 8000);
+  const cKey = `chartSupp:${cleanSym}:${tvInt}`;
+  const cached = getCached(cKey, 4000);
   if (cached) return cached;
 
   let inflight = seriesInFlight.get(cKey);
   if (!inflight) {
     inflight = (async () => {
-      const bars = [];
-      let completed = false;
-      const boatsTicker = `BOATS_LS:${cleanSym.replace(/-/g, '.')}`;
+      const prefix = await resolveTvExchangePrefixForSym(cleanSym);
+      const tvTicker = cleanSym.replace(/-/g, '.');
+      const extTicker = `${prefix}:${tvTicker}`;
+      const boatsTicker = `BOATS_LS:${tvTicker}`;
+      const extMap = new Map();
+      const boatsMap = new Map();
+      const csExt = 'cs_e_' + Math.random().toString(36).slice(2, 9);
+      const csBoats = 'cs_b_' + Math.random().toString(36).slice(2, 9);
+      let extDone = false;
+      let boatsDone = false;
 
       await runTvWsPackets({
-        timeoutMs: 1550,
-        settleMs: 50,
+        timeoutMs: 1750,
+        settleMs: 60,
         setup: (send) => {
-          const cs = 'cs_' + Math.random().toString(36).slice(2, 10);
           send(packTvMsg('set_auth_token', ['unauthorized_user_token']));
-          send(packTvMsg('chart_create_session', [cs, '']));
-          send(packTvMsg('resolve_symbol', [cs, 'sds_sym_1', JSON.stringify({
+          send(packTvMsg('chart_create_session', [csExt, '']));
+          send(packTvMsg('resolve_symbol', [csExt, 'sds_sym_ext', '=' + JSON.stringify({
+            adjustment: 'splits',
+            session: 'extended',
+            symbol: extTicker
+          })]));
+          send(packTvMsg('create_series', [csExt, 'sds_ext', 's1', 'sds_sym_ext', tvInt, 180, '']));
+
+          send(packTvMsg('chart_create_session', [csBoats, '']));
+          send(packTvMsg('resolve_symbol', [csBoats, 'sds_sym_b', '=' + JSON.stringify({
             adjustment: 'splits',
             session: 'regular',
             symbol: boatsTicker
-          }).replace(/^/, '=')]));
-          send(packTvMsg('create_series', [cs, 'sds_1', 's1', 'sds_sym_1', tvInt, 96, '']));
+          })]));
+          send(packTvMsg('create_series', [csBoats, 'sds_b', 's1', 'sds_sym_b', tvInt, 96, '']));
         },
         onJson: (msg) => {
+          const cs = msg.p?.[0];
           if (msg.m === 'timescale_update' || msg.m === 'du') {
-            const list = msg.p?.[1]?.sds_1?.s;
-            if (Array.isArray(list)) {
-              for (const item of list) {
-                const v = item?.v;
-                if (!Array.isArray(v) || v.length < 5) continue;
-                const t = Math.floor(Number(v[0]));
-                const o = Number(v[1]);
-                const h = Number(v[2]);
-                const l = Number(v[3]);
-                const c = Number(v[4]);
-                const vol = Math.max(0, Number(v[5]) || 0);
-                if (!isFinite(t) || !isFinite(o) || !isFinite(h) || !isFinite(l) || !isFinite(c) || o <= 0 || c <= 0) continue;
-                if (!isOvernightWindowET(t)) continue;
-                bars.push({
-                  time: t,
-                  open: o,
-                  high: Math.max(h, o, c),
-                  low: Math.min(l, o, c),
-                  close: c,
-                  volume: vol
-                });
+            const extList = cs === csExt ? msg.p?.[1]?.sds_ext?.s : null;
+            if (Array.isArray(extList)) {
+              for (const item of extList) {
+                const bar = parseTvBarTuple(item?.v);
+                if (bar) extMap.set(bar.time, bar);
+              }
+            }
+            const boatsList = cs === csBoats ? msg.p?.[1]?.sds_b?.s : null;
+            if (Array.isArray(boatsList)) {
+              for (const item of boatsList) {
+                const bar = parseTvBarTuple(item?.v);
+                if (bar && isOvernightWindowET(bar.time)) boatsMap.set(bar.time, bar);
               }
             }
           } else if (msg.m === 'series_completed' || msg.m === 'symbol_error') {
-            completed = true;
+            if (cs === csExt) extDone = true;
+            else if (cs === csBoats) boatsDone = true;
           }
         },
-        isDone: () => completed
+        isDone: () => extDone && boatsDone
       });
 
-      const dedup = new Map();
-      for (const b of bars) dedup.set(b.time, b);
-      const sorted = Array.from(dedup.values()).sort((a, b) => a.time - b.time);
-      setCached(cKey, sorted);
-      return sorted;
+      const result = {
+        extendedBars: Array.from(extMap.values()).sort((a, b) => a.time - b.time),
+        boatsBars: Array.from(boatsMap.values()).sort((a, b) => a.time - b.time)
+      };
+      setCached(cKey, result);
+      return result;
     })().finally(() => {
       seriesInFlight.delete(cKey);
     });
     seriesInFlight.set(cKey, inflight);
   }
 
-  return inflight.catch(() => []);
+  return inflight.catch(() => ({ extendedBars: [], boatsBars: [] }));
 }
 
-function mergeBoatsBarsIntoChartPayload(payload, boatsBars) {
+function mergeTvChartSupplement(payload, supp, yfInterval = '30m') {
   const res = payload?.chart?.result?.[0];
-  if (!res || !Array.isArray(boatsBars) || !boatsBars.length) return payload;
+  const extBars = Array.isArray(supp?.extendedBars) ? supp.extendedBars : [];
+  const boatsBars = Array.isArray(supp?.boatsBars) ? supp.boatsBars : [];
+  if (!res || (!extBars.length && !boatsBars.length)) return payload;
 
   const tsArr = Array.isArray(res.timestamp) ? res.timestamp : [];
   const q0 = res.indicators?.quote?.[0] || {};
@@ -530,33 +609,69 @@ function mergeBoatsBarsIntoChartPayload(payload, boatsBars) {
   const closeArr = Array.isArray(q0.close) ? q0.close : [];
   const volArr = Array.isArray(q0.volume) ? q0.volume : [];
 
+  const normInt = String(yfInterval || '').toLowerCase();
+  const alignStep = (normInt === '60m' || normInt === '1h') ? 60 : (TV_STEP_SEC[normInt] || 0);
   const barMap = new Map();
   let minYahooTs = Infinity;
-  for (let i = 0; i < tsArr.length; i++) {
-    const t = Math.floor(Number(tsArr[i]));
-    const c = closeArr[i];
-    if (!isFinite(t) || c == null || !isFinite(c)) continue;
-    if (t < minYahooTs) minYahooTs = t;
-    barMap.set(t, {
-      time: t,
-      open: openArr[i] ?? c,
-      high: highArr[i] ?? c,
-      low: lowArr[i] ?? c,
-      close: c,
-      volume: volArr[i] ?? 0
-    });
-  }
 
-  const floorTs = isFinite(minYahooTs) ? minYahooTs - 12 * 3600 : 0;
-  let added = 0;
-  for (const b of boatsBars) {
-    if (b.time >= floorTs && !barMap.has(b.time)) {
-      barMap.set(b.time, b);
-      added++;
+  for (let i = 0; i < tsArr.length; i++) {
+    const rawT = Math.floor(Number(tsArr[i]));
+    const c = closeArr[i];
+    if (!isFinite(rawT) || c == null || !isFinite(c)) continue;
+    const t = alignStep > 0 ? Math.floor(rawT / alignStep) * alignStep : rawT;
+    if (t < minYahooTs) minYahooTs = t;
+    const o = openArr[i] ?? c;
+    const h = highArr[i] ?? c;
+    const l = lowArr[i] ?? c;
+    const v = Math.max(0, volArr[i] ?? 0);
+    const prev = barMap.get(t);
+    if (prev) {
+      prev.high = Math.max(prev.high, h, o, c);
+      prev.low = Math.min(prev.low, l, o, c);
+      prev.close = c;
+      prev.volume = Math.max(prev.volume, v);
+    } else {
+      barMap.set(t, { time: t, open: o, high: Math.max(h, o, c), low: Math.min(l, o, c), close: c, volume: v });
     }
   }
 
-  if (added > 0) {
+  const floorTs = isFinite(minYahooTs) ? minYahooTs - 12 * 3600 : 0;
+  let changed = false;
+
+  // On 60m/1h, remove any unaligned Yahoo intra-hour snapshot bar already covered by a TradingView candle
+  if ((normInt === '60m' || normInt === '1h') && extBars.length) {
+    const extStart = extBars[0].time;
+    for (const yTs of Array.from(barMap.keys())) {
+      if (yTs < extStart || yTs % 1800 === 0) continue;
+      if (extBars.some(b => b.time <= yTs && yTs - b.time < 3600 && b.time !== yTs)) {
+        barMap.delete(yTs);
+        changed = true;
+      }
+    }
+  }
+
+  for (const b of boatsBars) {
+    if (b.time < floorTs) continue;
+    const cur = barMap.get(b.time);
+    if (!cur || cur.volume <= 0) {
+      barMap.set(b.time, b);
+      changed = true;
+    }
+  }
+
+  const lastExt = extBars.length ? extBars[extBars.length - 1] : null;
+  for (const b of extBars) {
+    if (b.time < floorTs) continue;
+    const cur = barMap.get(b.time);
+    const isExtWindow = !isRegularWindowET(b.time) && !isOvernightWindowET(b.time);
+    const shouldReplace = !cur || isExtWindow || (cur.volume <= 0 && b.volume > 0) || (lastExt && b.time === lastExt.time && b.volume >= cur.volume);
+    if (shouldReplace) {
+      barMap.set(b.time, b);
+      changed = true;
+    }
+  }
+
+  if (changed) {
     const merged = Array.from(barMap.values()).sort((a, b) => a.time - b.time);
     res.timestamp = merged.map(b => b.time);
     res.indicators = {
@@ -578,11 +693,22 @@ function mergeBoatsBarsIntoChartPayload(payload, boatsBars) {
   return payload;
 }
 
+async function fetchBoatsOvernightSeries(sym, yfInterval, opts) {
+  const supp = await fetchTvChartSupplement(sym, yfInterval, opts);
+  return supp.boatsBars;
+}
+
+function mergeBoatsBarsIntoChartPayload(payload, boatsBars) {
+  return mergeTvChartSupplement(payload, { boatsBars, extendedBars: [] });
+}
+
 module.exports = {
   TV_INTERVAL_MAP,
   toEpochSec,
   isUsEquityTicker,
   enrichQuotesWithTvExtended,
+  fetchTvChartSupplement,
+  mergeTvChartSupplement,
   fetchBoatsOvernightSeries,
   mergeBoatsBarsIntoChartPayload
 };

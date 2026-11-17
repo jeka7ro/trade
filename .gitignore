@@ -3,3 +3,4 @@ node_modules/
 .DS_Store
 telegram_state.json
 screener_state.json
+users_state.json

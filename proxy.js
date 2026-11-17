@@ -16,13 +16,14 @@ const yf = typeof YFClass === 'function'
   ? new YFClass({ suppressNotices: ['yahooSurvey', 'ripHistorical'], validation: { logErrors: false } })
   : YFClass;
 const QuantEngine = require('./quant-engine.js');
+const { handleAuthApiRequest } = require('./netlify/functions/auth-store.js');
 const {
   TV_INTERVAL_MAP,
   toEpochSec,
   isUsEquityTicker,
   enrichQuotesWithTvExtended,
-  fetchBoatsOvernightSeries,
-  mergeBoatsBarsIntoChartPayload
+  fetchTvChartSupplement,
+  mergeTvChartSupplement
 } = require('./netlify/functions/tv-overnight.js');
 const discoveredMetaMap = new Map();
 
@@ -119,7 +120,7 @@ async function resolveOfficialLogoAsset(rawSym) {
       if (best) {
         logoid = best.logoid || (best.country ? `country/${best.country}` : '');
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const candidateUrls = [];
@@ -150,7 +151,7 @@ async function resolveOfficialLogoAsset(rawSym) {
           return entry;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const svgBuf = Buffer.from(buildFallbackMonogramSvg(upper), 'utf8');
@@ -188,11 +189,11 @@ async function handleYahooProxyTarget(targetUrlRaw) {
     const validIntervals = new Set(['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo']);
     const yfInterval = validIntervals.has(interval) ? interval : '1d';
     const period1 = rangeToPeriod1(range, yfInterval);
-    const wantBoats = includePrePost && TV_INTERVAL_MAP[yfInterval] && isUsEquityTicker(rawSym);
+    const wantExt = includePrePost && TV_INTERVAL_MAP[yfInterval] && isUsEquityTicker(rawSym);
 
-    const [ch, boatsBars] = await Promise.all([
+    const [ch, tvSupp] = await Promise.all([
       yf.chart(rawSym, { period1, interval: yfInterval, includePrePost }, { validateResult: false }),
-      wantBoats ? fetchBoatsOvernightSeries(rawSym, yfInterval, { getCached, setCached }).catch(() => []) : Promise.resolve([])
+      wantExt ? fetchTvChartSupplement(rawSym, yfInterval, { getCached, setCached }).catch(() => null) : Promise.resolve(null)
     ]);
     const quotes = (ch?.quotes || []).filter(q => q && q.date && q.close != null);
     const payload = {
@@ -213,7 +214,9 @@ async function handleYahooProxyTarget(targetUrlRaw) {
         error: null
       }
     };
-    if (boatsBars.length) mergeBoatsBarsIntoChartPayload(payload, boatsBars);
+    if (tvSupp && (tvSupp.extendedBars?.length || tvSupp.boatsBars?.length)) {
+      mergeTvChartSupplement(payload, tvSupp, yfInterval);
+    }
     setCached(cacheKey, payload);
     return payload;
   }
@@ -250,12 +253,12 @@ async function handleYahooProxyTarget(targetUrlRaw) {
               setCached(`quote:${String(single.symbol).toUpperCase()}`, single);
               results.push({ ...single });
             }
-          } catch (__) {}
+          } catch (__) { }
         }));
       }
     }
 
-    await enrichQuotesWithTvExtended(results, { getCached, setCached }).catch(() => {});
+    await enrichQuotesWithTvExtended(results, { getCached, setCached }).catch(() => { });
     return { quoteResponse: { result: results, error: null } };
   }
 
@@ -413,7 +416,7 @@ function loadTgState() {
         tgRuntime.logs = raw.logs.slice(0, 40);
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function saveTgState() {
@@ -443,7 +446,7 @@ function saveTgState() {
       logs: tgRuntime.logs.slice(0, 40)
     };
     fs.writeFileSync(TG_STATE_FILE, JSON.stringify(payload, null, 2), 'utf8');
-  } catch (_) {}
+  } catch (_) { }
 }
 
 loadTgState();
@@ -1139,8 +1142,8 @@ async function discoverLiveMarketUniverse() {
 const OPPS_TF_MAP = {
   '15m': { interval: '15m', range: '25d', eth: true },
   '30m': { interval: '30m', range: '45d', eth: true },
-  '1h':  { interval: '60m', range: '90d', eth: true },
-  '1d':  { interval: '1d',  range: '1y',  eth: false }
+  '1h': { interval: '60m', range: '90d', eth: true },
+  '1d': { interval: '1d', range: '1y', eth: false }
 };
 
 function selectTopOppsFromPool(pool, dir = 'all', limit = 10) {
@@ -1240,7 +1243,7 @@ async function computeTopMarketOpportunities({ tf = '30m', dir = 'all', limit = 
       for (const q of (qRes?.quoteResponse?.result || [])) {
         if (q?.symbol) quoteMap.set(String(q.symbol).toUpperCase(), q);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Evaluate OHLCV + Institutional Quant & AI Strategist in bounded chunks of 8
     const evaluated = [];
@@ -1366,12 +1369,21 @@ async function generateSingleAITradeIdeaServer(rawSym, rawTf = '30m') {
   const q = quoteRes?.quoteResponse?.result?.[0] || {};
   const tvMeta = discoveredMetaMap.get(sym);
   const extFields = extractQuoteExtFields(q);
-  const news = (newsRes?.news || []).slice(0, 4).map(n => ({
-    title: n.title || '',
-    publisher: n.publisher || 'Yahoo Finance',
-    link: n.link || n.canonicalUrl?.url || '',
-    publishedAt: n.providerPublishTime ? new Date(n.providerPublishTime).toISOString() : ''
-  })).filter(x => x.title);
+  const news = (newsRes?.news || []).slice(0, 4).map(n => {
+    const rawPt = n.providerPublishTime;
+    const normPt = (typeof rawPt === 'number' && rawPt < 1e12) ? rawPt * 1000 : rawPt;
+    let publishedAt = '';
+    if (normPt) {
+      const d = new Date(normPt);
+      if (!isNaN(d.getTime())) publishedAt = d.toISOString();
+    }
+    return {
+      title: n.title || '',
+      publisher: n.publisher || 'Yahoo Finance',
+      link: n.link || n.canonicalUrl?.url || '',
+      publishedAt
+    };
+  }).filter(x => x.title);
 
   const idea = QuantEngine.generateAITradeIdea(sym, bars, {
     tf: normTf,
@@ -2005,7 +2017,7 @@ async function handleTelegramCommand(chatId, rawText, fromUser = '') {
     'intreaba', 'pret', 'p', 'quote', 'analiza', 'semnal', 'acuratete', 'validare', 'winrate', 'stats'
   ]);
   if (slowCmds.has(cmdToken) || !hadSlash) {
-    tgApi('sendChatAction', { chat_id: chatId, action: 'typing' }, 4000).catch(() => {});
+    tgApi('sendChatAction', { chat_id: chatId, action: 'typing' }, 4000).catch(() => { });
   }
 
   if (cmdToken === 'start') {
@@ -2307,7 +2319,7 @@ async function handleTelegramCommand(chatId, rawText, fromUser = '') {
           const qRes = await handleYahooProxyTarget(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(sym)}`);
           const curP = qRes?.quoteResponse?.result?.[0]?.regularMarketPrice;
           if (isFinite(curP) && val < curP) { cond = 'price_dn'; dir = 'dn'; }
-        } catch (_) {}
+        } catch (_) { }
       }
     }
 
@@ -2331,9 +2343,9 @@ async function handleTelegramCommand(chatId, rawText, fromUser = '') {
     enqueueUiAction({ type: 'ALERT_ADD', alert: newAlert });
 
     const condTxt = cond === 'price_up' ? `&ge; ${fmtNum(val)}`
-                  : cond === 'price_dn' ? `&le; ${fmtNum(val)}`
-                  : cond === 'rsi_lt' ? `RSI &lt; ${val}`
-                  : `RSI &gt; ${val}`;
+      : cond === 'price_dn' ? `&le; ${fmtNum(val)}`
+        : cond === 'rsi_lt' ? `RSI &lt; ${val}`
+          : `RSI &gt; ${val}`;
     await sendTelegramNotification({
       chatId,
       category: 'reply',
@@ -2596,7 +2608,7 @@ async function handleTelegramCommand(chatId, rawText, fromUser = '') {
           });
           return;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const baseList = Array.from(new Set([
@@ -2725,7 +2737,7 @@ async function handleTelegramCommand(chatId, rawText, fromUser = '') {
           replyMarkup: { inline_keyboard: buildSymbolInlineKeyboard(analysis.sym, analysis.tf) }
         });
         return;
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -2748,7 +2760,7 @@ async function handleTelegramCommand(chatId, rawText, fromUser = '') {
         replyMarkup: { inline_keyboard: rows }
       });
       return;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   await sendTelegramNotification({
@@ -2801,7 +2813,7 @@ async function handleTelegramCallbackQuery(cb) {
       : p1 === 'radarIntel'
         ? (tgRuntime.prefs.radarIntel ? 'Radar Auto: PORNIT' : 'Radar Auto: OPRIT')
         : 'Preferințe actualizate';
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: toastTxt }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: toastTxt }).catch(() => { });
     if (msgId) {
       const isHub = act === 'hubtog';
       await tgApi('editMessageText', {
@@ -2810,14 +2822,14 @@ async function handleTelegramCallbackQuery(cb) {
         text: isHub ? formatControlHubHtml() : formatPrefsMessageHtml(),
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: isHub ? buildControlHubInlineKeyboard() : buildPrefsInlineKeyboard() }
-      }).catch(() => {});
+      }).catch(() => { });
     }
     return;
   }
 
   if (act === 'hub' && p1) {
     if (p1 === 'kb') {
-      await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: 'Actualizez tastatura de jos...' }).catch(() => {});
+      await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: 'Actualizez tastatura de jos...' }).catch(() => { });
       await sendTelegramNotification({
         chatId,
         category: 'reply',
@@ -2844,29 +2856,29 @@ async function handleTelegramCallbackQuery(cb) {
       notificari: '/notificari'
     };
     const targetCmd = hubCmdMap[p1] || `/${p1}`;
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Încarc ${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Încarc ${p1}...` }).catch(() => { });
     await handleTelegramCommand(chatId, targetCmd, cb.from?.first_name || 'Trader');
     return;
   }
 
   if (act === 'cockpitsec' && p1) {
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Încarc ${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Încarc ${p1}...` }).catch(() => { });
     try {
       await sendCockpitSectionView(chatId, p1, { messageId: msgId });
     } catch (e) {
       console.warn('[Telegram] cockpitsec err:', e.message);
-      await sendTelegramNotification({ chatId, category: 'reply', html: `Eroare ${escHtml(p1)}: ${escHtml(e.message)}` }).catch(() => {});
+      await sendTelegramNotification({ chatId, category: 'reply', html: `Eroare ${escHtml(p1)}: ${escHtml(e.message)}` }).catch(() => { });
     }
     return;
   }
 
   if (act === 'radarmode' && p1) {
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Radar: ${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Radar: ${p1}...` }).catch(() => { });
     try {
       await sendEarlyRadarView(chatId, p1, { messageId: msgId });
     } catch (e) {
       console.warn('[Telegram] radarmode err:', e.message);
-      await sendTelegramNotification({ chatId, category: 'reply', html: `Eroare Radar (${escHtml(p1)}): ${escHtml(e.message)}` }).catch(() => {});
+      await sendTelegramNotification({ chatId, category: 'reply', html: `Eroare Radar (${escHtml(p1)}): ${escHtml(e.message)}` }).catch(() => { });
     }
     return;
   }
@@ -2875,7 +2887,7 @@ async function handleTelegramCallbackQuery(cb) {
     tgRuntime.prefs.enabled = false;
     saveTgState();
     enqueueUiAction({ type: 'PREFS_UPDATED', prefs: tgRuntime.prefs });
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: 'Notificările Telegram au fost OPRITE' }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: 'Notificările Telegram au fost OPRITE' }).catch(() => { });
     await sendTelegramNotification({
       chatId,
       category: 'reply',
@@ -2886,7 +2898,7 @@ async function handleTelegramCallbackQuery(cb) {
   }
 
   if (act === 'cmd' && p1) {
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Rulez /${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Rulez /${p1}...` }).catch(() => { });
     await handleTelegramCommand(chatId, `/${p1}`, cb.from?.first_name || 'Trader');
     return;
   }
@@ -2894,7 +2906,7 @@ async function handleTelegramCallbackQuery(cb) {
   if (act === 'top10') {
     const tf = p1 || '30m';
     const dir = p2 || 'all';
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Actualizez Top 10 (${dir.toUpperCase()})...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Actualizez Top 10 (${dir.toUpperCase()})...` }).catch(() => { });
     try {
       const pack = await computeTopMarketOpportunities({ tf, dir, limit: 10, forceRefresh: false });
       const row1 = (pack.opportunities || []).slice(0, 5).map(o => ({ text: `${o.sym} (${o.direction})`, callback_data: `an:${o.sym}` }));
@@ -2909,7 +2921,7 @@ async function handleTelegramCallbackQuery(cb) {
         html: formatTopOppsTelegramHtml(pack),
         replyMarkup: { inline_keyboard: row1.length ? [row1, row2] : [row2] }
       });
-    } catch (_) {}
+    } catch (_) { }
     return;
   }
 
@@ -2918,12 +2930,12 @@ async function handleTelegramCallbackQuery(cb) {
     tgRuntime.terminal.activeSymbol = p1;
     tgRuntime.terminal.activeTf = tf;
     enqueueUiAction({ type: 'OPEN_CHART', sym: p1, tf });
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Grafic deschis: ${p1} (${tf.toUpperCase()})` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Grafic deschis: ${p1} (${tf.toUpperCase()})` }).catch(() => { });
     return;
   }
 
   if (act === 'an' && p1) {
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Analizez ${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Analizez ${p1}...` }).catch(() => { });
     try {
       const a = await analyzeSymbolServer(p1, tgRuntime.terminal.activeTf || '15m');
       await sendTelegramNotification({
@@ -2932,12 +2944,12 @@ async function handleTelegramCallbackQuery(cb) {
         html: formatAnalysisHtml(a),
         replyMarkup: { inline_keyboard: buildSymbolInlineKeyboard(a.sym, a.tf) }
       });
-    } catch (_) {}
+    } catch (_) { }
     return;
   }
 
   if (act === 'an_deep' && p1) {
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Intel SEC/Opt ${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Intel SEC/Opt ${p1}...` }).catch(() => { });
     try {
       const intel = getIntelEngine();
       const tf = tgRuntime.terminal.activeTf || '15m';
@@ -2949,7 +2961,7 @@ async function handleTelegramCallbackQuery(cb) {
         replyMarkup: { inline_keyboard: buildSymbolInlineKeyboard(p1, tf) }
       });
     } catch (e) {
-      await sendTelegramNotification({ chatId, category: 'reply', html: `Eroare Deep Intel ${escHtml(p1)}: ${escHtml(e.message)}` }).catch(() => {});
+      await sendTelegramNotification({ chatId, category: 'reply', html: `Eroare Deep Intel ${escHtml(p1)}: ${escHtml(e.message)}` }).catch(() => { });
     }
     return;
   }
@@ -2958,13 +2970,13 @@ async function handleTelegramCallbackQuery(cb) {
     if (!tgRuntime.terminal.watchlist.includes(p1)) tgRuntime.terminal.watchlist.unshift(p1);
     saveTgState();
     enqueueUiAction({ type: 'WL_ADD', sym: p1 });
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `${p1} adăugat în Watchlist` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `${p1} adăugat în Watchlist` }).catch(() => { });
     return;
   }
 
   if (act === 'alpct' && p1 && p2) {
     const pct = parseFloat(p2);
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Setez alertă ${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Setez alertă ${p1}...` }).catch(() => { });
     try {
       const qRes = await handleYahooProxyTarget(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(p1)}`);
       const curP = qRes?.quoteResponse?.result?.[0]?.regularMarketPrice;
@@ -2989,7 +3001,7 @@ async function handleTelegramCallbackQuery(cb) {
           html: `Alertă setată: <b>${escHtml(p1)}</b> ${pct >= 0 ? '&ge;' : '&le;'} <code>${fmtNum(target)}</code> (${pct >= 0 ? '+' : ''}${pct}% față de ${fmtNum(curP)})`
         });
       }
-    } catch (_) {}
+    } catch (_) { }
     return;
   }
 
@@ -2998,23 +3010,23 @@ async function handleTelegramCallbackQuery(cb) {
     tgRuntime.terminal.alerts = (tgRuntime.terminal.alerts || []).filter(a => a.id !== id);
     saveTgState();
     enqueueUiAction({ type: 'ALERT_DEL', id });
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: 'Alertă ștearsă' }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: 'Alertă ștearsă' }).catch(() => { });
     return;
   }
 
   if (act === 'ord' && p1 && p2) {
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Execut ordin ${p2.toUpperCase()} pe ${p1}...` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Execut ordin ${p2.toUpperCase()} pe ${p1}...` }).catch(() => { });
     await handleTelegramCommand(chatId, `/${p2 === 'buy' ? 'buy' : 'short'} ${p1}`);
     return;
   }
 
   if (act === 'pclose' && p1) {
     enqueueUiAction({ type: 'PAPER_CLOSE', sym: p1 });
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Poziție ${p1} închisă` }).catch(() => {});
+    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: `Poziție ${p1} închisă` }).catch(() => { });
     return;
   }
 
-  await tgApi('answerCallbackQuery', { callback_query_id: cb.id }).catch(() => {});
+  await tgApi('answerCallbackQuery', { callback_query_id: cb.id }).catch(() => { });
 }
 
 async function processTelegramUpdate(upd) {
@@ -3047,8 +3059,8 @@ async function startTelegramBridge() {
     tgRuntime.botUsername = me.username || '';
     tgRuntime.botFirstName = me.first_name || '';
     tgRuntime.botOk = true;
-    await tgApi('deleteWebhook', { drop_pending_updates: false }, 6000).catch(() => {});
-    await tgApi('setMyCommands', { commands: BOT_COMMANDS_SPEC }, 8000).catch(() => {});
+    await tgApi('deleteWebhook', { drop_pending_updates: false }, 6000).catch(() => { });
+    await tgApi('setMyCommands', { commands: BOT_COMMANDS_SPEC }, 8000).catch(() => { });
     console.log(`[Telegram] Connected @${tgRuntime.botUsername} (chat ${tgRuntime.chatId || 'dynamic'})`);
   } catch (e) {
     console.warn('[Telegram] Bot init warning:', e.message);
@@ -3118,19 +3130,19 @@ async function startTelegramBridge() {
               `Condiție: <code>Preț ${a.cond === 'price_up' ? '&ge;' : '&le;'} ${fmtNum(a.price)}</code>\n` +
               `Preț live: <b>${fmtNum(curP)}</b>`,
             replyMarkup: { inline_keyboard: buildSymbolInlineKeyboard(a.sym, '15m', { includeMuteBtn: true }) }
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
       if (changed) saveTgState();
-    } catch (_) {}
+    } catch (_) { }
   }, 18000);
 
   // Smart Early Signal Radar AI Monitor (every 4 minutes — respects Market Hours, Pre-BUY Gate, Cooldown & Hourly Cap)
   setTimeout(() => {
-    runSmartRadarMonitorCycle({ forceRun: false }).catch(() => {});
+    runSmartRadarMonitorCycle({ forceRun: false }).catch(() => { });
   }, 22000);
   setInterval(() => {
-    runSmartRadarMonitorCycle({ forceRun: false }).catch(() => {});
+    runSmartRadarMonitorCycle({ forceRun: false }).catch(() => { });
   }, 4 * 60 * 1000);
 }
 
@@ -3336,7 +3348,7 @@ async function searchGlobalSymbols(rawQuery, catFilter = 'all') {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const finalOut = topCandidates
@@ -3386,8 +3398,8 @@ function sendJson(res, status, obj) {
 
 const requestHandler = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -3397,6 +3409,28 @@ const requestHandler = async (req, res) => {
 
   const parsedUrl = new URL(req.url || '/', 'http://localhost');
   const pathname = parsedUrl.pathname;
+
+  if (pathname.startsWith('/api/auth/')) {
+    try {
+      const body = (req.method === 'POST' || req.method === 'PUT') ? await readJsonBody(req) : {};
+      const query = Object.fromEntries(parsedUrl.searchParams.entries());
+      const out = await handleAuthApiRequest({
+        method: req.method,
+        pathname,
+        headers: req.headers,
+        body,
+        query
+      });
+      if (out.redirect) {
+        res.writeHead(302, { Location: out.redirect, 'Cache-Control': 'no-store' });
+        res.end();
+        return;
+      }
+      return sendJson(res, out.status || 200, out.body);
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, error: e.message });
+    }
+  }
 
   const intel = getIntelEngine();
 
@@ -3467,6 +3501,17 @@ const requestHandler = async (req, res) => {
         tf: body.tf || '30m',
         watchlist: wl
       });
+      return sendJson(res, 200, data);
+    } catch (e) {
+      return sendJson(res, 500, { ok: false, error: e.message });
+    }
+  }
+
+  if (pathname === '/api/intel/portfolio-evaluate' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const pf = body?.realPortfolio || body || {};
+      const data = await intel.evaluateRealPortfolio(pf);
       return sendJson(res, 200, data);
     } catch (e) {
       return sendJson(res, 500, { ok: false, error: e.message });
@@ -3562,7 +3607,7 @@ const requestHandler = async (req, res) => {
           tgRuntime.botUsername = me.username || '';
           tgRuntime.botFirstName = me.first_name || '';
           tgRuntime.botOk = true;
-        }).catch(() => {});
+        }).catch(() => { });
       }
       if (body.prefs && typeof body.prefs === 'object') {
         tgRuntime.prefs = normalizeTgPrefs(body.prefs, tgRuntime.prefs);
@@ -3721,7 +3766,7 @@ const requestHandler = async (req, res) => {
         try {
           const host = new URL(quoteData.summaryProfile.website).hostname;
           logoUrl = `https://logo.clearbit.com/${host}`;
-        } catch (_) {}
+        } catch (_) { }
       }
       return sendJson(res, 200, {
         name: quoteData?.price?.shortName || sym,
@@ -3781,9 +3826,9 @@ const server = http.createServer((req, res) => {
     if (!res.headersSent) {
       try {
         return sendJson(res, 500, { ok: false, error: err?.message || 'Internal Server Error' });
-      } catch (_) {}
+      } catch (_) { }
     }
-    try { res.end(); } catch (_) {}
+    try { res.end(); } catch (_) { }
   });
 });
 // Prevent Node 5s keep-alive timeout race with Chrome HTTP/1.1 connection reuse (Failed to fetch)

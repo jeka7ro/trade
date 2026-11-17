@@ -16,13 +16,15 @@
       this.getSeries = opts.getSeries;
       this.getBars = opts.getBars;
       this.fmtPrice = opts.fmtPrice || (v => Number(v).toFixed(2));
-      this.onToolReset = opts.onToolReset || (() => {});
+      this.onToolReset = opts.onToolReset || (() => { });
 
       this.tool = 'cursor';
       this.magnet = false;
       this.hideDrawings = false;
 
       this.symbol = '';
+      this.storagePrefix = opts.storagePrefix || 'tp_ultra_drawings_';
+      this.onDrawingsChange = typeof opts.onDrawingsChange === 'function' ? opts.onDrawingsChange : null;
       this.drawings = [];
       this.draft = null; // First point clicked while drawing 2-point shapes
       this.mousePt = null;
@@ -34,6 +36,7 @@
       this.tpoData = null;
       this.footprintData = null;
       this.patternData = null;
+      this.wolfeData = null;
       this.expectedMoveData = null;
       this.showVPVR = false;
       this.showSMC = false;
@@ -41,18 +44,39 @@
       this.showTPO = false;
       this.showFootprint = false;
       this.showAutoPatterns = false;
+      this.showWolfeWave = false;
       this.showExpectedMove = false;
       this.showExtSessions = true;
 
       this._etFmt = null;
       this._etCache = new Map();
+      this.hitRegions = [];
 
       this._raf = null;
       this._bindEvents();
     }
 
     setSymbol(sym) {
-      this.symbol = sym || '';
+      const next = sym || '';
+      if (this.symbol !== next) {
+        this.vpvrData = null;
+        this.smcData = null;
+        this.tradePlan = null;
+        this.tpoData = null;
+        this.footprintData = null;
+        this.patternData = null;
+        this.wolfeData = null;
+        this.expectedMoveData = null;
+        this.hitRegions = [];
+      }
+      this.symbol = next;
+      this.draft = null;
+      this._loadDrawings();
+      this.requestRender();
+    }
+
+    setStorageScope(prefix) {
+      this.storagePrefix = prefix || 'tp_ultra_drawings_';
       this.draft = null;
       this._loadDrawings();
       this.requestRender();
@@ -98,8 +122,8 @@
     }
 
     setLayers({
-      vpvrData, smcData, tradePlan, tpoData, footprintData, patternData, expectedMoveData,
-      showVPVR, showSMC, showTradePlan, showTPO, showFootprint, showAutoPatterns, showExpectedMove,
+      vpvrData, smcData, tradePlan, tpoData, footprintData, patternData, wolfeData, expectedMoveData,
+      showVPVR, showSMC, showTradePlan, showTPO, showFootprint, showAutoPatterns, showWolfeWave, showExpectedMove,
       showExtSessions
     }) {
       if (vpvrData !== undefined) this.vpvrData = vpvrData;
@@ -108,6 +132,7 @@
       if (tpoData !== undefined) this.tpoData = tpoData;
       if (footprintData !== undefined) this.footprintData = footprintData;
       if (patternData !== undefined) this.patternData = patternData;
+      if (wolfeData !== undefined) this.wolfeData = wolfeData;
       if (expectedMoveData !== undefined) this.expectedMoveData = expectedMoveData;
       if (showVPVR !== undefined) this.showVPVR = showVPVR;
       if (showSMC !== undefined) this.showSMC = showSMC;
@@ -115,6 +140,7 @@
       if (showTPO !== undefined) this.showTPO = showTPO;
       if (showFootprint !== undefined) this.showFootprint = showFootprint;
       if (showAutoPatterns !== undefined) this.showAutoPatterns = showAutoPatterns;
+      if (showWolfeWave !== undefined) this.showWolfeWave = showWolfeWave;
       if (showExpectedMove !== undefined) this.showExpectedMove = showExpectedMove;
       if (showExtSessions !== undefined) this.showExtSessions = showExtSessions;
       this.requestRender();
@@ -258,7 +284,7 @@
         if ((e.pointerType === 'mouse' && e.button !== 0) || this.tool === 'cursor') return;
         e.preventDefault();
         e.stopPropagation();
-        try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        try { this.canvas.setPointerCapture(e.pointerId); } catch (_) { }
 
         const pos = getLocalPos(e);
         const anchor = this._xyToAnchor(pos.x, pos.y);
@@ -346,7 +372,7 @@
     }
 
     _storageKey() {
-      return `tp_ultra_drawings_${this.symbol || 'DEFAULT'}`;
+      return `${this.storagePrefix}${this.symbol || 'DEFAULT'}`;
     }
 
     _loadDrawings() {
@@ -361,7 +387,8 @@
     _saveDrawings() {
       try {
         localStorage.setItem(this._storageKey(), JSON.stringify(this.drawings.slice(-50)));
-      } catch (_) {}
+        if (this.onDrawingsChange) this.onDrawingsChange(this.symbol, this.drawings);
+      } catch (_) { }
     }
 
     // ─── MASTER RENDER PIPELINE ─────────────────────────────────────────────
@@ -382,6 +409,7 @@
       const chart = this.getChart();
       const series = this.getSeries();
       const bars = this.getBars();
+      this.hitRegions = [];
       if (!chart || !series || !bars || !bars.length) {
         ctx.restore();
         return;
@@ -392,6 +420,7 @@
       if (this.showVPVR && this.vpvrData) this._renderVPVR(ctx, w, h, series);
       if (this.showSMC && this.smcData) this._renderSMC(ctx, w, h, chart, series, bars);
       if (this.showAutoPatterns && this.patternData) this._renderAutoPatterns(ctx, w, h, chart, series);
+      if (this.showWolfeWave) this._renderWolfeWave(ctx, w, h, chart, series, bars);
       if (this.showExpectedMove && this.expectedMoveData) this._renderExpectedMove(ctx, w, h, chart, series, bars);
       if (this.showFootprint && this.footprintData) this._renderFootprint(ctx, w, h, chart, series, bars);
       if (this.showTradePlan && this.tradePlan) this._renderTradePlan(ctx, w, h, chart, series, bars);
@@ -472,7 +501,7 @@
           startIdx = Math.max(0, Math.floor(vr.from) - 2);
           endIdx = Math.min(bars.length - 1, Math.ceil(vr.to) + 2);
         }
-      } catch (_) {}
+      } catch (_) { }
       if (endIdx < startIdx) return;
 
       // Estimate half-bar pixel width so adjacent session bars join seamlessly with zero gaps
@@ -575,6 +604,18 @@
         if (bw >= 44) {
           ctx.fillStyle = st.txt;
           ctx.fillText(st.tag, x1 + 5, h - 6);
+          const tw = ctx.measureText(st.tag).width;
+          const sessDesc = sp.sess === 'PRE'
+            ? { title: 'Sesiune PRE-MARKET (SUA)', meaning: 'Tranzacționare înainte de deschiderea bursei americane: 04:00 – 09:30 ET (11:00 – 16:30 ora României).', action: 'Lichiditatea este mai redusă decât în sesiunea regulară și spread-urile pot fi mai mari. Reacțiile la știri sau praguri cheie dau direcția deschiderii.' }
+            : sp.sess === 'POST'
+              ? { title: 'Sesiune POST-MARKET / After-Hours', meaning: 'Tranzacționare după închiderea bursei americane: 16:00 – 20:00 ET (23:00 – 03:00 ora României).', action: 'Reacții frecvente la raportări financiare (earnings), comunicate SEC 8-K și ghidaj. Confirmă mișcarea la volum mai mare în Pre-Market/RTH.' }
+              : { title: 'Sesiune OVERNIGHT (BOATS)', meaning: 'Sesiune de noapte prin Blue Ocean ATS: 20:00 – 04:00 ET (03:00 – 11:00 ora României).', action: 'Indică sentimentul global înainte de Pre-Market. Mișcările pe volum subțire pot fi retestate la 11:00 RO.' };
+          this._addHit({ x: x1 + 2, y: h - 20, w: tw + 8, h: 16 }, {
+            category: 'Sesiune Extinsă (ETH)',
+            badge: st.tag,
+            tone: 'neut',
+            ...sessDesc
+          });
         }
       }
       ctx.restore();
@@ -629,7 +670,15 @@
         ctx.lineTo(w, yPOC);
         ctx.stroke();
         ctx.setLineDash([]);
-        this._drawTag(ctx, w - maxBarPx - 4, yPOC, `POC ${this.fmtPrice(vp.poc)}`, '#d97706', '#fff', 'right');
+        const pocRect = this._drawTag(ctx, w - maxBarPx - 4, yPOC, `POC ${this.fmtPrice(vp.poc)}`, '#d97706', '#fff', 'right');
+        this._addHit(pocRect, {
+          category: 'VPVR · Volume Profile',
+          badge: `POC ${this.fmtPrice(vp.poc)}`,
+          tone: 'warn',
+          title: 'Point of Control (POC)',
+          meaning: 'Nivelul exact de preț unde s-a tranzacționat cel mai mare volum din zona analizată — prețul de „echilibru” instituțional.',
+          action: 'Prețul tinde să fie atras către POC ca un magnet. Deasupra POC cumpărătorii controlează echilibrul; sub POC controlul e bearish.'
+        });
         ctx.restore();
       }
       if (yVAH != null && yVAH >= 8 && yVAH <= h - 8 && (!yPOC || Math.abs(yVAH - yPOC) > 16)) {
@@ -642,7 +691,15 @@
         ctx.lineTo(w, yVAH);
         ctx.stroke();
         ctx.setLineDash([]);
-        this._drawTag(ctx, w - maxBarPx - 4, yVAH, `VAH ${this.fmtPrice(vp.vah)}`, 'rgba(14, 116, 144, 0.92)', '#e0f2fe', 'right');
+        const vahRect = this._drawTag(ctx, w - maxBarPx - 4, yVAH, `VAH ${this.fmtPrice(vp.vah)}`, 'rgba(14, 116, 144, 0.92)', '#e0f2fe', 'right');
+        this._addHit(vahRect, {
+          category: 'VPVR · Volume Profile',
+          badge: `VAH ${this.fmtPrice(vp.vah)}`,
+          tone: 'neut',
+          title: 'Value Area High (VAH)',
+          meaning: 'Limita superioară a zonei în care s-a concentrat 70% din volumul total (zona de valoare corectă).',
+          action: 'Funcționează ca rezistență în consolidări; un breakout susținut peste VAH indică acceptarea unor prețuri mai mari (impuls bullish).'
+        });
         ctx.restore();
       }
       if (yVAL != null && yVAL >= 8 && yVAL <= h - 8 && (!yPOC || Math.abs(yVAL - yPOC) > 16)) {
@@ -655,7 +712,15 @@
         ctx.lineTo(w, yVAL);
         ctx.stroke();
         ctx.setLineDash([]);
-        this._drawTag(ctx, w - maxBarPx - 4, yVAL, `VAL ${this.fmtPrice(vp.val)}`, 'rgba(14, 116, 144, 0.92)', '#e0f2fe', 'right');
+        const valRect = this._drawTag(ctx, w - maxBarPx - 4, yVAL, `VAL ${this.fmtPrice(vp.val)}`, 'rgba(14, 116, 144, 0.92)', '#e0f2fe', 'right');
+        this._addHit(valRect, {
+          category: 'VPVR · Volume Profile',
+          badge: `VAL ${this.fmtPrice(vp.val)}`,
+          tone: 'neut',
+          title: 'Value Area Low (VAL)',
+          meaning: 'Limita inferioară a zonei în care s-a concentrat 70% din volumul total.',
+          action: 'Funcționează ca suport pentru respingeri spre POC; o spargere curată sub VAL accelerează căderea către următorul nod de volum.'
+        });
         ctx.restore();
       }
     }
@@ -688,10 +753,26 @@
         ctx.lineTo(w, top + boxH);
         ctx.stroke();
 
+        const obLbl = ob.bullish ? 'OB +' : 'OB −';
+        const obY = top + Math.min(boxH - 2, 10);
         ctx.fillStyle = ob.bullish ? (isLight ? '#047857' : '#10b981') : (isLight ? '#be123c' : '#f87171');
         ctx.font = '700 9.5px sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(ob.bullish ? 'OB +' : 'OB −', w - 8, top + Math.min(boxH - 2, 10));
+        ctx.fillText(obLbl, w - 8, obY);
+        const obW = ctx.measureText(obLbl).width;
+        const zoneStr = `${this.fmtPrice(ob.bottom)} – ${this.fmtPrice(ob.top)}`;
+        this._addHit({ x: w - 8 - obW - 6, y: obY - 11, w: Math.max(obW + 12, 38), h: Math.max(15, Math.min(boxH, 24)) }, {
+          category: 'SMC · Order Block',
+          badge: `${obLbl} (${zoneStr})`,
+          tone: ob.bullish ? 'up' : 'dn',
+          title: ob.bullish ? 'Bullish Order Block (OB + · Cerere)' : 'Bearish Order Block (OB − · Ofertă)',
+          meaning: ob.bullish
+            ? `Zonă instituțională de acumulare (ultima lumânare roșie înaintea unui impuls puternic de urcare) în intervalul ${zoneStr}.`
+            : `Zonă instituțională de distribuție/vânzare (ultima lumânare verde înaintea unei scăderi agresive) în intervalul ${zoneStr}.`,
+          action: ob.bullish
+            ? `La retestarea zonei ${zoneStr}, cumpărătorii mari apără deseori prețul → caută semnale de respingere în sus (BUY / suport).`
+            : `La retestarea zonei ${zoneStr}, ordinele de vânzare rămase pot respinge prețul în jos → zonă cheie de rezistență / Short.`
+        });
       }
 
       // 2. Fair Value Gaps (FVG)
@@ -712,7 +793,21 @@
           : (isLight ? 'rgba(180, 83, 9, 0.90)' : 'rgba(251, 191, 36, 0.85)');
         ctx.font = '700 9px sans-serif';
         ctx.textAlign = 'left';
-        if (w - left > 45) ctx.fillText('FVG', left + 4, top + Math.min(boxH - 2, 10));
+        if (w - left > 45) {
+          const fvgY = top + Math.min(boxH - 2, 10);
+          ctx.fillText('FVG', left + 4, fvgY);
+          const fvgRange = `${this.fmtPrice(fvg.bottom)} – ${this.fmtPrice(fvg.top)}`;
+          this._addHit({ x: left, y: fvgY - 10, w: 36, h: Math.max(14, Math.min(boxH, 22)) }, {
+            category: 'SMC · Imbalance',
+            badge: `FVG (${fvgRange})`,
+            tone: fvg.bullish ? 'up' : 'dn',
+            title: fvg.bullish ? 'Fair Value Gap Bullish (FVG)' : 'Fair Value Gap Bearish (FVG)',
+            meaning: `Gol de lichiditate apărut dintr-o mișcare bruscă de 3 lumânări între ${fvgRange}, unde piața nu a apucat să tranzacționeze echilibrat.`,
+            action: fvg.bullish
+              ? `Prețul revine frecvent să „umple” parțial acest gol (${fvgRange}), oferind o zonă de pullback pentru continuare bullish.`
+              : `Prețul poate retesta acest gol (${fvgRange}) pentru a reîncărca lichiditate înainte de a continua scăderea.`
+          });
+        }
       }
 
       // 3. BOS & CHoCH Horizontal Structure Breaks
@@ -735,10 +830,28 @@
         ctx.setLineDash([]);
 
         const midX = (Math.max(0, x1) + Math.min(w, x2)) / 2;
+        const lblY = st.bullish ? y - 4 : y + 10;
         ctx.fillStyle = col;
         ctx.font = '800 9.5px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(st.type, midX, st.bullish ? y - 4 : y + 10);
+        ctx.fillText(st.type, midX, lblY);
+        const stW = ctx.measureText(st.type).width;
+        const pxStr = this.fmtPrice(st.price);
+        const isChoch = st.type === 'CHoCH';
+        this._addHit({ x: midX - stW / 2 - 6, y: lblY - 10, w: stW + 12, h: 14 }, {
+          category: 'SMC · Structura Pieței',
+          badge: `${st.type} · ${pxStr}`,
+          tone: st.bullish ? 'up' : 'dn',
+          title: isChoch
+            ? `CHoCH — Change of Character (${st.bullish ? 'Bullish' : 'Bearish'})`
+            : `BOS — Break of Structure (${st.bullish ? 'Bullish' : 'Bearish'})`,
+          meaning: isChoch
+            ? `Schimbare de caracter la ${pxStr}: prețul a rupt primul prag structural împotriva trendului anterior — semnal timpuriu de posibilă întoarcere (reversal).`
+            : `Ruptură de structură la ${pxStr}: prețul a spart ultimul ${st.bullish ? 'maxim' : 'minim'} în aceeași direcție cu trendul existent.`,
+          action: isChoch
+            ? `Atenție la schimbarea direcției! Așteaptă o retestare în OB/FVG pentru a confirma ${st.bullish ? 'noul trend ascendent' : 'noul trend descendent'}.`
+            : `Confirmă continuarea trendului ${st.bullish ? 'Bullish (în sus)' : 'Bearish (în jos)'}. Retragerile spre ultimul OB/FVG devin puncte clasice de intrare.`
+        });
         ctx.restore();
       }
     }
@@ -802,12 +915,44 @@
       ctx.restore();
 
       // Compact Right-Edge Labels
-      this._drawTag(ctx, x2, yTP2, `TP2 ${this.fmtPrice(tp.tp2)}`, '#089981', '#fff', 'right');
+      const tp2Rect = this._drawTag(ctx, x2, yTP2, `TP2 ${this.fmtPrice(tp.tp2)}`, '#089981', '#fff', 'right');
+      this._addHit(tp2Rect, {
+        category: 'Plan Tranzacție R:R',
+        badge: `TP2 · ${this.fmtPrice(tp.tp2)}`,
+        tone: 'up',
+        title: 'Take-Profit 2 (Țintă Principală)',
+        meaning: 'Obiectivul extins de profit calculat dinamic din ATR și structura pieței.',
+        action: 'Închide restul poziției sau mută Stop-Loss pe profit (trailing) odată ce prețul atinge TP2.'
+      });
       if (yTP1 != null && Math.abs(yTP1 - yTP2) > 18 && Math.abs(yTP1 - yEntry) > 18) {
-        this._drawTag(ctx, x2, yTP1, `TP1 ${this.fmtPrice(tp.tp1)}`, '#0d6e5d', '#e2e8f0', 'right');
+        const tp1Rect = this._drawTag(ctx, x2, yTP1, `TP1 ${this.fmtPrice(tp.tp1)}`, '#0d6e5d', '#e2e8f0', 'right');
+        this._addHit(tp1Rect, {
+          category: 'Plan Tranzacție R:R',
+          badge: `TP1 · ${this.fmtPrice(tp.tp1)}`,
+          tone: 'up',
+          title: 'Take-Profit 1 (Parțial)',
+          meaning: 'Primul nivel realist de marcare parțială a profitului (~50% din poziție).',
+          action: 'La atingerea TP1, profesioniștii încasează jumătate și mută SL la prețul de intrare (break-even).'
+        });
       }
-      this._drawTag(ctx, x2, yEntry, `IN ${this.fmtPrice(tp.entry)}`, '#2962ff', '#fff', 'right');
-      this._drawTag(ctx, x2, ySL, `SL ${this.fmtPrice(tp.sl)}`, '#f23645', '#fff', 'right');
+      const inRect = this._drawTag(ctx, x2, yEntry, `IN ${this.fmtPrice(tp.entry)}`, '#2962ff', '#fff', 'right');
+      this._addHit(inRect, {
+        category: 'Plan Tranzacție R:R',
+        badge: `IN · ${this.fmtPrice(tp.entry)}`,
+        tone: 'neut',
+        title: 'Preț de Intrare Sugerat (Entry)',
+        meaning: 'Nivelul curent de referință al semnalului Smart Quant.',
+        action: 'Compară distanța față de SL și TP1/TP2 pentru a verifica raportul Risc / Recompensă (>= 1:2).'
+      });
+      const slRect = this._drawTag(ctx, x2, ySL, `SL ${this.fmtPrice(tp.sl)}`, '#f23645', '#fff', 'right');
+      this._addHit(slRect, {
+        category: 'Plan Tranzacție R:R',
+        badge: `SL · ${this.fmtPrice(tp.sl)}`,
+        tone: 'dn',
+        title: 'Stop-Loss (Protecție Capital)',
+        meaning: 'Pragul de invalidare a scenariului: dacă prețul îl sparge, setup-ul nu mai este valabil.',
+        action: 'Nu muta SL-ul mai jos/sus contra poziției; dimensionează poziția astfel încât pierderea maximă să fie 1%–2% din cont.'
+      });
     }
 
     // ─── LAYER 3B: ULTIMATE TPO (TIME PRICE OPPORTUNITY / MARKET PROFILE) ───
@@ -864,7 +1009,15 @@
         ctx.lineTo(maxPx * 1.65, yPOC);
         ctx.stroke();
         ctx.setLineDash([]);
-        this._drawTag(ctx, maxPx + 8, yPOC, `TPO POC ${this.fmtPrice(tpo.poc)}`, '#0891b2', '#fff', 'left');
+        const tpoRect = this._drawTag(ctx, maxPx + 8, yPOC, `TPO POC ${this.fmtPrice(tpo.poc)}`, '#0891b2', '#fff', 'left');
+        this._addHit(tpoRect, {
+          category: 'TPO Market Profile',
+          badge: `TPO POC · ${this.fmtPrice(tpo.poc)}`,
+          tone: 'neut',
+          title: 'Time Price Opportunity (TPO POC)',
+          meaning: 'Prețul la care piața a petrecut cel mai mult timp în sesiunile recente (Market Profile).',
+          action: 'Indică zona de acceptare de timp: deviațiile mari față de TPO POC fără volum tind să revină spre acest nivel.'
+        });
         ctx.restore();
       }
     }
@@ -930,7 +1083,121 @@
       const tagX = Math.min(w - 12, Math.max(80, ux2));
       const tagY = Math.max(22, Math.min(h - 22, (uy2 + ly2) / 2));
       const tagBg = pat.bias === 'bull' ? '#059669' : pat.bias === 'bear' ? '#e11d48' : '#0284c7';
-      this._drawTag(ctx, tagX, tagY, `${pat.name} · ${pat.stateLbl}`, tagBg, '#ffffff', 'right');
+      const patRect = this._drawTag(ctx, tagX, tagY, `${pat.name} · ${pat.stateLbl}`, tagBg, '#ffffff', 'right');
+      this._addHit(patRect, this._describePattern(pat));
+      ctx.restore();
+    }
+
+    // ─── LAYER 3C-bis: WOLFE WAVE (1-2-3-4-5 + LINEA EPA 1->4) ─────────────
+    _renderWolfeWave(ctx, w, h, chart, series) {
+      const ww = this.wolfeData;
+      if (!ww) {
+        const emptyRect = this._drawTag(ctx, 14, h - 26, 'Wolfe 1-5: Caută convergență (0 active)', 'rgba(30, 41, 59, 0.85)', '#cbd5e1', 'left');
+        this._addHit(emptyRect, {
+          category: 'Wolfe Wave (1-2-3-4-5)',
+          badge: 'SCANNER ACTIV',
+          tone: 'neut',
+          title: 'Triunghi / Valurile lui Bill Wolfe (Wolfe Wave)',
+          meaning: 'Pe simbolul și timeframe-ul curent nu există momentan o pană convergentă completă cu 5 puncte simetrice 1-2-3-4-5.',
+          action: 'Caută un punct 3 sub/peste 1, punctul 4 între 1 și 2, și punctul 5 la atingerea/spargerea ușoară a liniei 1–3 (Sweet Zone). Încearcă pe 15m, 30m, 1h sau 1D.'
+        });
+        return;
+      }
+
+      const ts = chart.timeScale();
+      const pts = [ww.p1, ww.p2, ww.p3, ww.p4, ww.p5].map((p, idx) => ({
+        num: idx + 1,
+        x: ts.logicalToCoordinate(p.idx),
+        y: series.priceToCoordinate(p.price),
+        price: p.price
+      }));
+      const xExt = ts.logicalToCoordinate(ww.extIdx);
+      const y13Ext = series.priceToCoordinate(ww.ext13Price);
+      const y24Ext = series.priceToCoordinate(ww.ext24Price);
+      const xEta = ts.logicalToCoordinate(ww.etaIdx);
+      const yEpa = series.priceToCoordinate(ww.epaPrice);
+
+      if (pts.some(p => p.x == null || p.y == null || !isFinite(p.x) || !isFinite(p.y))) return;
+
+      const mainCol = ww.bullish ? '#10b981' : '#f43f5e';
+      const fillCol = ww.bullish ? 'rgba(16, 185, 129, 0.065)' : 'rgba(244, 63, 94, 0.065)';
+      ctx.save();
+
+      // Subtle shaded triangle 1 -> 5 -> 4 -> 2
+      if (xExt != null && y13Ext != null && y24Ext != null) {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(xExt, y13Ext);
+        ctx.lineTo(xExt, y24Ext);
+        ctx.lineTo(pts[1].x, pts[1].y);
+        ctx.closePath();
+        ctx.fillStyle = fillCol;
+        ctx.fill();
+      }
+
+      // 1-2-3-4-5 internal wave path (subtle dotted)
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+      ctx.lineWidth = 1.1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Line 1-3-5 & Line 2-4
+      ctx.strokeStyle = mainCol;
+      ctx.lineWidth = 1.85;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(xExt != null ? xExt : pts[4].x, y13Ext != null ? y13Ext : pts[4].y);
+      ctx.moveTo(pts[1].x, pts[1].y);
+      ctx.lineTo(xExt != null ? xExt : pts[3].x, y24Ext != null ? y24Ext : pts[3].y);
+      ctx.stroke();
+
+      // Line 1 -> 4 Projected EPA Target (Gold dashed)
+      const epaX2 = xEta != null ? Math.min(w - 14, Math.max(pts[3].x + 28, xEta)) : Math.min(w - 14, pts[3].x + 65);
+      const epaY2 = yEpa != null ? Math.max(18, Math.min(h - 18, yEpa)) : pts[3].y;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(epaX2, epaY2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Numbered wave circles 1..5
+      for (const p of pts) {
+        if (p.x < 4 || p.x > w - 4 || p.y < 8 || p.y > h - 8) continue;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+        ctx.fillStyle = p.num === 5 ? '#f59e0b' : (ww.bullish ? '#064e3b' : '#4c0519');
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = p.num === 5 ? '#fef3c7' : mainCol;
+        ctx.stroke();
+        ctx.fillStyle = p.num === 5 ? '#000' : '#f8fafc';
+        ctx.font = '800 9.5px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(p.num), p.x, p.y + 0.5);
+      }
+
+      const epaStr = this.fmtPrice(ww.epaPrice);
+      const p5Str = this.fmtPrice(ww.p5.price);
+      const dirLbl = ww.bullish ? 'Wolfe Bullish 1-5' : 'Wolfe Bearish 1-5';
+      const epaRect = this._drawTag(ctx, Math.max(85, Math.min(w - 10, epaX2)), epaY2, `${dirLbl} · EPA ${epaStr}`, ww.bullish ? '#059669' : '#e11d48', '#ffffff', 'right');
+      this._addHit(epaRect, {
+        category: 'Wolfe Wave · Țintă EPA',
+        badge: ww.status,
+        tone: ww.bullish ? 'up' : 'dn',
+        title: `${dirLbl} (Punct 5: ${p5Str} → Țintă EPA: ${epaStr})`,
+        meaning: ww.bullish
+          ? `Triunghi/Pană convergentă de întoarcere Bullish (1→2→3→4→5). Punctul 5 (${p5Str}) atinge sau depășește ușor linia 1–3 („Sweet Zone”), pregătind revenirea spre linia 1→4.`
+          : `Triunghi/Pană convergentă de întoarcere Bearish (1→2→3→4→5). Punctul 5 (${p5Str}) testează linia superioară 1–3 („Sweet Zone”), pregătind scăderea spre linia 1→4.`,
+        action: `Regula Bill Wolfe: intrarea se face în Sweet Zone (Punct 5 ~${p5Str}, cu SL imediat dincolo de vârful 5), iar ținta matematică EPA de pe linia aurie 1→4 este ${epaStr}.`
+      });
       ctx.restore();
     }
 
@@ -980,8 +1247,18 @@
       ctx.stroke();
       ctx.setLineDash([]);
 
-      this._drawTag(ctx, xEnd, yU1, `+1σ ${this.fmtPrice(em.upper1)} (+${em.movePct1SD.toFixed(1)}%)`, '#7c3aed', '#fff', 'right');
-      this._drawTag(ctx, xEnd, yL1, `-1σ ${this.fmtPrice(em.lower1)} (-${em.movePct1SD.toFixed(1)}%)`, '#7c3aed', '#fff', 'right');
+      const emUpRect = this._drawTag(ctx, xEnd, yU1, `+1σ ${this.fmtPrice(em.upper1)} (+${em.movePct1SD.toFixed(1)}%)`, '#7c3aed', '#fff', 'right');
+      const emDnRect = this._drawTag(ctx, xEnd, yL1, `-1σ ${this.fmtPrice(em.lower1)} (-${em.movePct1SD.toFixed(1)}%)`, '#7c3aed', '#fff', 'right');
+      const emInfo = {
+        category: 'Volatilitate Statistică',
+        badge: `±${em.movePct1SD.toFixed(1)}% (1σ)`,
+        tone: 'neut',
+        title: 'Expected Move Cone (±1σ · 68%)',
+        meaning: `Intervalul statistic estimat (${this.fmtPrice(em.lower1)} – ${this.fmtPrice(em.upper1)}) în care prețul ar trebui să rămână cu probabilitate de ~68% în următoarele ${em.horizonBars} bare.`,
+        action: 'Folosește limitele ±1σ pentru a plasa ținte realiste de Take-Profit sau pentru a detecta mișcări extreme supracumpărate/supravândute.'
+      };
+      this._addHit(emUpRect, emInfo);
+      this._addHit(emDnRect, emInfo);
       ctx.restore();
     }
 
@@ -1022,7 +1299,17 @@
         const yPos = isBull ? Math.min(h - 14, yLo + 14) : Math.max(14, yHi - 14);
         const bg = it.absorption ? '#d97706' : (isBull ? 'rgba(5, 150, 105, 0.92)' : 'rgba(225, 29, 72, 0.92)');
 
-        this._drawTag(ctx, x, yPos, `${prefix}${fmtD}`, bg, '#fff', 'center');
+        const fpRect = this._drawTag(ctx, x, yPos, `${prefix}${fmtD}`, bg, '#fff', 'center');
+        this._addHit(fpRect, {
+          category: 'Orderflow Proxy (OHLCV)',
+          badge: `${prefix}${fmtD}`,
+          tone: it.absorption ? 'warn' : (isBull ? 'up' : 'dn'),
+          title: it.absorption ? 'Absorbție Estimată (ABS)' : (isBull ? 'Dezechilibru Cumpărători (+Δ)' : 'Dezechilibru Vânzători (-Δ)'),
+          meaning: it.absorption
+            ? 'Volum mare cu deplasare mică a prețului — indică faptul că ordinele limită absorb agresiunea contrară (posibil punct de întoarcere).'
+            : `Delta volumului estimat din structura lumânării indică presiune netă ${isBull ? 'de cumpărare' : 'de vânzare'} (${prefix}${fmtD}).`,
+          action: 'Combină semnalul cu zonele SMC (OB/FVG) sau VPVR pentru confirmare înainte de intrare.'
+        });
         lastLabelX = x;
       }
       ctx.restore();
@@ -1234,6 +1521,66 @@
       ctx.textBaseline = 'middle';
       ctx.fillText(text, bx + padX, y + 0.5);
       ctx.restore();
+      return { x: bx, y: by, w: tw, h: boxH };
+    }
+
+    _addHit(rect, info) {
+      if (!rect || !isFinite(rect.x) || !isFinite(rect.y)) return;
+      this.hitRegions.push({
+        x: rect.x - 4,
+        y: rect.y - 3,
+        w: Math.max(18, rect.w + 8),
+        h: Math.max(14, rect.h + 6),
+        ...info
+      });
+    }
+
+    hitTestAnnotation(px, py) {
+      for (let i = this.hitRegions.length - 1; i >= 0; i--) {
+        const r = this.hitRegions[i];
+        if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return r;
+      }
+      return null;
+    }
+
+    _describePattern(pat) {
+      const name = String(pat.name || 'Structură Dinamică');
+      const resStr = pat.upperNow != null ? this.fmtPrice(pat.upperNow) : '—';
+      const supStr = pat.lowerNow != null ? this.fmtPrice(pat.lowerNow) : '—';
+      const tgtStr = pat.targetPrice != null ? this.fmtPrice(pat.targetPrice) : '—';
+      let meaning = 'Formațiune geometrică detectată automat între maximele (linia roșie) și minimele (linia verde) recente.';
+      if (name.includes('Dublu Vârf')) {
+        meaning = 'Pattern clasic de epuizare bearish (Double Top): prețul a testat de două ori zona de rezistență (linia roșie) fără să o poată sparge în sus.';
+      } else if (name.includes('Dublu Minim')) {
+        meaning = 'Pattern clasic de întoarcere bullish (Double Bottom): cumpărătorii au apărat de două ori același suport (linia verde).';
+      } else if (name.includes('Triunghi Descendent')) {
+        meaning = 'Prețul face maxime tot mai joase împotriva unui suport orizontal (presiune crescândă de vânzare spre o spargere în jos).';
+      } else if (name.includes('Triunghi Ascendent')) {
+        meaning = 'Prețul presează cu minime tot mai înalte o rezistență plată (acumulare bullish înainte de breakout).';
+      } else if (name.includes('Triunghi Simetric')) {
+        meaning = 'Compresie de volatilitate între maxime descendente și minime ascendente — urmează de obicei o mișcare explozivă la ieșirea din triunghi.';
+      } else if (name.includes('Falling Wedge')) {
+        meaning = 'Pană descendentă (Falling Wedge · Bullish): vânzătorii își pierd forța, iar ieșirea în sus peste linia roșie generează des o revenire puternică.';
+      } else if (name.includes('Rising Wedge')) {
+        meaning = 'Pană ascendentă (Rising Wedge · Bearish): urcarea pierde din avânt, iar spargerea liniei verzi în jos semnalează risc de corecție rapidă.';
+      } else if (name.includes('Canal Ascendent')) {
+        meaning = 'Trend ascendent ordonat între două linii paralele; suportul verde oferă zone de retest, iar rezistența roșie marchează zone de profit.';
+      } else if (name.includes('Canal Descendent')) {
+        meaning = 'Trend descendent ordonat între maxime și minime paralele în coborâre; revenirea peste linia roșie semnalează schimbare de impuls.';
+      }
+      const stateInfo = pat.stateLbl === 'BREAKDOWN JOS'
+        ? `Prețul a spart deja suportul (${supStr}) ÎN JOS. Linia roșie (${resStr}) devine rezistență, iar ținta tehnică proiectată este ~${tgtStr}.`
+        : pat.stateLbl === 'BREAKOUT SUS'
+          ? `Prețul a spart deja rezistența (${resStr}) ÎN SUS. Suport cheie la ${supStr}, iar ținta tehnică proiectată este ~${tgtStr}.`
+          : `Prețul este încă în interiorul formațiunii (Suport ${supStr} · Rezistență ${resStr}). Așteaptă confirmarea la ieșirea din linie (~${tgtStr}).`;
+      return {
+        category: 'Auto Chart Pattern',
+        badge: pat.stateLbl || 'ÎN STRUCTURĂ',
+        tone: pat.bias === 'bull' ? 'up' : (pat.bias === 'bear' ? 'dn' : 'neut'),
+        title: `${name} · ${pat.stateLbl || ''}`,
+        meaning,
+        action: stateInfo
+      };
     }
   }
 
