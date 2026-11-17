@@ -10193,15 +10193,7 @@
     googleBtn?.addEventListener('click', async () => {
       setErr('');
       await refreshAuthProviders();
-      if (googleProviderCfg.googleEnabled) {
-        window.location.href = '/api/auth/google/start';
-      } else {
-        setErr('Conectarea 1-Click cu Google necesită Client ID & Secret OAuth în .env. Te poți autentifica mai jos cu email și parolă.', true);
-        const inp = (regForm && regForm.style.display !== 'none')
-          ? document.getElementById('authRegEmail')
-          : document.getElementById('authLoginId');
-        inp?.focus();
-      }
+      window.location.href = '/api/auth/google/start';
     });
 
     const closeAccountMenu = () => document.getElementById('authAccountMenu')?.classList.remove('open');

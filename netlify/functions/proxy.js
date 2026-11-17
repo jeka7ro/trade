@@ -66,7 +66,16 @@ exports.handler = async (event) => {
   }
 
   const qs = event.queryStringParameters || {};
-  const evPath = String(event.path || '');
+  let evPath = String(event.path || '');
+  if (event.rawUrl) {
+    try {
+      const u = new URL(event.rawUrl);
+      if (u.pathname && !u.pathname.includes('/.netlify/functions/')) evPath = u.pathname;
+    } catch (_) {}
+  }
+  if (event.headers?.['x-nf-original-pathname']) {
+    evPath = String(event.headers['x-nf-original-pathname']);
+  }
 
   // Shared User Auth, Google OAuth & Personal/General Settings API
   if (evPath.includes('/api/auth/')) {
@@ -84,6 +93,24 @@ exports.handler = async (event) => {
         headers: { ...CORS_HEADERS, Location: out.redirect },
         body: ''
       };
+    }
+    if (out.body && (evPath.endsWith('/api/auth/me') || evPath.endsWith('/api/auth/portfolio')) && out.body.user?.usernameLower !== 'guest') {
+      const curPf = out.body.realPortfolio || out.body.personalState?.realPortfolio || out.body.mergedState?.realPortfolio;
+      if (!curPf || !Array.isArray(curPf.assets) || curPf.assets.length === 0) {
+        try {
+          const syncRes = await serverlessEtoroService.syncNow('default');
+          if (syncRes?.positionsCount > 0) {
+            const builtPf = serverlessEtoroService.buildRealPortfolioFromEtoro({
+              existingPortfolio: curPf,
+              snapshot: syncRes.snapshot,
+              positions: Object.values(serverlessEtoroService.getStatus('default').positions || {})
+            });
+            if (out.body.personalState) out.body.personalState.realPortfolio = builtPf;
+            if (out.body.mergedState) out.body.mergedState.realPortfolio = builtPf;
+            if (out.body.realPortfolio !== undefined) out.body.realPortfolio = builtPf;
+          }
+        } catch (_) {}
+      }
     }
     return {
       statusCode: out.status || 200,
