@@ -78,10 +78,11 @@
   // ─── 1. PROXY & ENDPOINT CONFIGURATION ────────────────────────────────────
   const IS_LOCAL = window.location.hostname === 'localhost'
     || window.location.hostname === '127.0.0.1'
+    || /\.trycloudflare\.com$/i.test(window.location.hostname)
     || /^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(window.location.hostname);
   const PROXY_ENDPOINTS = IS_LOCAL
-    ? ['/proxy?url=', 'http://localhost:9030/proxy?url=']
-    : ['/.netlify/functions/proxy?url='];
+    ? ['/proxy?url=', '/.netlify/functions/proxy?url=']
+    : ['/.netlify/functions/proxy?url=', '/proxy?url='];
 
   async function fetchViaProxy(targetUrl, timeoutMs = 9500) {
     let lastErr = null;
@@ -957,12 +958,13 @@
     setTimeout(resizeAllCharts, 40);
   }
 
-  const CHART_CROSSHAIR_FMT = new Intl.DateTimeFormat('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
-  const CHART_YEAR_FMT = new Intl.DateTimeFormat('ro-RO', { year: 'numeric' });
-  const CHART_MONTH_FMT = new Intl.DateTimeFormat('ro-RO', { month: 'short', year: '2-digit' });
-  const CHART_DAY_FMT = new Intl.DateTimeFormat('ro-RO', { day: '2-digit', month: 'short' });
-  const CHART_TIME_FMT = new Intl.DateTimeFormat('ro-RO', { hour: '2-digit', minute: '2-digit', hour12: false });
-  const CHART_SEC_FMT = new Intl.DateTimeFormat('ro-RO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const CHART_TZ_RO = 'Europe/Bucharest';
+  const CHART_CROSSHAIR_FMT = new Intl.DateTimeFormat('ro-RO', { timeZone: CHART_TZ_RO, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+  const CHART_YEAR_FMT = new Intl.DateTimeFormat('ro-RO', { timeZone: CHART_TZ_RO, year: 'numeric' });
+  const CHART_MONTH_FMT = new Intl.DateTimeFormat('ro-RO', { timeZone: CHART_TZ_RO, month: 'short', year: '2-digit' });
+  const CHART_DAY_FMT = new Intl.DateTimeFormat('ro-RO', { timeZone: CHART_TZ_RO, day: '2-digit', month: 'short' });
+  const CHART_TIME_FMT = new Intl.DateTimeFormat('ro-RO', { timeZone: CHART_TZ_RO, hour: '2-digit', minute: '2-digit', hour12: false });
+  const CHART_SEC_FMT = new Intl.DateTimeFormat('ro-RO', { timeZone: CHART_TZ_RO, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
   function chartTimeToDate(time) {
     if (typeof time === 'number') return new Date(time * 1000);
@@ -1912,9 +1914,9 @@
           bars = Q.toTickBars(bars, Math.max(10, parseInt(cleanTf, 10)));
         } else if (/^\d+s$/.test(cleanTf)) {
           bars = synthesizeSecondBars(bars, Math.max(1, Math.min(30, parseInt(cleanTf, 10))));
-        } else if (/^\d+m$/.test(cleanTf) && !['1m', '5m', '15m', '30m'].includes(cleanTf)) {
+        } else if (/^\d+m$/.test(cleanTf)) {
           bars = aggregateBucketSeconds(bars, Math.max(1, parseInt(cleanTf, 10)) * 60);
-        } else if (/^\d+h$/.test(cleanTf) && cleanTf !== '1h') {
+        } else if (/^\d+h$/.test(cleanTf)) {
           bars = aggregateBucketSeconds(bars, Math.max(1, parseInt(cleanTf, 10)) * 3600);
         }
         if (bars.length >= 5) {
@@ -2513,6 +2515,131 @@
     el.style.display = 'inline-flex';
   }
 
+  function formatTabTitlePart(symStr, priceVal, pctVal, compact = false) {
+    if (!symStr) return '';
+    if (isFinite(priceVal) && priceVal > 0) {
+      if (!compact && isFinite(pctVal)) {
+        return `${symStr} ${fmt(priceVal)} (${pctVal >= 0 ? '+' : ''}${pctVal.toFixed(2)}%)`;
+      }
+      return `${symStr} ${fmt(priceVal)}`;
+    }
+    return symStr;
+  }
+
+  function updateBrowserTabTitle() {
+    const primarySym = normalizeSymbol(state.symbol);
+    if (!primarySym) return;
+    const needed = getNeededSecPanesCount(state.layout);
+    const activeSyms = [primarySym];
+    const activePaneBySym = new Map();
+    if (needed > 0 && Array.isArray(secPanes)) {
+      for (let i = 0; i < Math.min(needed, secPanes.length); i++) {
+        const p = secPanes[i];
+        const s = normalizeSymbol(p?.sym);
+        if (s && !activeSyms.includes(s)) {
+          activeSyms.push(s);
+          activePaneBySym.set(s, p);
+        }
+      }
+    }
+
+    const isMulti = activeSyms.length > 1;
+    const parts = activeSyms.map((s, idx) => {
+      if (idx === 0) {
+        const px = state._lastTitlePrice;
+        const pct = state._lastTitlePct;
+        if (isFinite(px) && px > 0) return formatTabTitlePart(s, px, pct, isMulti);
+      }
+      const p = activePaneBySym.get(s);
+      const lq = liveQuoteCache[s];
+      const fq = fullQuoteCache[s];
+      const wl = state.watchlist.find(w => w.sym === s);
+      const lastB = (p?.bars && p.bars.length) ? p.bars[p.bars.length - 1] : null;
+      const px = (isFinite(p?._liveTitlePrice) && p._liveTitlePrice > 0)
+        ? p._liveTitlePrice
+        : ((lq?.extType && isFinite(lq?.extPrice)) ? lq.extPrice : (lq?.price ?? fq?.regularMarketPrice ?? wl?.price ?? lastB?.close));
+      const pct = isFinite(p?._liveTitlePct)
+        ? p._liveTitlePct
+        : ((lq?.extType && isFinite(lq?.extChgPct)) ? lq.extChgPct : (lq?.chgPct ?? fq?.regularMarketChangePercent ?? wl?.chgPct));
+      return formatTabTitlePart(s, px, pct, isMulti);
+    }).filter(Boolean);
+
+    if (parts.length === 1 && (!isFinite(state._lastTitlePrice) || state._lastTitlePrice <= 0)) {
+      document.title = `${primarySym} · TradePro`;
+    } else if (parts.length > 0) {
+      document.title = parts.join(' · ');
+    }
+  }
+
+  function buildPaneEtoroStripHtml(sym, livePx) {
+    const pf = authState.realPortfolio;
+    const assets = Array.isArray(pf?.assets) ? pf.assets : [];
+    if (!assets.length || !sym) return '';
+    const upper = String(sym || '').toUpperCase().replace(/\.(24-7|24-5)$/i, '');
+    const hit = assets.find(a => {
+      const aSym = String(a.sym || '').toUpperCase();
+      const bSym = String(a.brokerSym || '').toUpperCase().replace(/\.(24-7|24-5)$/i, '');
+      return aSym === upper || bSym === upper || String(a.brokerSym || '').toUpperCase() === String(sym || '').toUpperCase();
+    });
+    if (!hit) return '';
+    const units = Number(hit.units || 0);
+    const avgOpen = Number(hit.avgOpen || 0);
+    const curPx = Number.isFinite(Number(livePx)) && Number(livePx) > 0 ? Number(livePx) : Number(hit.brokerPrice || avgOpen || 0);
+    const sign = hit.side === 'SHORT' ? -1 : 1;
+    const inv = Number(hit.invested ?? (units * avgOpen));
+    const pnl = (hit.source === 'etoro_api' && hit.brokerPnl != null && Math.abs(curPx - Number(hit.brokerPrice || curPx)) < 1e-3)
+      ? Number(hit.brokerPnl)
+      : (units * (curPx - avgOpen) * sign);
+    const netVal = Math.max(0, inv + pnl);
+    const lots = Array.isArray(hit.lots) ? hit.lots : [];
+    const validSls = lots.map(l => Number(l.sl)).filter(v => Number.isFinite(v) && v > 0);
+    const minSl = validSls.length ? Math.min(...validSls) : (Number(hit.sl) > 0 ? Number(hit.sl) : null);
+    const maxSl = validSls.length ? Math.max(...validSls) : minSl;
+    const slTxt = minSl
+      ? (maxSl && Math.abs(maxSl - minSl) > 1e-4 ? `$${fmt(minSl)}–$${fmt(maxSl)}` : `$${fmt(minSl)}`)
+      : 'Fără SL';
+    const refSl = minSl ? (sign > 0 ? maxSl : minSl) : null;
+    const slDistPct = (refSl && curPx > 0) ? Math.abs(((curPx - refSl) / curPx) * 100) : null;
+    const slDanger = slDistPct != null && slDistPct <= 5.5 ? 'dn' : '';
+    const fmtCompactUsd = (v, sgn = false) => {
+      const n = Number(v || 0);
+      const prefix = sgn ? (n >= 0 ? '+$' : '-$') : (n < 0 ? '-$' : '$');
+      return `${prefix}${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2, maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 })}`;
+    };
+    return `
+      <span class="pes-etoro-ico" title="Poziție live eToro" aria-label="eToro"><svg viewBox="0 0 24 24" width="15" height="15"><rect width="24" height="24" rx="5" fill="#13c636"/><path d="M16.6 13.6c-.5 1.8-2.2 3-4.3 3-2.6 0-4.6-2-4.6-4.6s2-4.6 4.6-4.6c2.5 0 4.4 1.8 4.4 4.4 0 .4 0 .7-.1 1H9.9c.2 1.3 1.2 2.1 2.5 2.1 1 0 1.8-.5 2.2-1.3h2zm-6.7-2.4h4.6c-.2-1.2-1-2-2.2-2-1.3 0-2.1.8-2.4 2z" fill="#ffffff"/><path d="M7.2 7.2c.6-1 1.6-1.7 2.8-1.9l.4 1.4c-.8.2-1.4.6-1.8 1.3L7.2 7.2zm9.6 0-1.4.8c-.4-.7-1-1.1-1.8-1.3l.4-1.4c1.2.2 2.2.9 2.8 1.9z" fill="#ffffff"/></svg></span>
+      <span class="pes-val-pill" title="Valoare curentă netă în eToro">Val <b>${fmtCompactUsd(netVal)}</b></span>
+      <span class="pes-item ${pnl >= 0 ? 'up' : 'dn'}" title="Profit / Pierdere curentă eToro">P&amp;L <b>${fmtCompactUsd(pnl, true)}</b></span>
+      <span class="pes-sep">·</span>
+      <span class="pes-item ${slDanger}" title="Stop-Loss eToro">SL <b>${slTxt}</b>${slDistPct != null ? ` <small>(−${slDistPct.toFixed(1)}%)</small>` : ''}</span>
+    `;
+  }
+
+  function updatePaneEtoroStrip(el, sym, livePx) {
+    if (!el) return;
+    const html = buildPaneEtoroStripHtml(sym, livePx);
+    if (html) {
+      el.innerHTML = html;
+      el.style.display = 'inline-flex';
+    } else {
+      el.style.display = 'none';
+      el.innerHTML = '';
+    }
+  }
+
+  function refreshAllPaneEtoroStrips() {
+    const priPx = state._lastTitlePrice || liveQuoteCache[state.symbol]?.price || state.bars?.[state.bars.length - 1]?.close;
+    updatePaneEtoroStrip(document.getElementById('primaryPfStrip'), state.symbol, priPx);
+    if (Array.isArray(secPanes)) {
+      secPanes.forEach(p => {
+        const el = document.getElementById(`secPfStrip${p.id}`);
+        if (!el) return;
+        const px = p._liveTitlePrice || liveQuoteCache[p.sym]?.price || p.bars?.[p.bars.length - 1]?.close;
+        updatePaneEtoroStrip(el, p.sym, px);
+      });
+    }
+  }
+
   function applySecondaryPaneQuoteUI(p, opts) {
     const { sym, priceHtml, regHtml, regPrice, regChg, regChgPct, extType, extPrice, extChg, extChgPct } = opts || {};
     if (!p) return;
@@ -2545,6 +2672,12 @@
       extPct: extChgPct,
       showPriceAlways: true
     });
+    const effPx = hasExt ? extPrice : regPrice;
+    const effPct = (hasExt && isFinite(extChgPct)) ? extChgPct : regChgPct;
+    if (isFinite(effPx) && effPx > 0) p._liveTitlePrice = effPx;
+    if (isFinite(effPct)) p._liveTitlePct = effPct;
+    updatePaneEtoroStrip(document.getElementById(`secPfStrip${p.id}`), sym || p.sym, effPx);
+    updateBrowserTabTitle();
   }
 
   function updateHeaderAndLegend(lastBar, prevBar, { allowPending = false } = {}) {
@@ -2740,15 +2873,18 @@
       if (baSpreadVal) baSpreadVal.textContent = spreadTxt;
       const titlePrice = isFinite(activeHeroPrice) ? activeHeroPrice : refPx;
       const titlePct = (extCoversHero && isFinite(extPctVal)) ? extPctVal : sessPct;
-      const titleUp = isFinite(titlePct) ? titlePct >= 0 : isUp;
-      document.title = isFinite(titlePct)
-        ? `${sym} ${fmt(titlePrice)} (${titleUp ? '+' : ''}${titlePct.toFixed(2)}%)`
-        : `${sym} ${fmt(titlePrice)}`;
+      state._lastTitlePrice = titlePrice;
+      state._lastTitlePct = titlePct;
+      updatePaneEtoroStrip(document.getElementById('primaryPfStrip'), sym, titlePrice);
+      updateBrowserTabTitle();
     } else {
       if (baSellPrice) baSellPrice.textContent = '—';
       if (baBuyPrice) baBuyPrice.textContent = '—';
       if (baSpreadVal) baSpreadVal.textContent = '—';
-      document.title = `${sym} · TradePro`;
+      state._lastTitlePrice = NaN;
+      state._lastTitlePct = NaN;
+      updatePaneEtoroStrip(document.getElementById('primaryPfStrip'), sym, NaN);
+      updateBrowserTabTitle();
     }
     if (hasRenderedBars) {
       state.prevChartPrice = lastBar.close;
@@ -7168,8 +7304,17 @@
       paneEl = document.createElement('div');
       paneEl.id = `secPane${p.id}`;
       paneEl.className = 'chart-pane secondary-pane';
-      paneEl.innerHTML = `<div class="sec-pane-bar"></div><div id="secCanvas${p.id}" class="sec-canvas"></div>`;
+      paneEl.innerHTML = `<div class="sec-pane-bar"></div><div id="secPfStrip${p.id}" class="pane-etoro-strip" style="display:none;"></div><div id="secCanvas${p.id}" class="sec-canvas"></div>`;
       grid.appendChild(paneEl);
+    } else if (!document.getElementById(`secPfStrip${p.id}`)) {
+      const barEl = paneEl.querySelector('.sec-pane-bar');
+      if (barEl) {
+        const pfDiv = document.createElement('div');
+        pfDiv.id = `secPfStrip${p.id}`;
+        pfDiv.className = 'pane-etoro-strip';
+        pfDiv.style.display = 'none';
+        barEl.insertAdjacentElement('afterend', pfDiv);
+      }
     }
 
     const canvasEl = document.getElementById(`secCanvas${p.id}`);
@@ -7199,9 +7344,9 @@
 
       if (bar) {
         bar.innerHTML = `
-          <div class="sec-pane-left" style="display:flex;align-items:center;gap:6px;min-width:0;">
-            <span id="secLogoBox${p.id}" style="display:inline-flex;align-items:center;">${renderLogoAvatar(p.sym, 'sm')}</span>
-            <input id="secSymInput${p.id}" class="sec-pane-sym" value="${p.sym}" size="7" spellcheck="false" autocomplete="off" title="Scrie simbol + Enter (sau click pe ecran și alege din Watchlist)">
+          <div class="sec-pane-left">
+            <span id="secLogoBox${p.id}" style="display:inline-flex;align-items:center;flex-shrink:0;">${renderLogoAvatar(p.sym, 'sm')}</span>
+            <input id="secSymInput${p.id}" class="sec-pane-sym" value="${p.sym}" size="6" spellcheck="false" autocomplete="off" title="Scrie simbol + Enter (sau click pe ecran și alege din Watchlist)">
             <button id="secSearchBtn${p.id}" class="tb-btn icon-only" style="width:24px;height:24px;" title="Caută simbol pentru Ecranul #${p.id + 1}">
               <svg class="tv-ico sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7.5"/><line x1="20" y1="20" x2="16.35" y2="16.35"/></svg>
             </button>
@@ -7209,22 +7354,24 @@
               ${tfOpts.map(([val, lbl]) => `<option value="${val}" ${val === p.tf ? 'selected' : ''}>${lbl}</option>`).join('')}
             </select>
           </div>
-          <div class="sec-pane-right" style="display:flex;align-items:center;gap:6px;min-width:0;">
+          <div class="sec-pane-right">
             <span id="secLivePrice${p.id}" class="sec-live-price tabular">—</span>
             <span id="secLiveChg${p.id}" class="sec-live-chg tabular">—</span>
             <span id="secExtBadge${p.id}" class="ext-sess-pill sec-ext-pill tabular" style="display:none;" title="Pre-Market / Post-Market / Overnight"></span>
-            <span id="secSigBadge${p.id}" class="pill pill-neut">—</span>
-            <div class="pane-prof-tab">
-              <button type="button" id="secIndBtn${p.id}" class="pane-prof-btn" title="Profil / Skin &amp; Indicatori pentru Ecran #${p.id + 1}">
-                <span class="pane-prof-dot"></span>
-                <span id="secIndLbl${p.id}">Ind</span>
+            <div class="sec-pane-tools">
+              <span id="secSigBadge${p.id}" class="pill pill-neut">—</span>
+              <div class="pane-prof-tab">
+                <button type="button" id="secIndBtn${p.id}" class="pane-prof-btn" title="Profil / Skin &amp; Indicatori pentru Ecran #${p.id + 1}">
+                  <span class="pane-prof-dot"></span>
+                  <span id="secIndLbl${p.id}">Ind</span>
+                </button>
+                <button type="button" id="secCopyBtn${p.id}" class="pane-prof-copy" title="Copiază profilul / indicatorii acestui grafic" aria-label="Copiază profilul">${ICO.copy}</button>
+                <button type="button" id="secPasteBtn${p.id}" class="pane-prof-paste" style="display:none;" title="Preia profilul copiat">${ICO.paste}<span id="secPasteLbl${p.id}">Preia</span></button>
+              </div>
+              <button id="secMaxBtn${p.id}" class="tb-btn icon-only" style="width:24px;height:24px;" title="Maximizează pe tot ecranul">
+                <svg class="tv-ico sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><line x1="21" y1="3" x2="13" y2="11"/><path d="M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>
               </button>
-              <button type="button" id="secCopyBtn${p.id}" class="pane-prof-copy" title="Copiază profilul / indicatorii acestui grafic" aria-label="Copiază profilul">${ICO.copy}</button>
-              <button type="button" id="secPasteBtn${p.id}" class="pane-prof-paste" style="display:none;" title="Preia profilul copiat">${ICO.paste}<span id="secPasteLbl${p.id}">Preia</span></button>
             </div>
-            <button id="secMaxBtn${p.id}" class="tb-btn icon-only" style="width:24px;height:24px;" title="Maximizează pe tot ecranul">
-              <svg class="tv-ico sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><line x1="21" y1="3" x2="13" y2="11"/><path d="M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>
-            </button>
           </div>
         `;
       }
@@ -7335,13 +7482,14 @@
         };
       }
 
+      wirePaneBarDoubleClick(bar, p.id);
+      wirePaneBarDoubleClick(document.getElementById(`secPfStrip${p.id}`), p.id);
+
       if (maxBtn) {
+        maxBtn.title = 'Maximizează / Revino la layout (sau dublu-click pe bară)';
         maxBtn.onclick = (e) => {
           e.stopPropagation();
-          const symToMax = p.sym;
-          const tfToMax = p.tf;
-          setMultiChartLayout('1');
-          loadSymbol(symToMax, tfToMax);
+          togglePaneFullscreen(p.id);
         };
       }
     } else {
@@ -7365,7 +7513,52 @@
     return paneEl;
   }
 
+  let zoomedPaneId = null;
+
+  function clearPaneFullscreen() {
+    zoomedPaneId = null;
+    const grid = document.getElementById('chartsGrid');
+    if (grid) grid.classList.remove('has-zoomed-pane');
+    document.querySelectorAll('#chartsGrid .chart-pane.pane-zoomed').forEach(el => el.classList.remove('pane-zoomed'));
+  }
+
+  function togglePaneFullscreen(paneId) {
+    if (state.layout === '1') return;
+    const grid = document.getElementById('chartsGrid');
+    if (!grid) return;
+    const targetId = Number(paneId) || 0;
+    if (zoomedPaneId === targetId) {
+      clearPaneFullscreen();
+    } else {
+      clearPaneFullscreen();
+      const targetEl = targetId === 0
+        ? document.getElementById('primaryPane')
+        : document.getElementById(`secPane${targetId}`);
+      if (!targetEl) return;
+      zoomedPaneId = targetId;
+      grid.classList.add('has-zoomed-pane');
+      targetEl.classList.add('pane-zoomed');
+      focusChartPane(targetId);
+    }
+    resizeAllCharts();
+    requestAnimationFrame(resizeAllCharts);
+    setTimeout(resizeAllCharts, 70);
+  }
+
+  function wirePaneBarDoubleClick(el, paneId) {
+    if (!el || el.dataset.dblZoomWired === '1') return;
+    el.dataset.dblZoomWired = '1';
+    el.addEventListener('dblclick', (e) => {
+      if (state.layout === '1') return;
+      if (e.target && e.target.closest('input, select, button, a')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      togglePaneFullscreen(paneId);
+    });
+  }
+
   async function setMultiChartLayout(layoutCode) {
+    clearPaneFullscreen();
     const validLayouts = ['1', '2v', '2h', '3v', '4', '6', '8', '9', '10', '12', '16', '20'];
     const cleanLayout = validLayouts.includes(layoutCode) ? layoutCode : '1';
     state.layout = cleanLayout;
@@ -7398,6 +7591,7 @@
     saveSecondaryPanes();
     focusChartPane(state.focusedPaneId);
     syncLiveStreamSubscriptions();
+    updateBrowserTabTitle();
     setTimeout(resizeAllCharts, 50);
 
     // Load active secondary panes in smooth parallel batches of 5 (handles up to 20 live charts effortlessly)
@@ -9255,6 +9449,15 @@
     if (existIdx >= 0) list[existIdx] = entry;
     else list.unshift(entry);
     writeWorkspaceArrangements(list);
+    wirePaneBarDoubleClick(document.getElementById('tvLegendBox'), 0);
+    wirePaneBarDoubleClick(document.getElementById('primaryPfStrip'), 0);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && zoomedPaneId !== null) {
+        clearPaneFullscreen();
+        resizeAllCharts();
+        requestAnimationFrame(resizeAllCharts);
+      }
+    });
     renderWorkspaceArrangementsUI();
     showToast(`Aranjament „${cleanName}” Salvat`, `${needed + 1} ecrane cu simbolurile, intervalele și skin-urile lor individuale sunt salvate.`);
   }
@@ -11383,6 +11586,7 @@
           const s = getActiveFocusedSymbol();
           const lq = liveQuoteCache[s];
           renderDetailsPortfolioBox(s, lq?.regPrice, lq?.regChg);
+          refreshAllPaneEtoroStrips();
         } catch (_) { }
         return authState.realPortfolio;
       },
@@ -11394,6 +11598,7 @@
         });
         authState.realPortfolio = res.realPortfolio || null;
         if (authState.personalState) authState.personalState.realPortfolio = authState.realPortfolio;
+        refreshAllPaneEtoroStrips();
         window.dispatchEvent(new CustomEvent('tp:realPortfolioUpdated', {
           detail: { userId: authState.user?.id || null, realPortfolio: authState.realPortfolio }
         }));
@@ -11405,6 +11610,7 @@
         authState.user = null;
         authState.personalState = null;
         authState.realPortfolio = null;
+        refreshAllPaneEtoroStrips();
         window.dispatchEvent(new CustomEvent('tp:realPortfolioUpdated', { detail: { userId: null, realPortfolio: null } }));
         try {
           localStorage.removeItem(AUTH_TOKEN_KEY);

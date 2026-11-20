@@ -100,14 +100,22 @@ exports.handler = async (event) => {
         try {
           const syncRes = await serverlessEtoroService.syncNow('default');
           if (syncRes?.positionsCount > 0) {
-            const builtPf = serverlessEtoroService.buildRealPortfolioFromEtoro({
+            const builtPf = syncRes.realPortfolio || serverlessEtoroService.buildRealPortfolioFromEtoro({
               existingPortfolio: curPf,
               snapshot: syncRes.snapshot,
-              positions: Object.values(serverlessEtoroService.getStatus('default').positions || {})
+              positions: syncRes.positions || serverlessEtoroService.getStatus('default').latestPositions || []
             });
             if (out.body.personalState) out.body.personalState.realPortfolio = builtPf;
             if (out.body.mergedState) out.body.mergedState.realPortfolio = builtPf;
             if (out.body.realPortfolio !== undefined) out.body.realPortfolio = builtPf;
+            try {
+              await handleAuthApiRequest({
+                method: 'PUT',
+                pathname: '/api/auth/portfolio',
+                headers: event.headers || {},
+                body: { realPortfolio: builtPf }
+              });
+            } catch (_) {}
           }
         } catch (_) {}
       }
@@ -122,9 +130,24 @@ exports.handler = async (event) => {
   // eToro Read-Only Sync API on Netlify
   if (evPath.includes('/api/etoro/')) {
     try {
+      const authGate = await handleAuthApiRequest({
+        method: 'GET',
+        pathname: '/api/auth/me',
+        headers: event.headers || {}
+      });
+      if (!authGate?.body?.authenticated || !authGate?.body?.user) {
+        return { statusCode: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ ok: false, error: 'Autentificare necesară pentru eToro API.' }) };
+      }
       const bodyObj = event.body ? JSON.parse(event.body) : {};
       if (evPath.endsWith('/status') && event.httpMethod === 'GET') {
-        return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(serverlessEtoroService.getStatus('default')) };
+        let st = serverlessEtoroService.getStatus('default');
+        if ((!st.openPositionsCount || st.openPositionsCount === 0) && st.credentials?.configured) {
+          try {
+            await serverlessEtoroService.syncNow('default');
+            st = serverlessEtoroService.getStatus('default');
+          } catch (_) {}
+        }
+        return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(st) };
       }
       if (evPath.endsWith('/config') && event.httpMethod === 'POST') {
         return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(serverlessEtoroService.updateConfig('default', bodyObj)) };
@@ -138,6 +161,16 @@ exports.handler = async (event) => {
       }
       if (evPath.endsWith('/sync') && event.httpMethod === 'POST') {
         const resSync = await serverlessEtoroService.syncNow('default');
+        if (resSync?.realPortfolio?.assets?.length) {
+          try {
+            await handleAuthApiRequest({
+              method: 'PUT',
+              pathname: '/api/auth/portfolio',
+              headers: event.headers || {},
+              body: { realPortfolio: resSync.realPortfolio }
+            });
+          } catch (_) {}
+        }
         return { statusCode: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(resSync) };
       }
     } catch (e) {
@@ -145,23 +178,87 @@ exports.handler = async (event) => {
     }
   }
 
-  // Real Portfolio Live Risk & Technical Evaluator on Netlify
-  if (evPath.includes('/api/intel/portfolio-evaluate') && event.httpMethod === 'POST') {
+  // TradePro AI Intelligence Endpoints on Netlify
+  if (evPath.includes('/api/intel/')) {
+    const jsonIntel = (code, obj) => ({
+      statusCode: code,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(obj)
+    });
     try {
-      const bodyObj = event.body ? JSON.parse(event.body) : {};
-      const pf = bodyObj?.realPortfolio || bodyObj?.portfolio || bodyObj || {};
-      const data = await serverlessIntelEngine.evaluateRealPortfolio(pf);
-      return {
-        statusCode: 200,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(data)
-      };
+      if (evPath.endsWith('/market-overview') && event.httpMethod === 'GET') {
+        const data = await serverlessIntelEngine.fetchMarketOverview(qs.refresh === '1');
+        return jsonIntel(200, data);
+      }
+      if (evPath.endsWith('/early-radar') && event.httpMethod === 'GET') {
+        const mode = qs.mode || 'all';
+        const forceRefresh = qs.refresh === '1';
+        const wlParam = qs.wl || '';
+        const customSyms = wlParam ? wlParam.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const filters = {
+          chgMin: qs.chgMin,
+          chgMax: qs.chgMax,
+          minRvolTod: qs.minRvolTod,
+          minVolAccel5m: qs.minVolAccel5m,
+          maxFloatM: qs.maxFloatM,
+          maxSpreadPct: qs.maxSpreadPct,
+          nearVwapOrRes: qs.nearVwapOrRes === '1',
+          requirePosAccel: qs.requirePosAccel === '1',
+          requireCatalyst: qs.requireCatalyst === '1'
+        };
+        const data = await serverlessIntelEngine.computeEarlyRadar({ mode, customSyms, forceRefresh, filters });
+        return jsonIntel(200, data);
+      }
+      if (evPath.endsWith('/order-flow') && event.httpMethod === 'GET') {
+        const data = await serverlessIntelEngine.fetchOrderFlowIntel(qs.sym || 'ONDS', qs.tf || '5m');
+        return jsonIntel(200, data);
+      }
+      if (evPath.endsWith('/symbol-deep') && event.httpMethod === 'GET') {
+        const data = await serverlessIntelEngine.fetchSymbolDeepIntel(qs.sym || 'ONDS', qs.tf || '30m');
+        return jsonIntel(200, data);
+      }
+      if (evPath.endsWith('/copilot') && event.httpMethod === 'POST') {
+        const bodyObj = event.body ? JSON.parse(event.body) : {};
+        const data = await serverlessIntelEngine.answerCopilotQuery({
+          query: bodyObj.query || '',
+          sym: bodyObj.sym || 'ONDS',
+          tf: bodyObj.tf || '30m',
+          watchlist: Array.isArray(bodyObj.watchlist) ? bodyObj.watchlist : []
+        });
+        return jsonIntel(200, data);
+      }
+      if (evPath.endsWith('/scanner-cockpit') && event.httpMethod === 'GET') {
+        const wlParam = qs.wl || '';
+        const customSyms = wlParam ? wlParam.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const data = await serverlessIntelEngine.fetchScannerCockpit(customSyms, qs.refresh === '1');
+        return jsonIntel(200, data);
+      }
+      if (evPath.endsWith('/signal-validation') && event.httpMethod === 'GET') {
+        const data = await serverlessIntelEngine.getSignalValidationReport(qs.refresh === '1');
+        return jsonIntel(200, data);
+      }
+      if (evPath.endsWith('/portfolio-evaluate') && event.httpMethod === 'POST') {
+        const bodyObj = event.body ? JSON.parse(event.body) : {};
+        let pf = bodyObj?.realPortfolio || bodyObj?.portfolio || bodyObj || {};
+        if (!pf || !Array.isArray(pf.assets) || pf.assets.length === 0) {
+          try {
+            const syncRes = await serverlessEtoroService.syncNow('default');
+            if (syncRes?.positionsCount > 0) {
+              pf = syncRes.realPortfolio || serverlessEtoroService.buildRealPortfolioFromEtoro({
+                existingPortfolio: pf,
+                snapshot: syncRes.snapshot,
+                positions: syncRes.positions || serverlessEtoroService.getStatus('default').latestPositions || []
+              });
+            }
+          } catch (_) {}
+        }
+        const data = await serverlessIntelEngine.evaluateRealPortfolio(pf);
+        if (pf?.assets?.length) data.syncedPortfolio = pf;
+        return jsonIntel(200, data);
+      }
+      return jsonIntel(404, { ok: false, error: 'Ruta Intel necunoscută.' });
     } catch (e) {
-      return {
-        statusCode: 500,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify({ ok: false, error: e.message })
-      };
+      return jsonIntel(500, { ok: false, error: e.message });
     }
   }
 
@@ -411,9 +508,7 @@ exports.handler = async (event) => {
           error: null
         }
       };
-      if (tvSupp && (tvSupp.extendedBars?.length || tvSupp.boatsBars?.length)) {
-        mergeTvChartSupplement(payload, tvSupp, yfInterval);
-      }
+      mergeTvChartSupplement(payload, tvSupp, yfInterval);
       return {
         statusCode: 200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },

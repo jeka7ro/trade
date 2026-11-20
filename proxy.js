@@ -214,9 +214,7 @@ async function handleYahooProxyTarget(targetUrlRaw) {
         error: null
       }
     };
-    if (tvSupp && (tvSupp.extendedBars?.length || tvSupp.boatsBars?.length)) {
-      mergeTvChartSupplement(payload, tvSupp, yfInterval);
-    }
+    mergeTvChartSupplement(payload, tvSupp, yfInterval);
     setCached(cacheKey, payload);
     return payload;
   }
@@ -3459,6 +3457,14 @@ const requestHandler = async (req, res) => {
         global.__tpEtoroService.configureScheduler('default');
       }
       const etoroSvc = global.__tpEtoroService;
+      const authGate = await handleAuthApiRequest({
+        method: 'GET',
+        pathname: '/api/auth/me',
+        headers: req.headers || {}
+      });
+      if (!authGate?.body?.authenticated || !authGate?.body?.user) {
+        return sendJson(res, 401, { ok: false, error: 'Autentificare necesară pentru eToro API.' });
+      }
 
       if (pathname === '/api/etoro/status' && req.method === 'GET') {
         return sendJson(res, 200, etoroSvc.getStatus('default'));

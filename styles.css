@@ -249,6 +249,19 @@ button:active {
   overflow: visible;
 }
 
+/* iPadOS / iOS Standalone PWA: push #topbar cleanly below the OS status bar & multitasking pill */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: max(36px, calc(env(safe-area-inset-top, 0px) + 14px)) !important;
+  }
+}
+
+@media all and (display-mode: standalone) and (orientation: landscape) {
+  body {
+    padding-top: max(42px, calc(env(safe-area-inset-top, 0px) + 18px)) !important;
+  }
+}
+
 .tv-brand {
   display: flex;
   align-items: center;
@@ -1798,29 +1811,45 @@ button:active {
 
 /* Secondary Multi-Chart Header */
 .sec-pane-bar {
-  height: 38px;
+  height: 36px;
   background: var(--bg-panel);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 11px;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 8px;
   font-size: 12px;
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .sec-pane-left {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
 }
 
 .sec-pane-right {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
+  overflow: hidden;
+}
+
+.sec-pane-right .sec-pane-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sec-pane-right>button,
@@ -1830,16 +1859,18 @@ button:active {
 }
 
 .sec-pane-sym {
-  height: 26px;
-  min-width: 54px;
+  height: 24px;
+  width: 62px;
+  min-width: 48px;
   font-weight: 800;
   color: var(--text-bright);
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  padding: 2px 10px;
-  font-size: 12.5px;
+  padding: 1px 7px;
+  font-size: 12px;
   outline: none;
+  flex-shrink: 0;
 }
 
 .sec-pane-sym:focus {
@@ -1847,19 +1878,20 @@ button:active {
 }
 
 .sec-pane-tf {
-  height: 26px;
+  height: 24px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  padding: 2px 9px;
-  font-size: 11.5px;
+  padding: 1px 6px;
+  font-size: 11px;
   font-weight: 600;
   outline: none;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .sec-live-price {
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 800;
   color: var(--text-bright);
   letter-spacing: -0.01em;
@@ -1868,17 +1900,291 @@ button:active {
 }
 
 .sec-live-chg {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .sec-ext-pill {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
   flex-shrink: 0;
+}
+
+/* Compact eToro Live Position Strip inside Chart Panes */
+.pane-etoro-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 9px;
+  background: rgba(10, 17, 30, 0.94);
+  border-bottom: 1px solid rgba(19, 198, 54, 0.22);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.pane-etoro-strip .pes-etoro-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(19, 198, 54, 0.35));
+}
+
+.pane-etoro-strip .pes-item {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.pane-etoro-strip .pes-item b {
+  color: var(--text-bright);
+  font-weight: 700;
+}
+
+.pane-etoro-strip .pes-item.up,
+.pane-etoro-strip .pes-item.up b {
+  color: var(--tv-green);
+}
+
+.pane-etoro-strip .pes-item.dn,
+.pane-etoro-strip .pes-item.dn b {
+  color: var(--tv-red);
+}
+
+.pane-etoro-strip .pes-val-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.34);
+  color: #7dd3fc;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.pane-etoro-strip .pes-val-pill b {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.pane-etoro-strip .pes-sep {
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+
+/* Multi-chart unified header: Primary Pane #1 matches Secondary Panes #2-#20 1:1 */
+#chartsGrid.layout-1 #tvLegendBox {
+  top: 30px;
+}
+
+#chartsGrid:not(.layout-1) #tvLegendBox {
+  position: static;
+  width: 100%;
+  max-width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--bg-panel);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  flex-shrink: 0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+#chartsGrid:not(.layout-1) .chart-pane.focused-pane #tvLegendBox {
+  background: var(--tv-blue-bg);
+  border-bottom-color: rgba(10, 132, 255, 0.42);
+}
+
+#chartsGrid:not(.layout-1) .tv-symbol-line {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 0;
+  height: 24px;
+  padding: 0;
+  gap: 5px;
+  max-width: none;
+}
+
+#chartsGrid:not(.layout-1) .tv-substatus-row {
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  gap: 4px;
+}
+
+#chartsGrid:not(.layout-1) #curCompanySub,
+#chartsGrid:not(.layout-1) #ohlcStrip,
+#chartsGrid:not(.layout-1) #barCountdownBadge {
+  display: none !important;
+}
+
+#chartsGrid:not(.layout-1) #curSymbolTitle {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#chartsGrid:not(.layout-1) #curTfBadge {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 0 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+#chartsGrid:not(.layout-1) #curLivePriceHero {
+  font-size: 13px;
+}
+
+#chartsGrid:not(.layout-1) #curSessionChgBadge {
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  font-size: 11px;
+}
+
+#chartsGrid:not(.layout-1) #curSessionChgBadge.pill-buy {
+  color: var(--tv-green);
+}
+
+#chartsGrid:not(.layout-1) #curSessionChgBadge.pill-sell {
+  color: var(--tv-red);
+}
+
+/* Hide noisy SELL/BEAR/Short signal clutter in 3+ multi-chart grids so ALL panes stay 100% identical & clean */
+#chartsGrid.layout-3v #smartHudCard,
+#chartsGrid.layout-4 #smartHudCard,
+#chartsGrid.layout-6 #smartHudCard,
+#chartsGrid.layout-8 #smartHudCard,
+#chartsGrid.layout-9 #smartHudCard,
+#chartsGrid.layout-10 #smartHudCard,
+#chartsGrid.layout-12 #smartHudCard,
+#chartsGrid.layout-16 #smartHudCard,
+#chartsGrid.layout-20 #smartHudCard,
+#chartsGrid.layout-3v [id^="secSigBadge"],
+#chartsGrid.layout-4 [id^="secSigBadge"],
+#chartsGrid.layout-6 [id^="secSigBadge"],
+#chartsGrid.layout-8 [id^="secSigBadge"],
+#chartsGrid.layout-9 [id^="secSigBadge"],
+#chartsGrid.layout-10 [id^="secSigBadge"],
+#chartsGrid.layout-12 [id^="secSigBadge"],
+#chartsGrid.layout-16 [id^="secSigBadge"],
+#chartsGrid.layout-20 [id^="secSigBadge"] {
+  display: none !important;
+}
+
+#chartsGrid.layout-6 #curLivePriceHero,
+#chartsGrid.layout-8 #curLivePriceHero,
+#chartsGrid.layout-9 #curLivePriceHero {
+  font-size: 12.5px;
+}
+
+#chartsGrid.layout-6 #curSessionChgBadge,
+#chartsGrid.layout-8 #curSessionChgBadge,
+#chartsGrid.layout-9 #curSessionChgBadge {
+  font-size: 10.5px;
+}
+
+/* Instant Full-Pane Zoom Toggle (Double-click any pane bar -> Full -> Double-click -> Back) */
+#chartsGrid.has-zoomed-pane {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 1fr !important;
+}
+
+#chartsGrid.has-zoomed-pane .chart-pane:not(.pane-zoomed) {
+  display: none !important;
+}
+
+#chartsGrid.has-zoomed-pane .chart-pane.pane-zoomed {
+  display: flex !important;
+  grid-column: 1 / -1 !important;
+  grid-row: 1 / -1 !important;
+  width: 100%;
+  height: 100%;
+}
+
+#chartsGrid:not(.layout-1) #tvLegendBox,
+#chartsGrid:not(.layout-1) .sec-pane-bar,
+#chartsGrid:not(.layout-1) .pane-etoro-strip {
+  cursor: pointer;
+  user-select: none;
+}
+
+#chartsGrid.layout-4 .sec-pane-left > button,
+#chartsGrid.layout-6 .sec-pane-left > button,
+#chartsGrid.layout-8 .sec-pane-left > button,
+#chartsGrid.layout-9 .sec-pane-left > button,
+#chartsGrid.layout-10 .sec-pane-left > button,
+#chartsGrid.layout-12 .sec-pane-left > button,
+#chartsGrid.layout-16 .sec-pane-left > button,
+#chartsGrid.layout-20 .sec-pane-left > button {
+  display: none;
+}
+
+#chartsGrid.layout-6 .sec-pane-sym,
+#chartsGrid.layout-8 .sec-pane-sym,
+#chartsGrid.layout-9 .sec-pane-sym {
+  width: 54px;
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+#chartsGrid.layout-6 .sec-pane-tf,
+#chartsGrid.layout-8 .sec-pane-tf,
+#chartsGrid.layout-9 .sec-pane-tf {
+  font-size: 10.5px;
+  padding: 1px 4px;
+}
+
+#chartsGrid.layout-6 .sec-live-price,
+#chartsGrid.layout-8 .sec-live-price,
+#chartsGrid.layout-9 .sec-live-price {
+  font-size: 12.5px;
+}
+
+#chartsGrid.layout-6 .sec-live-chg,
+#chartsGrid.layout-8 .sec-live-chg,
+#chartsGrid.layout-9 .sec-live-chg {
+  font-size: 10.5px;
+}
+
+#chartsGrid.layout-6 .pane-prof-copy,
+#chartsGrid.layout-6 .pane-prof-paste,
+#chartsGrid.layout-8 .pane-prof-copy,
+#chartsGrid.layout-8 .pane-prof-paste,
+#chartsGrid.layout-9 .pane-prof-copy,
+#chartsGrid.layout-9 .pane-prof-paste {
+  display: none !important;
 }
 
 .sec-canvas {

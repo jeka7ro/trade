@@ -1011,7 +1011,8 @@ async function handleAuthApiRequest({ method, pathname, headers = {}, body = {},
       return { status: 400, body: { ok: false, error: 'Completează username/email și parola.' } };
     }
 
-    const user = db.users.find(u => u.usernameLower === identifier || u.emailLower === identifier);
+    const cleanId = identifier.replace(/\./g, '');
+    const user = db.users.find(u => u.usernameLower === identifier || String(u.usernameLower || '').replace(/\./g, '') === cleanId || u.emailLower === identifier);
     if (!user) {
       return { status: 401, body: { ok: false, error: 'Username/email sau parolă incorectă.' } };
     }

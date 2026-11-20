@@ -371,6 +371,13 @@ async function fetchTvQuotesForUsStocks(quoteObjs, { getCached = defaultCacheGet
           const qs = 'qs_' + Math.random().toString(36).slice(2, 10);
           send(packTvMsg('set_auth_token', ['unauthorized_user_token']));
           send(packTvMsg('quote_create_session', [qs]));
+          send(packTvMsg('quote_set_fields', [
+            qs,
+            'lp', 'lp_time', 'regular_close', 'current_session',
+            'rtc', 'rtc_time', 'rch', 'rchp',
+            'ntc', 'ntc_time', 'nch', 'nchp',
+            'trade_loaded', 'night_loaded', 'hub_rt_loaded'
+          ]));
           send(packTvMsg('quote_add_symbols', [qs, ...pairs.map(p => p.tvSym)]));
         },
         onJson: (msg) => {
@@ -387,8 +394,14 @@ async function fetchTvQuotesForUsStocks(quoteObjs, { getCached = defaultCacheGet
           if (st === 'error') return true;
           const v = collected[p.tvSym];
           if (!v) return false;
-          if (v.night_loaded === true) return true;
-          return v.trade_loaded === true && (v.rtc != null || v.current_session === 'market' || v.current_session === 'out_of_session');
+          const sess = String(v.current_session || '').toLowerCase();
+          if (sess === 'pre_market' || sess === 'post_market') {
+            return v.rtc != null || v.hub_rt_loaded === true;
+          }
+          if (sess === 'night') {
+            return v.ntc != null || (v.night_loaded === true && v.hub_rt_loaded === true);
+          }
+          return v.hub_rt_loaded === true && (v.night_loaded === true || sess === 'market');
         })
       });
 
@@ -461,23 +474,29 @@ async function enrichQuotesWithTvExtended(quoteObjs, cacheOpts = {}) {
       const rtcTs = toEpochSec(tv.rtc_time);
       const { chg: rChg, pct: rPct } = computeExtDelta(tv.rtc, tv.rch, tv.rchp);
 
-      if (tvSess === 'pre_market') {
+      if (tvSess === 'pre_market' || mktState === 'PRE') {
         const prevPreTs = toEpochSec(q.preMarketTime);
-        if (!(q.preMarketPrice > 0) || rtcTs > prevPreTs) {
+        const isFakeYahooEcho = isFinite(regP) && q.preMarketPrice === regP && Math.abs(q.preMarketChange || 0) < 1e-6;
+        if (!(q.preMarketPrice > 0) || isFakeYahooEcho || rtcTs >= prevPreTs) {
           q.preMarketPrice = tv.rtc;
           q.preMarketChange = rChg;
           q.preMarketChangePercent = rPct;
-          q.preMarketTime = rtcTs || Math.floor(Date.now() / 1000);
+          q.preMarketTime = rtcTs || toEpochSec(q.preMarketTime) || Math.floor(Date.now() / 1000);
         }
-      } else if (tvSess === 'post_market') {
+      } else if (tvSess === 'post_market' || mktState === 'POST' || mktState === 'POSTPOST') {
         const prevPostTs = toEpochSec(q.postMarketTime);
-        if (!(q.postMarketPrice > 0) || rtcTs > prevPostTs) {
+        const isFakeYahooEcho = isFinite(regP) && q.postMarketPrice === regP && Math.abs(q.postMarketChange || 0) < 1e-6;
+        if (!(q.postMarketPrice > 0) || isFakeYahooEcho || rtcTs >= prevPostTs) {
           q.postMarketPrice = tv.rtc;
           q.postMarketChange = rChg;
           q.postMarketChangePercent = rPct;
-          q.postMarketTime = rtcTs || Math.floor(Date.now() / 1000);
+          q.postMarketTime = rtcTs || toEpochSec(q.postMarketTime) || Math.floor(Date.now() / 1000);
         }
       }
+    } else if (mktState === 'PRE' && isFinite(regP) && q.preMarketPrice === regP && (!q.preMarketChange || Math.abs(q.preMarketChange) < 1e-6)) {
+      q.preMarketPrice = null;
+      q.preMarketChange = null;
+      q.preMarketChangePercent = null;
     }
   }
   return quoteObjs;
@@ -599,7 +618,7 @@ function mergeTvChartSupplement(payload, supp, yfInterval = '30m') {
   const res = payload?.chart?.result?.[0];
   const extBars = Array.isArray(supp?.extendedBars) ? supp.extendedBars : [];
   const boatsBars = Array.isArray(supp?.boatsBars) ? supp.boatsBars : [];
-  if (!res || (!extBars.length && !boatsBars.length)) return payload;
+  if (!res) return payload;
 
   const tsArr = Array.isArray(res.timestamp) ? res.timestamp : [];
   const q0 = res.indicators?.quote?.[0] || {};
@@ -610,15 +629,20 @@ function mergeTvChartSupplement(payload, supp, yfInterval = '30m') {
   const volArr = Array.isArray(q0.volume) ? q0.volume : [];
 
   const normInt = String(yfInterval || '').toLowerCase();
-  const alignStep = (normInt === '60m' || normInt === '1h') ? 60 : (TV_STEP_SEC[normInt] || 0);
+  const isHourly = normInt === '60m' || normInt === '1h';
+  const alignStep = TV_STEP_SEC[normInt] || (normInt === '2m' ? 120 : normInt === '90m' ? 5400 : 0);
+  if (!alignStep && !extBars.length && !boatsBars.length) return payload;
+
   const barMap = new Map();
   let minYahooTs = Infinity;
+  let changed = false;
 
   for (let i = 0; i < tsArr.length; i++) {
     const rawT = Math.floor(Number(tsArr[i]));
     const c = closeArr[i];
     if (!isFinite(rawT) || c == null || !isFinite(c)) continue;
     const t = alignStep > 0 ? Math.floor(rawT / alignStep) * alignStep : rawT;
+    if (t !== rawT) changed = true;
     if (t < minYahooTs) minYahooTs = t;
     const o = openArr[i] ?? c;
     const h = highArr[i] ?? c;
@@ -629,28 +653,18 @@ function mergeTvChartSupplement(payload, supp, yfInterval = '30m') {
       prev.high = Math.max(prev.high, h, o, c);
       prev.low = Math.min(prev.low, l, o, c);
       prev.close = c;
-      prev.volume = Math.max(prev.volume, v);
+      prev.volume = isHourly && (rawT % alignStep === 1800) ? (prev.volume + v) : Math.max(prev.volume, v);
+      changed = true;
     } else {
       barMap.set(t, { time: t, open: o, high: Math.max(h, o, c), low: Math.min(l, o, c), close: c, volume: v });
     }
   }
 
   const floorTs = isFinite(minYahooTs) ? minYahooTs - 12 * 3600 : 0;
-  let changed = false;
 
-  // On 60m/1h, remove any unaligned Yahoo intra-hour snapshot bar already covered by a TradingView candle
-  if ((normInt === '60m' || normInt === '1h') && extBars.length) {
-    const extStart = extBars[0].time;
-    for (const yTs of Array.from(barMap.keys())) {
-      if (yTs < extStart || yTs % 1800 === 0) continue;
-      if (extBars.some(b => b.time <= yTs && yTs - b.time < 3600 && b.time !== yTs)) {
-        barMap.delete(yTs);
-        changed = true;
-      }
-    }
-  }
-
-  for (const b of boatsBars) {
+  for (const rawB of boatsBars) {
+    const bTime = alignStep > 0 ? Math.floor(rawB.time / alignStep) * alignStep : rawB.time;
+    const b = bTime === rawB.time ? rawB : { ...rawB, time: bTime };
     if (b.time < floorTs) continue;
     const cur = barMap.get(b.time);
     if (!cur || cur.volume <= 0) {
@@ -660,11 +674,13 @@ function mergeTvChartSupplement(payload, supp, yfInterval = '30m') {
   }
 
   const lastExt = extBars.length ? extBars[extBars.length - 1] : null;
-  for (const b of extBars) {
+  for (const rawB of extBars) {
+    const bTime = alignStep > 0 ? Math.floor(rawB.time / alignStep) * alignStep : rawB.time;
+    const b = bTime === rawB.time ? rawB : { ...rawB, time: bTime };
     if (b.time < floorTs) continue;
     const cur = barMap.get(b.time);
     const isExtWindow = !isRegularWindowET(b.time) && !isOvernightWindowET(b.time);
-    const shouldReplace = !cur || isExtWindow || (cur.volume <= 0 && b.volume > 0) || (lastExt && b.time === lastExt.time && b.volume >= cur.volume);
+    const shouldReplace = !cur || isHourly || isExtWindow || (cur.volume <= 0 && b.volume > 0) || (lastExt && rawB.time === lastExt.time && b.volume >= cur.volume);
     if (shouldReplace) {
       barMap.set(b.time, b);
       changed = true;

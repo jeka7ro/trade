@@ -2913,14 +2913,17 @@
     }
 
     let pf = bridge().getRealPortfolio?.();
-    if (!pf || force) {
+    if (!pf || !Array.isArray(pf.assets) || pf.assets.length === 0 || force) {
       try {
-        pf = await bridge().fetchRealPortfolio?.();
+        const fetchedPf = await bridge().fetchRealPortfolio?.();
+        if (fetchedPf && (Array.isArray(fetchedPf.assets) && fetchedPf.assets.length > 0 || !pf)) {
+          pf = fetchedPf;
+        }
       } catch (_) { }
     }
     pf = (pf && typeof pf === 'object') ? pf : { broker: 'eToro', currency: 'USD', cashAvailable: null, accountEquity: null, notes: '', assets: [] };
 
-    if (!force && stateIntel.pfEvalData && Date.now() - stateIntel.pfEvalTs < 35000) {
+    if (!force && stateIntel.pfEvalData && Date.now() - stateIntel.pfEvalTs < 35000 && pf.assets?.length > 0) {
       renderRealPortfolioStageFromData(pf, stateIntel.pfEvalData);
       return;
     }
@@ -2948,12 +2951,20 @@
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         evalData = await res.json();
+        if (evalData?.syncedPortfolio?.assets?.length && (!pf.assets || pf.assets.length === 0)) {
+          pf = evalData.syncedPortfolio;
+          try { await bridge().saveRealPortfolio?.(pf); } catch (_) {}
+        }
       } catch (_) {
         evalData = await evaluatePortfolioClientFallback(pf);
       }
       if (stateIntel.view !== 'portfolio') return;
       try {
-        const etRes = await fetch('/api/etoro/status', { cache: 'no-store' });
+        const tokEt = bridge().getAuthToken?.() || localStorage.getItem('tp_auth_token_v1') || '';
+        const etRes = await fetch('/api/etoro/status', {
+          cache: 'no-store',
+          headers: tokEt ? { Authorization: `Bearer ${tokEt}` } : {}
+        });
         if (etRes.ok) stateIntel.etoroStatus = await etRes.json();
       } catch (_) { }
 
@@ -3948,8 +3959,8 @@
                     </div>
                   </div>
                   <div class="pf-etoro-cell r tabular">
-                    <div class="pf-cell-main"><span class="pf-price-live ${flashCls}">$${fmtPx(r.livePrice)}</span></div>
-                    <div class="pf-cell-sub ${r.dayChgPct >= 0 ? 'up' : 'dn'}">${fmtPct(r.dayChgPct)}</div>
+                    <div class="pf-cell-main"><span class="pf-price-live ${flashCls}">$${fmtPx(r.livePrice)}</span> <span class="${r.dayChgPct >= 0 ? 'up' : 'dn'}" style="font-size:11px;font-weight:700;margin-left:4px;">${fmtPct(r.dayChgPct)}</span></div>
+                    <div class="pf-cell-sub ${slDanger}" style="font-weight:600;">${slLabelHtml}${r.minSlDistPct != null ? ` (−${r.minSlDistPct.toFixed(1)}%)` : ''}</div>
                   </div>
                   <div class="pf-etoro-cell r tabular">
                     <div class="pf-cell-main">${Number(r.units).toLocaleString('en-US', { maximumFractionDigits: 2 })} u</div>
@@ -4180,6 +4191,10 @@
       stateIntel.pfShowEtoroConfig = false;
       renderRealPortfolioStageFromData(pf, evalData);
     });
+    const etoroAuthHeaders = () => {
+      const tok = bridge().getAuthToken?.() || localStorage.getItem('tp_auth_token_v1') || '';
+      return { 'Content-Type': 'application/json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) };
+    };
     stage.querySelector('#etoroSaveCfgBtn')?.addEventListener('click', async () => {
       try {
         const apiKey = stage.querySelector('#etoroApiKeyInp')?.value.trim() || '';
@@ -4188,7 +4203,7 @@
         const syncIntervalMin = Number(stage.querySelector('#etoroIntervalSel')?.value || 5);
         const r = await fetch('/api/etoro/config', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: etoroAuthHeaders(),
           body: JSON.stringify({ apiKey, userKey, enabled, syncIntervalMin })
         });
         const j = await r.json();
@@ -4207,7 +4222,7 @@
         const userKey = stage.querySelector('#etoroUserKeyInp')?.value.trim() || '';
         const r = await fetch('/api/etoro/test', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: etoroAuthHeaders(),
           body: JSON.stringify({ apiKey, userKey })
         });
         const j = await r.json();
@@ -4228,13 +4243,16 @@
         if (apiKey || userKey) {
           await fetch('/api/etoro/config', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: etoroAuthHeaders(),
             body: JSON.stringify({ apiKey, userKey, enabled, syncIntervalMin })
           });
         }
-        const r = await fetch('/api/etoro/sync', { method: 'POST' });
+        const r = await fetch('/api/etoro/sync', { method: 'POST', headers: etoroAuthHeaders() });
         const j = await r.json();
         if (!r.ok || j.ok === false) throw new Error(j.error || 'Eroare sincronizare eToro.');
+        if (j.realPortfolio?.assets?.length) {
+          try { await bridge().saveRealPortfolio?.(j.realPortfolio); } catch (_) {}
+        }
         stateIntel.pfCalcSlInput = '';
         stateIntel.pfCalcTpInput = '';
         stateIntel.pfCalcCashInput = '';

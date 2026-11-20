@@ -8,3 +8,5 @@ etoro_state.json
 early-signal-log.json
 inject_scanner.py
 *.pdf
+.cloudflared
+.cloudflared.tgz

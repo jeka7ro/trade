@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
 
 const ETORO_API_HOST = 'public-api.etoro.com';
@@ -31,7 +32,9 @@ const ALLOWED_READ_ENDPOINTS = Object.freeze([
 const FORBIDDEN_METHODS = Object.freeze(['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'CONNECT', 'TRACE']);
 
 const STATE_FILE = path.join(__dirname, 'etoro_state.json');
+const TMP_STATE_FILE = path.join(os.tmpdir(), 'etoro_state.json');
 const ENV_FILE = path.join(__dirname, '.env');
+let memoryEtoroDb = null;
 
 /**
  * Hard security gate validating that a request to eToro is strictly a whitelisted GET operation.
@@ -78,31 +81,55 @@ function createEmptyDb() {
   };
 }
 
-function loadEtoroDb() {
-  try {
-    if (fs.existsSync(STATE_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-      return {
-        ...createEmptyDb(),
-        ...raw,
-        etoro_accounts: raw.etoro_accounts || {},
-        etoro_positions: raw.etoro_positions || {},
-        etoro_portfolio_snapshots: Array.isArray(raw.etoro_portfolio_snapshots) ? raw.etoro_portfolio_snapshots : [],
-        etoro_position_history: Array.isArray(raw.etoro_position_history) ? raw.etoro_position_history : [],
-        etoro_sync_logs: Array.isArray(raw.etoro_sync_logs) ? raw.etoro_sync_logs : [],
-        etoro_notifications: Array.isArray(raw.etoro_notifications) ? raw.etoro_notifications : [],
-        instruments_cache: raw.instruments_cache || { updatedAt: 0, map: {} }
-      };
-    }
-  } catch (_) {}
-  return createEmptyDb();
+function normalizeEtoroDb(raw) {
+  return {
+    ...createEmptyDb(),
+    ...(raw || {}),
+    etoro_accounts: raw?.etoro_accounts || {},
+    etoro_positions: raw?.etoro_positions || {},
+    etoro_portfolio_snapshots: Array.isArray(raw?.etoro_portfolio_snapshots) ? raw.etoro_portfolio_snapshots : [],
+    etoro_position_history: Array.isArray(raw?.etoro_position_history) ? raw.etoro_position_history : [],
+    etoro_sync_logs: Array.isArray(raw?.etoro_sync_logs) ? raw.etoro_sync_logs : [],
+    etoro_notifications: Array.isArray(raw?.etoro_notifications) ? raw.etoro_notifications : [],
+    instruments_cache: raw?.instruments_cache || { updatedAt: 0, map: {} }
+  };
 }
 
-function saveEtoroDb(db) {
+function loadEtoroDbGlobal() {
+  if (memoryEtoroDb) return memoryEtoroDb;
+  let bestRaw = null;
+  let bestTs = -1;
+  for (const fileCand of [TMP_STATE_FILE, STATE_FILE]) {
+    try {
+      if (fs.existsSync(fileCand)) {
+        const raw = JSON.parse(fs.readFileSync(fileCand, 'utf8'));
+        const ts = Number(raw?._savedAt || raw?.etoro_portfolio_snapshots?.[0]?.timestamp || 0);
+        if (!bestRaw || ts > bestTs) {
+          bestRaw = raw;
+          bestTs = ts;
+        }
+      }
+    } catch (_) {}
+  }
+  memoryEtoroDb = bestRaw ? normalizeEtoroDb(bestRaw) : createEmptyDb();
+  return memoryEtoroDb;
+}
+
+function saveEtoroDbGlobal(db) {
+  const norm = normalizeEtoroDb(db);
+  norm._savedAt = Date.now();
+  memoryEtoroDb = norm;
+  const payload = JSON.stringify(norm, null, 2);
   try {
     const tmp = `${STATE_FILE}.tmp.${process.pid}`;
-    fs.writeFileSync(tmp, JSON.stringify(db, null, 2), 'utf8');
+    fs.writeFileSync(tmp, payload, 'utf8');
     fs.renameSync(tmp, STATE_FILE);
+    return;
+  } catch (_) {}
+  try {
+    const tmpFallback = `${TMP_STATE_FILE}.tmp.${process.pid}`;
+    fs.writeFileSync(tmpFallback, payload, 'utf8');
+    fs.renameSync(tmpFallback, TMP_STATE_FILE);
   } catch (_) {}
 }
 
@@ -157,6 +184,16 @@ function persistKeysToEnvFile(apiKey, userKey) {
 function createEtoroSyncService({ onPortfolioSynced = null, fetchImpl = global.fetch } = {}) {
   let syncTimer = null;
   let activeSyncPromise = null;
+  const isMockFetch = Boolean(fetchImpl && fetchImpl !== global.fetch);
+  let isolatedMockDb = isMockFetch ? createEmptyDb() : null;
+  const loadEtoroDb = () => isMockFetch ? isolatedMockDb : loadEtoroDbGlobal();
+  const saveEtoroDb = (db) => {
+    if (isMockFetch) {
+      isolatedMockDb = normalizeEtoroDb(db);
+    } else {
+      saveEtoroDbGlobal(db);
+    }
+  };
 
   async function etoroReadOnlyGet(endpointPath, customKeys = null) {
     const creds = customKeys || getEnvCredentials();
@@ -195,15 +232,16 @@ function createEtoroSyncService({ onPortfolioSynced = null, fetchImpl = global.f
   }
 
   function getOrCreateAccountConfig(db, userId = 'default') {
+    const isCfg = getEnvCredentials().configured;
     if (!db.etoro_accounts[userId]) {
       db.etoro_accounts[userId] = {
         userId,
         accountType: 'REAL',
         permissionMode: 'READ_ONLY',
-        enabled: false,
+        enabled: isCfg,
         syncIntervalMin: 5,
         overwriteManual: false,
-        status: getEnvCredentials().configured ? 'Disconnected' : 'Disconnected',
+        status: isCfg ? 'Connected' : 'Disconnected',
         lastSyncAt: null,
         lastTestAt: null,
         lastError: null
@@ -577,11 +615,19 @@ function createEtoroSyncService({ onPortfolioSynced = null, fetchImpl = global.f
           });
         }
 
+        const builtPortfolio = buildRealPortfolioFromEtoro({
+          existingPortfolio: null,
+          snapshot,
+          positions
+        });
+
         return {
           ok: true,
           status: acc.status,
           lastSyncAt: acc.lastSyncAt,
           snapshot,
+          positions,
+          realPortfolio: builtPortfolio,
           positionsCount: positions.length,
           ordersCount: orders.length,
           changesDetected: changes.length,
@@ -732,6 +778,7 @@ function createEtoroSyncService({ onPortfolioSynced = null, fetchImpl = global.f
         status: !creds.configured ? 'Disconnected' : acc.status
       },
       latestSnapshot: db.etoro_portfolio_snapshots?.[0] || null,
+      latestPositions: Object.values(db.etoro_positions || {}),
       openPositionsCount: Object.keys(db.etoro_positions || {}).length,
       recentHistory: (db.etoro_position_history || []).slice(0, 20),
       recentLogs: (db.etoro_sync_logs || []).slice(0, 15),
